@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run lint:*)",
+      "Bash(sed -i '' 's/MARKETING_VERSION = 1.0;/MARKETING_VERSION = 1.1;/g' /Users/mac/rrn/KBffee/ios/KBffee.xcodeproj/project.pbxproj)",
+      "Bash(sed -i '' 's/CURRENT_PROJECT_VERSION = 1;/CURRENT_PROJECT_VERSION = 2;/g' /Users/mac/rrn/KBffee/ios/KBffee.xcodeproj/project.pbxproj)",
+      "Bash(npx tsc:*)",
+      "Bash(yarn tsc:*)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(xargs ls:*)",
+      "Bash(find /Users/mac/rrn/KBffee/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"member\\\\|Member\\\\|회원\" {} \\\\;)",
+      "Bash(ls -la /Users/mac/rrn/KBffee/src/screens/*/)",
+      "Bash(find /Users/mac/rrn/KBffee/src -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -l \"type\\\\|interface\" {} \\\\;)",
+      "Bash(xcodebuild -version)",
+      "Bash(killall Xcode)",
+      "Bash(killall XCBBuildService)",
+      "Bash(killall com.apple.dt.SKAgent)",
+      "Bash(pod install *)",
+      "Bash(ls -la /Users/mac/rrn/KBffee/*.d.ts)",
+      "Bash(npm list *)",
+      "Bash(npx firebase-tools *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(echo \"EXIT_CODE=$?\")",
+      "Read(//tmp/**)",
+      "Bash(script -q /tmp/firebase-deploy.log npx firebase-tools deploy --only functions)",
+      "Bash(FIREBASE_CLI_EXPERIMENTS=none npx firebase-tools deploy --only functions --non-interactive)",
+      "Bash(node -e ' *)",
+      "Bash(npx which *)",
+      "Bash(npx -y firebase-tools@latest projects:list)",
+      "Bash(npx -y firebase-tools@latest deploy --only functions)",
+      "Bash(npx -y firebase-tools@latest functions:log --only onStoreCreated)",
+      "Bash(xxd /Users/mac/rrn/KBffee/functions/.env)",
+      "Bash(yarn build *)",
+      "Bash(yarn dev *)",
+      "Bash(open http://localhost:3000)"
+    ]
+  }
+}
