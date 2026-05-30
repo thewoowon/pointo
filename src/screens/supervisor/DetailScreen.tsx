@@ -42,8 +42,7 @@ const DetailScreen = ({navigation, route}: any) => {
     level: 0,
     stamps: 0,
     phase: 'americano',
-    americanoCoupons: 0,
-    beverageCoupons: 0,
+    coupons: {},
     hasRated: false,
   });
 
@@ -111,9 +110,9 @@ const DetailScreen = ({navigation, route}: any) => {
       return;
     }
 
-    if (numberValue < storeConfig.stampsPerCoupon) {
+    if (numberValue < 1) {
       Alert.alert(
-        `${storeConfig.stampsPerCoupon}개 이상부터 사용 가능해요`,
+        '사용할 스탬프를 1개 이상 입력해주세요',
         '다시 입력해주세요.',
       );
       return;

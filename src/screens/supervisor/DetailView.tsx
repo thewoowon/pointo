@@ -33,6 +33,12 @@ import {
 } from '../../components/Icons';
 import LinearGradient from 'react-native-linear-gradient';
 import {confirm} from '../../utils/alert';
+import {
+  normalizeUser,
+  flattenCouponsForFirestore,
+  makeUserContext,
+  totalSelected,
+} from '../../utils/coupons';
 
 const NUMBER_SEQUENCE = [
   [1, 2, 3],
@@ -55,31 +61,123 @@ const DetailView = ({
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const {track} = useAnalytics();
-  // const [timeLeft, setTimeLeft] = useState(1000);
+  const [mode, setMode] = useState<'earn' | 'use'>('earn');
   const [number, setNumber] = useState('');
   const [user, setUser] = useState<User>({
     last_used: '',
     level: 0,
     stamps: 0,
-    phase: 'americano',
-    americanoCoupons: 0,
-    beverageCoupons: 0,
+    phase: storeConfig.couponSequence[0] ?? 'americano',
+    coupons: {},
     hasRated: false,
   });
 
   const [userContext, setUserContext] = useState<UserContext>({
-    selectedCoupon: {
-      americano: 0,
-      beverage: 0,
-    },
-    possibleCoupons: {
-      americano: 0,
-      beverage: 0,
-    },
+    selectedCoupon: {},
+    possibleCoupons: {},
   });
 
   const {updateUser, updateSession, addLog, resolveUserDocId} =
     useFirestore(storeCode);
+
+  const isPointMode = storeConfig.mode === 'point';
+
+  const handleApprovePoint = async () => {
+    if (number.length === 0) {
+      Alert.alert('적립할 포인트를 입력해주세요', '다시 입력해주세요.');
+      return;
+    }
+    const pointValue = parseInt(number, 10);
+    if (isNaN(pointValue) || pointValue < 1) {
+      Alert.alert('적립할 포인트를 1 이상 입력해주세요', '다시 입력해주세요.');
+      return;
+    }
+
+    const newStamps = user.stamps + pointValue;
+    await updateUser(phoneNumber, {
+      stamps: newStamps,
+      last_used: new Date().toISOString().split('T')[0],
+    });
+
+    addLog({
+      action: 'stamp_saved',
+      phone_number: phoneNumber,
+      stamp: pointValue,
+      timestamp: Timestamp.now(),
+      note: `${pointValue.toLocaleString()}${storeConfig.pointUnit} 적립`,
+      store_code: storeCode ?? undefined,
+      user_level: user.level,
+    });
+
+    try {
+      const userId = hashPhone(phoneNumber);
+      const daysSinceSignup = user.created_at
+        ? dayjs().diff(dayjs(user.created_at), 'day')
+        : 0;
+      track(AnalyticsEvent.STAMP_EARNED, {
+        store_code: storeCode,
+        user_id: userId,
+        user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
+        user_level: user.level,
+        stamps_total: newStamps,
+        days_since_signup: daysSinceSignup,
+        stamp_count: pointValue,
+      });
+    } catch (error) {
+      console.log('Error logging point earned event:', error);
+    }
+
+    setNumber('');
+    updateLogs();
+  };
+
+  const handleUsingPoint = async () => {
+    const pointsToUse = parseInt(number, 10);
+    if (isNaN(pointsToUse) || pointsToUse < 1) {
+      Alert.alert('사용할 포인트를 입력해주세요', '다시 입력해주세요.');
+      return;
+    }
+    if (pointsToUse > user.stamps) {
+      Alert.alert('포인트 부족', '보유 포인트보다 많이 사용할 수 없습니다.');
+      return;
+    }
+
+    const newStamps = user.stamps - pointsToUse;
+    await updateUser(phoneNumber, {
+      stamps: newStamps,
+      last_used: new Date().toISOString().split('T')[0],
+    });
+
+    addLog({
+      action: 'stamp_used',
+      phone_number: phoneNumber,
+      stamp: pointsToUse,
+      timestamp: Timestamp.now(),
+      note: `${pointsToUse.toLocaleString()}${storeConfig.pointUnit} 사용`,
+      store_code: storeCode ?? undefined,
+      user_level: user.level,
+    });
+
+    try {
+      const daysSinceSignup = user.created_at
+        ? dayjs().diff(dayjs(user.created_at), 'day')
+        : 0;
+      track(AnalyticsEvent.COUPON_REDEEMED, {
+        store_code: storeCode,
+        user_id: hashPhone(phoneNumber),
+        user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
+        user_level: user.level,
+        stamps_total: newStamps,
+        days_since_signup: daysSinceSignup,
+        points_used: pointsToUse,
+      });
+    } catch (error) {
+      console.log('Error logging point used event:', error);
+    }
+
+    setNumber('');
+    updateLogs();
+  };
 
   const handleApprove = async () => {
     console.log('handleApprove', phoneNumber, number);
@@ -107,36 +205,36 @@ const DetailView = ({
     }
 
     const spc = storeConfig.stampsPerCoupon;
-    const currentQuotient = Math.floor(user.stamps / spc);
-    const totalQuotient = Math.floor((user.stamps + numberValue) / spc);
-    const difference = totalQuotient - currentQuotient;
+    // 레거시 누적 스탬프 보정 (23 → 3)
+    const currentStamps = user.stamps % spc;
+    const stampsAfterEarn = currentStamps + numberValue;
+    const difference = Math.floor(stampsAfterEarn / spc);
+    // 스탬프 카드 모델: 쿠폰 획득 시 나머지만 유지
+    const stampsTotal = stampsAfterEarn % spc;
 
     const previousLevel = user.level;
     let level = user.level;
     let phase = user.phase;
-    let americanoCoupons = user.americanoCoupons;
-    let beverageCoupons = user.beverageCoupons;
+    const coupons = {...user.coupons};
 
     const seq = storeConfig.couponSequence;
+    // phase가 현재 시퀀스에 없으면 첫 번째로 보정
+    if (seq.indexOf(phase) === -1) {
+      phase = seq[0];
+    }
     for (let index = 0; index < difference; index++) {
       const currentIdx = seq.indexOf(phase);
-      if (phase === 'americano') {
-        americanoCoupons += 1;
-      } else {
-        beverageCoupons += 1;
-      }
+      coupons[phase] = (coupons[phase] ?? 0) + 1;
       if (phase === storeConfig.levelIncrementOn) {
         level += 1;
       }
-      phase = seq[(currentIdx + 1) % seq.length] as 'americano' | 'beverage';
+      phase = seq[(currentIdx + 1) % seq.length];
     }
 
-    const stampsTotal = user.stamps + numberValue;
     const updateContext = {
       stamps: stampsTotal,
       phase,
-      americanoCoupons,
-      beverageCoupons,
+      ...flattenCouponsForFirestore(coupons, storeConfig.couponTypes),
       level,
       last_used: new Date().toISOString().split('T')[0],
     };
@@ -177,12 +275,14 @@ const DetailView = ({
         track(AnalyticsEvent.COUPON_ISSUED, {
           ...commonParams,
           coupons_issued: difference,
-          americano_coupons_total: americanoCoupons,
-          beverage_coupons_total: beverageCoupons,
+          coupons_total: coupons,
         });
       }
 
-      const previousTier = getTierFromLevel(previousLevel, storeConfig.levelTiers);
+      const previousTier = getTierFromLevel(
+        previousLevel,
+        storeConfig.levelTiers,
+      );
       const newTier = getTierFromLevel(level, storeConfig.levelTiers);
       if (previousTier !== newTier) {
         track(AnalyticsEvent.TIER_UP, {
@@ -219,59 +319,33 @@ const DetailView = ({
   };
 
   const handleUsing = async () => {
-    console.log('handleUsing', phoneNumber, number);
-    if (number.length === 0) {
-      Alert.alert('사용할 쿠폰의 수를 입력해주세요', '다시 입력해주세요.');
+    console.log('handleUsing', phoneNumber);
+    const selected = totalSelected(userContext.selectedCoupon);
+    if (selected < 1) {
+      Alert.alert('사용할 쿠폰을 선택해주세요', '쿠폰을 눌러 선택해주세요.');
       return;
     }
 
-    const numberValue = parseInt(number, 10);
-
-    if (user.stamps < 1) {
-      Alert.alert('스탬프가 부족해요', '적립 후 사용해주세요.');
-      return;
+    // 쿠폰만 차감 (스탬프 카드 모델: 쿠폰 사용 시 스탬프 변동 없음)
+    const remainingCoupons: Record<string, number> = {};
+    for (const ct of storeConfig.couponTypes) {
+      remainingCoupons[ct.id] =
+        (userContext.possibleCoupons[ct.id] ?? 0) -
+        (userContext.selectedCoupon[ct.id] ?? 0);
     }
-
-    if (numberValue < storeConfig.stampsPerCoupon) {
-      Alert.alert(
-        `${storeConfig.stampsPerCoupon}개 이상부터 사용 가능해요`,
-        '다시 입력해주세요.',
-      );
-      return;
-    }
-
-    if (user.stamps < numberValue) {
-      Alert.alert('스탬프가 부족해요', '적립 후 사용해주세요.');
-      return;
-    }
-
-    const stampsTotal = user.stamps - numberValue;
     await updateUser(phoneNumber, {
-      stamps: stampsTotal,
-      americanoCoupons:
-        userContext.possibleCoupons.americano -
-        userContext.selectedCoupon.americano,
-      beverageCoupons:
-        userContext.possibleCoupons.beverage -
-        userContext.selectedCoupon.beverage,
+      ...flattenCouponsForFirestore(remainingCoupons, storeConfig.couponTypes),
     });
 
-    let noteString = '';
-
-    if (userContext.selectedCoupon.americano > 0) {
-      const name = storeConfig.couponTypes.find(c => c.id === 'americano')?.name ?? '아메리카노';
-      noteString += `${name} ${userContext.selectedCoupon.americano}잔 `;
-    }
-
-    if (userContext.selectedCoupon.beverage > 0) {
-      const name = storeConfig.couponTypes.find(c => c.id === 'beverage')?.name ?? '조제음료';
-      noteString += `${name} ${userContext.selectedCoupon.beverage}잔 `;
-    }
+    const noteString = storeConfig.couponTypes
+      .filter(ct => (userContext.selectedCoupon[ct.id] ?? 0) > 0)
+      .map(ct => `${ct.name} ${userContext.selectedCoupon[ct.id]}장`)
+      .join(' ');
 
     addLog({
       action: 'stamp_used',
       phone_number: phoneNumber,
-      stamp: numberValue,
+      stamp: 0,
       timestamp: Timestamp.now(),
       note: noteString,
       store_code: storeCode ?? undefined,
@@ -287,35 +361,22 @@ const DetailView = ({
         user_id: hashPhone(phoneNumber),
         user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
         user_level: user.level,
-        stamps_total: stampsTotal,
+        stamps_total: user.stamps,
         days_since_signup: daysSinceSignup,
-        americano_redeemed: userContext.selectedCoupon.americano,
-        beverage_redeemed: userContext.selectedCoupon.beverage,
-        stamps_used: numberValue,
+        coupons_redeemed: userContext.selectedCoupon,
       });
     } catch (error) {
       console.log('Error logging coupon redeemed event:', error);
     }
 
     setNumber('');
-
-    // Toast.show({
-    //   type: 'custom_type',
-    //   text1: `스탬프 ${numberValue}개 사용되었습니다 - ${noteString}`,
-    //   text2: phoneNumber,
-    //   visibilityTime: 5000,
-    //   onPress: () => {
-    //     Toast.hide();
-    //   },
-    // });
-
-    // await updateSession(`session_${storeCode}`, {
-    //   last_used: new Date().toISOString().split('T')[0],
-    //   phone: '',
-    //   mode: 'waiting',
-    // });
-
     updateLogs();
+  };
+
+  const switchMode = (newMode: 'earn' | 'use') => {
+    setMode(newMode);
+    setNumber('');
+    setUserContext(makeUserContext(user.coupons, storeConfig.couponTypes));
   };
 
   const refresh = async () => {
@@ -334,51 +395,17 @@ const DetailView = ({
     }
 
     setNumber('');
-    setUserContext({
-      possibleCoupons: {
-        americano: user.americanoCoupons,
-        beverage: user.beverageCoupons,
-      },
-      selectedCoupon: {
-        americano: 0,
-        beverage: 0,
-      },
-    });
+    setUserContext(makeUserContext(user.coupons, storeConfig.couponTypes));
   };
 
   const onNumberPress = async (value: number | string) => {
-    // 선택된 쿠폰이 있다면 초기화 한다.
-
-    if (
-      userContext.selectedCoupon.americano > 0 ||
-      userContext.selectedCoupon.beverage > 0
-    ) {
-      const result = await confirm(
-        '쿠폰 입력 확인',
-        '쿠폰이 선택되어 있어요, 초기화하시겠어요?',
-      );
-      if (!result) {
-        return;
-      }
-      setUserContext({
-        possibleCoupons: {
-          americano: user.americanoCoupons,
-          beverage: user.beverageCoupons,
-        },
-        selectedCoupon: {
-          americano: 0,
-          beverage: 0,
-        },
-      });
-
-      setNumber('');
-      return;
-    }
+    // 스탬프 모드 사용 시 숫자 패드 비활성화 (쿠폰 선택만 가능)
+    if (mode === 'use' && !isPointMode) return;
 
     if (typeof value === 'number') {
       if (number.length > 3) {
         Alert.alert(
-          '적립하는 쿠폰의 수가 많은 것 같아요',
+          '적립하는 스탬프의 수가 많은 것 같아요',
           '한 번 더 확인해주세요.',
         );
         return;
@@ -392,7 +419,6 @@ const DetailView = ({
 
     if (typeof value === 'string') {
       if (value === 'c') {
-        // 뒤에서 한 글자씩 제거
         setNumber(number.slice(0, -1));
         return;
       }
@@ -400,13 +426,14 @@ const DetailView = ({
       if (value === '+10') {
         if (number.length > 3) {
           Alert.alert(
-            '적립하는 쿠폰의 수가 많은 것 같아요',
+            '적립하는 스탬프의 수가 많은 것 같아요',
             '한 번 더 확인해주세요.',
           );
           return;
         }
 
-        const nextNumber = (parseInt(number, 10) || 0) + storeConfig.stampsPerCoupon;
+        const nextNumber =
+          (parseInt(number, 10) || 0) + storeConfig.stampsPerCoupon;
 
         setNumber(nextNumber.toString());
         return;
@@ -440,34 +467,17 @@ const DetailView = ({
     // updateLogs();
   };
 
-  // 무조건 10개씩 사용
-  const onClickCoupon = (type: 'americano' | 'beverage') => () => {
-    if (type === 'americano') {
-      // 사용 가능하기 때문에 함수가 동작
-      // 총사용하는 쿠폰의 개수를 확인
-      const americanoStamp = (userContext.selectedCoupon.americano + 1) * 10;
-      const beverageStamp = userContext.selectedCoupon.beverage * 10;
-      setNumber(americanoStamp + beverageStamp + '');
-      setUserContext({
-        ...userContext,
-        selectedCoupon: {
-          ...userContext.selectedCoupon,
-          americano: userContext.selectedCoupon.americano + 1,
-        },
-      });
-    } else {
-      // 총사용하는 쿠폰의 개수를 확인
-      const americanoStamp = userContext.selectedCoupon.americano * 10;
-      const beverageStamp = (userContext.selectedCoupon.beverage + 1) * 10;
-      setNumber(americanoStamp + beverageStamp + '');
-      setUserContext({
-        ...userContext,
-        selectedCoupon: {
-          ...userContext.selectedCoupon,
-          beverage: userContext.selectedCoupon.beverage + 1,
-        },
-      });
-    }
+  const onClickCoupon = (typeId: string) => () => {
+    const newSelected = {
+      ...userContext.selectedCoupon,
+      [typeId]: (userContext.selectedCoupon[typeId] ?? 0) + 1,
+    };
+    const total = Object.values(newSelected).reduce((s, v) => s + v, 0);
+    setNumber(total.toString());
+    setUserContext({
+      ...userContext,
+      selectedCoupon: newSelected,
+    });
   };
 
   useFocusEffect(
@@ -490,19 +500,11 @@ const DetailView = ({
               console.log('No data found');
               return;
             }
-            const userProfile = {...data} as User;
+            const userProfile = normalizeUser(data, storeConfig.couponTypes);
             setUser(userProfile);
-            const newUserContext: UserContext = {
-              selectedCoupon: {
-                americano: 0,
-                beverage: 0,
-              },
-              possibleCoupons: {
-                americano: userProfile.americanoCoupons,
-                beverage: userProfile.beverageCoupons,
-              },
-            };
-            setUserContext(newUserContext);
+            setUserContext(
+              makeUserContext(userProfile.coupons, storeConfig.couponTypes),
+            );
           }
         });
       };
@@ -574,6 +576,7 @@ const DetailView = ({
                 style={[
                   styles.flexColumnBox,
                   {
+                    width: isCompact ? '100%' : 320,
                     height: 'auto',
                     gap: 10,
                     alignItems: 'flex-start',
@@ -594,107 +597,169 @@ const DetailView = ({
                     {phoneNumberLabel()}
                   </Text>
                 </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    backgroundColor: '#F0F0F0',
+                    borderRadius: 14,
+                    padding: 4,
+                    alignSelf: 'stretch',
+                    marginBottom: 4,
+                  }}>
+                  <Pressable
+                    onPress={() => switchMode('earn')}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 11,
+                      backgroundColor:
+                        mode === 'earn' ? '#FFFFFF' : 'transparent',
+                      shadowColor: mode === 'earn' ? '#000' : 'transparent',
+                      shadowOffset: {width: 0, height: 1},
+                      shadowOpacity: mode === 'earn' ? 0.1 : 0,
+                      shadowRadius: 3,
+                      elevation: mode === 'earn' ? 2 : 0,
+                      alignItems: 'center',
+                    }}>
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontFamily:
+                          mode === 'earn'
+                            ? 'Pretendard-Bold'
+                            : 'Pretendard-Medium',
+                        color: mode === 'earn' ? '#191D2B' : '#999',
+                        letterSpacing: -0.2,
+                      }}>
+                      적립
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => switchMode('use')}
+                    style={{
+                      flex: 1,
+                      paddingVertical: 10,
+                      borderRadius: 11,
+                      backgroundColor:
+                        mode === 'use' ? '#FFFFFF' : 'transparent',
+                      shadowColor: mode === 'use' ? '#000' : 'transparent',
+                      shadowOffset: {width: 0, height: 1},
+                      shadowOpacity: mode === 'use' ? 0.1 : 0,
+                      shadowRadius: 3,
+                      elevation: mode === 'use' ? 2 : 0,
+                      alignItems: 'center',
+                    }}>
+                    <Text
+                      style={{
+                        fontSize: 18,
+                        fontFamily:
+                          mode === 'use'
+                            ? 'Pretendard-Bold'
+                            : 'Pretendard-Medium',
+                        color: mode === 'use' ? '#191D2B' : '#999',
+                        letterSpacing: -0.2,
+                      }}>
+                      사용
+                    </Text>
+                  </Pressable>
+                </View>
                 <View style={styles.labelBox}>
-                  <Text style={styles.labelTitleText}>사용 또는 적립할</Text>
                   <Text style={styles.labelTitleText}>
-                    스탬프 개수를 입력해주세요
+                    {mode === 'earn'
+                      ? isPointMode ? '적립할 포인트를' : '적립할 스탬프 개수를'
+                      : isPointMode ? '사용할 포인트를' : '사용할 쿠폰을'}
+                  </Text>
+                  <Text style={styles.labelTitleText}>
+                    {mode === 'earn' ? '입력해주세요' : isPointMode ? '입력해주세요' : '선택해주세요'}
                   </Text>
                 </View>
-                <View style={styles.beverageWrapper}>
-                  {userContext.possibleCoupons.beverage -
-                    userContext.selectedCoupon.beverage >
-                    0 && (
-                    <View style={styles.beverageBox}>
-                      <View>
-                        <Text style={styles.beverageTitleText}>
-                          {storeConfig.couponTypes.find(c => c.id === 'beverage')?.name ?? '조제음료'}{' '}
-                          {userContext.possibleCoupons.beverage -
-                            userContext.selectedCoupon.beverage}
-                          잔
-                        </Text>
-                        <Text style={styles.beverageBodyText}>
-                          무료 사용가능
-                        </Text>
-                      </View>
-                      <Pressable onPress={onClickCoupon('beverage')}>
-                        <Text style={styles.beverageButtonText}>{storeConfig.stampsPerCoupon}개 입력</Text>
-                      </Pressable>
-                      {userContext.possibleCoupons.beverage -
-                        userContext.selectedCoupon.beverage >
-                        1 && (
-                        <View style={[styles.countBadge]}>
-                          <LinearGradient
-                            colors={['#FE8300', '#FC4A00']}
-                            locations={[0.4, 1]}
-                            start={{x: 0, y: 1}}
-                            end={{x: 1, y: 1}}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              display: 'flex',
-                              flexDirection: 'row',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              gap: 4,
-                              borderRadius: 20,
-                              // 깜빡이 효과
-                            }}>
-                            <Text style={styles.badgeText}>
-                              {userContext.possibleCoupons.beverage -
-                                userContext.selectedCoupon.beverage}
+                {mode === 'use' && !isPointMode && (
+                  <View style={styles.beverageWrapper}>
+                    {storeConfig.couponTypes.map(ct => {
+                      const remaining =
+                        (userContext.possibleCoupons[ct.id] ?? 0) -
+                        (userContext.selectedCoupon[ct.id] ?? 0);
+                      if (remaining <= 0) return null;
+                      return (
+                        <View key={ct.id} style={styles.beverageBox}>
+                          <View>
+                            <Text style={styles.beverageTitleText}>
+                              {ct.name} {remaining}장
                             </Text>
-                          </LinearGradient>
-                        </View>
-                      )}
-                    </View>
-                  )}
-                  {userContext.possibleCoupons.americano -
-                    userContext.selectedCoupon.americano >
-                    0 && (
-                    <View style={styles.beverageBox}>
-                      <View>
-                        <Text style={styles.beverageTitleText}>
-                          {storeConfig.couponTypes.find(c => c.id === 'americano')?.name ?? '아메리카노'}{' '}
-                          {userContext.possibleCoupons.americano -
-                            userContext.selectedCoupon.americano}
-                          잔
-                        </Text>
-                        <Text style={styles.beverageBodyText}>
-                          무료 사용가능
-                        </Text>
-                      </View>
-                      <Pressable onPress={onClickCoupon('americano')}>
-                        <Text style={styles.beverageButtonText}>{storeConfig.stampsPerCoupon}개 입력</Text>
-                      </Pressable>
-                      {userContext.possibleCoupons.americano -
-                        userContext.selectedCoupon.americano >
-                        1 && (
-                        <View style={styles.countBadge}>
-                          <LinearGradient
-                            colors={['#FE8300', '#FC4A00']}
-                            locations={[0.4, 1]}
-                            start={{x: 0, y: 1}}
-                            end={{x: 1, y: 1}}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              display: 'flex',
-                              flexDirection: 'row',
-                              justifyContent: 'center',
-                              alignItems: 'center',
-                              gap: 4,
-                              borderRadius: 20,
-                            }}>
-                            <Text style={styles.badgeText}>
-                              {userContext.possibleCoupons.americano -
-                                userContext.selectedCoupon.americano}
+                            <Text style={styles.beverageBodyText}>
+                              무료 사용가능
                             </Text>
-                          </LinearGradient>
+                          </View>
+                          <Pressable onPress={onClickCoupon(ct.id)}>
+                            <Text style={styles.beverageButtonText}>
+                              선택
+                            </Text>
+                          </Pressable>
+                          {remaining > 1 && (
+                            <View style={styles.countBadge}>
+                              <LinearGradient
+                                colors={['#FE8300', '#FC4A00']}
+                                locations={[0.4, 1]}
+                                start={{x: 0, y: 1}}
+                                end={{x: 1, y: 1}}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  display: 'flex',
+                                  flexDirection: 'row',
+                                  justifyContent: 'center',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  borderRadius: 20,
+                                }}>
+                                <Text style={styles.badgeText}>
+                                  {remaining}
+                                </Text>
+                              </LinearGradient>
+                            </View>
+                          )}
                         </View>
-                      )}
+                      );
+                    })}
+                  </View>
+                )}
+                {isPointMode && mode === 'earn' && storeConfig.pointPresets.length > 0 && (
+                  <View style={styles.beverageWrapper}>
+                    <Text style={styles.beverageBodyText}>빠른 적립</Text>
+                    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%'}}>
+                      {storeConfig.pointPresets.map(preset => (
+                        <Pressable
+                          key={preset.id}
+                          onPress={() => setNumber(String(preset.points))}
+                          style={({pressed}) => ({
+                            backgroundColor: number === String(preset.points) ? '#FE7901' : pressed ? '#E8E8E8' : '#F5F5F5',
+                            paddingHorizontal: 20,
+                            paddingVertical: 14,
+                            borderRadius: 14,
+                            minWidth: 100,
+                            alignItems: 'center',
+                          })}>
+                          <Text style={{
+                            fontSize: 16,
+                            fontFamily: 'Pretendard-SemiBold',
+                            color: number === String(preset.points) ? '#FFFFFF' : '#191D2B',
+                            letterSpacing: -0.2,
+                          }}>
+                            {preset.name}
+                          </Text>
+                          <Text style={{
+                            fontSize: 14,
+                            fontFamily: 'Pretendard-Regular',
+                            color: number === String(preset.points) ? 'rgba(255,255,255,0.8)' : '#999',
+                            marginTop: 2,
+                          }}>
+                            {preset.points.toLocaleString()}{storeConfig.pointUnit}
+                          </Text>
+                        </Pressable>
+                      ))}
                     </View>
-                  )}
-                </View>
+                  </View>
+                )}
               </View>
               <View
                 style={[
@@ -737,7 +802,7 @@ const DetailView = ({
                         lineHeight: 26,
                         letterSpacing: -0.2,
                       }}>
-                      현재 보유 스탬프
+                      {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
                     </Text>
                     <Text
                       style={{
@@ -746,7 +811,9 @@ const DetailView = ({
                         fontFamily: 'Prentendard-Semibold',
                         color: '#FE7901',
                       }}>
-                      {user.stamps}개
+                      {isPointMode
+                        ? `${user.stamps.toLocaleString()}${storeConfig.pointUnit}`
+                        : `${user.stamps % storeConfig.stampsPerCoupon}/${storeConfig.stampsPerCoupon}개`}
                     </Text>
                   </View>
                   <View
@@ -773,22 +840,27 @@ const DetailView = ({
                         },
                       ]}>
                       <View style={styles.headerNumberContainer}>
-                        <Text
-                          style={{
-                            color: '#FF8400',
-                          }}>
-                          {userContext.selectedCoupon.americano > 0 &&
-                            '아메리카노 ' +
-                              userContext.selectedCoupon.americano +
-                              '잔'}
-                          {userContext.selectedCoupon.americano > 0 &&
-                            userContext.selectedCoupon.beverage > 0 &&
-                            ', '}
-                          {userContext.selectedCoupon.beverage > 0 &&
-                            '조제음료 ' +
-                              userContext.selectedCoupon.beverage +
-                              '잔'}
-                        </Text>
+                        {mode === 'use' && !isPointMode &&
+                          totalSelected(userContext.selectedCoupon) > 0 && (
+                            <Text
+                              style={{
+                                color: '#FF8400',
+                              }}>
+                              {storeConfig.couponTypes
+                                .filter(
+                                  ct =>
+                                    (userContext.selectedCoupon[ct.id] ?? 0) >
+                                    0,
+                                )
+                                .map(
+                                  ct =>
+                                    `${ct.name} ${
+                                      userContext.selectedCoupon[ct.id]
+                                    }장`,
+                                )
+                                .join(', ')}
+                            </Text>
+                          )}
                         <Text
                           style={[
                             styles.headerNumberText,
@@ -798,7 +870,7 @@ const DetailView = ({
                               color: number.length > 0 ? '#191D2B' : '#E3E3E3',
                             },
                           ]}>
-                          {number || '00'}
+                          {number || '0'}
                         </Text>
                         <Text
                           style={[
@@ -807,13 +879,14 @@ const DetailView = ({
                               fontFamily: 'Pretendard-Semibold',
                             },
                           ]}>
-                          개
+                          {isPointMode ? storeConfig.pointUnit : mode === 'use' ? '장' : '개'}
                         </Text>
                       </View>
                     </View>
                     <View style={styles.divisor}></View>
                   </View>
                   <View
+                    pointerEvents={mode === 'use' && !isPointMode ? 'none' : 'auto'}
                     style={[
                       {
                         width: '100%',
@@ -822,6 +895,7 @@ const DetailView = ({
                         justifyContent: 'center',
                         alignItems: 'flex-start',
                         gap: 12,
+                        opacity: mode === 'use' && !isPointMode ? 0.25 : 1,
                       },
                     ]}>
                     {NUMBER_SEQUENCE.map((row, rowIndex) => (
@@ -834,7 +908,6 @@ const DetailView = ({
                                 backgroundColor: pressed ? '#EEEEEE' : '#fff',
                                 borderRadius: 10,
                               },
-                              // 또는 추가 스타일이 있으면 아래처럼
                               styles.numberInputButton,
                             ]}
                             onPress={() => onNumberPress(number)}>
@@ -851,7 +924,6 @@ const DetailView = ({
                             backgroundColor: pressed ? '#EEEEEE' : '#fff',
                             borderRadius: 10,
                           },
-                          // 또는 추가 스타일이 있으면 아래처럼
                           styles.numberInputButton,
                         ]}
                         onPress={() => onNumberPress(0)}>
@@ -863,7 +935,6 @@ const DetailView = ({
                             backgroundColor: pressed ? '#EEEEEE' : '#fff',
                             borderRadius: 10,
                           },
-                          // 또는 추가 스타일이 있으면 아래처럼
                           styles.numberInputButton,
                         ]}
                         onPress={() => onNumberPress('c')}>
@@ -872,9 +943,9 @@ const DetailView = ({
                     </View>
                   </View>
                   <View style={styles.confirmContainer}>
-                    {userContext.selectedCoupon.americano > 0 ||
-                    userContext.selectedCoupon.beverage > 0 ? (
+                    {mode === 'use' ? (
                       <>
+                        {!isPointMode && (
                         <Pressable
                           style={({pressed}) => [
                             styles.confirmButton,
@@ -897,16 +968,17 @@ const DetailView = ({
                             입력 초기화
                           </Text>
                         </Pressable>
+                        )}
                         <Pressable
                           style={({pressed}) => [
                             styles.confirmButton,
                             {
-                              width: pressed ? 142 : 150,
+                              width: isPointMode ? (pressed ? '98%' : '100%') : (pressed ? 142 : 150),
                               backgroundColor: '#0090FE',
                               shadowColor: '#0090FE',
                             },
                           ]}
-                          onPress={handleUsing}>
+                          onPress={isPointMode ? handleUsingPoint : handleUsing}>
                           <LinearGradient
                             colors={['#0090FE', '#003FFC']}
                             locations={[0.3, 1]}
@@ -939,7 +1011,7 @@ const DetailView = ({
                             shadowColor: '#FE6A00',
                           },
                         ]}
-                        onPress={handleApprove}>
+                        onPress={isPointMode ? handleApprovePoint : handleApprove}>
                         <LinearGradient
                           colors={['#FE6A00', '#FC0000']}
                           locations={[0.3, 1]}
@@ -972,19 +1044,21 @@ const DetailView = ({
                       marginTop: 8,
                       height: 26,
                     }}>
-                    {userContext.selectedCoupon.americano > 0 ||
-                    userContext.selectedCoupon.beverage > 0 ? (
+                    {mode === 'earn' ? (
                       <Text style={styles.beverageBodyText}>
-                        사용 후 잔여 스탬프:{' '}
-                        {user.stamps -
-                          userContext.selectedCoupon.beverage * 10 -
-                          userContext.selectedCoupon.americano * 10}
-                        개
+                        {isPointMode
+                          ? `적립 후 포인트: ${(user.stamps + (parseInt(number, 10) || 0)).toLocaleString()}${storeConfig.pointUnit}`
+                          : `적립 후 스탬프: ${(user.stamps + (parseInt(number, 10) || 0)) % storeConfig.stampsPerCoupon}/${storeConfig.stampsPerCoupon}개`}
                       </Text>
                     ) : (
                       <Text style={styles.beverageBodyText}>
-                        적립 후 잔여 스탬프:{' '}
-                        {user.stamps + parseInt(number, 10) || 0}개
+                        {isPointMode
+                          ? (parseInt(number, 10) || 0) > 0
+                            ? `${(parseInt(number, 10) || 0).toLocaleString()}${storeConfig.pointUnit} 사용 예정`
+                            : '사용할 포인트를 입력해주세요'
+                          : totalSelected(userContext.selectedCoupon) > 0
+                            ? `쿠폰 ${totalSelected(userContext.selectedCoupon)}장 사용 예정`
+                            : '쿠폰을 선택해주세요'}
                       </Text>
                     )}
                   </View>
@@ -1207,6 +1281,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   beverageWrapper: {
+    width: '100%',
     display: 'flex',
     flexDirection: 'column',
     justifyContent: 'center',

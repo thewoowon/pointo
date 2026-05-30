@@ -68,7 +68,7 @@ const AmericanoOneOverlay = ({show, couponName}: {show: boolean; couponName?: st
             letterSpacing: -0.5,
             color: '#fff',
           }}>
-          {couponName ?? '아메리카노'} 무료 쿠폰이 한장 생겨요!
+          {couponName ?? '쿠폰 A'} 무료 쿠폰이 한장 생겨요!
         </Text>
       </View>
     </View>

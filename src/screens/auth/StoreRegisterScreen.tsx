@@ -111,7 +111,7 @@ const StoreRegisterScreen = ({navigation}: any) => {
                   style={styles.input}
                   value={storeName}
                   onChangeText={setStoreName}
-                  placeholder="예) 룰루랄라 카페 강남점"
+                  placeholder="예) 우리동네 볼링장"
                   placeholderTextColor="#AAAAAA"
                   maxLength={30}
                 />

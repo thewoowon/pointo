@@ -1,8 +1,16 @@
 import React from 'react';
-import {View, Text, Image} from 'react-native';
+import {View, Text} from 'react-native';
 
-const AmericanoTwoOverlay = ({show, couponName}: {show: boolean; couponName?: string}) => {
-  return show ? (
+type Props = {
+  show: boolean;
+  remaining: 1 | 2;
+  couponName?: string;
+};
+
+const StampNearOverlay = ({show, remaining, couponName}: Props) => {
+  if (!show) return null;
+
+  return (
     <View
       style={{
         position: 'absolute',
@@ -14,17 +22,12 @@ const AmericanoTwoOverlay = ({show, couponName}: {show: boolean; couponName?: st
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
-        gap: 16,
         zIndex: 1,
+        gap: 16,
       }}>
-      <Image
-        source={require(`../../assets/images/americano_two.png`)}
-        style={{
-          width: 278,
-          height: 278,
-          marginBottom: 20,
-        }}
-      />
+      <Text style={{fontSize: 80, marginBottom: 8}}>
+        {remaining === 1 ? '1' : '2'}
+      </Text>
       <Text
         style={{
           fontSize: 42,
@@ -33,7 +36,7 @@ const AmericanoTwoOverlay = ({show, couponName}: {show: boolean; couponName?: st
           letterSpacing: -1,
           color: '#fff',
         }}>
-        2개만 더!
+        {remaining}개만 더!
       </Text>
       <View
         style={{
@@ -51,13 +54,7 @@ const AmericanoTwoOverlay = ({show, couponName}: {show: boolean; couponName?: st
             color: '#fff',
           }}>
           스탬프{' '}
-          <Text
-            style={{
-              color: '#FF8400',
-            }}>
-            2개
-          </Text>
-          만 더 모으면{' '}
+          <Text style={{color: '#FF8400'}}>{remaining}개</Text>만 더 모으면{' '}
         </Text>
         <Text
           style={{
@@ -67,11 +64,11 @@ const AmericanoTwoOverlay = ({show, couponName}: {show: boolean; couponName?: st
             letterSpacing: -0.5,
             color: '#fff',
           }}>
-          {couponName ?? '쿠폰 A'} 무료 쿠폰이 한장 생겨요!
+          {couponName ?? '쿠폰'} 무료 쿠폰이 한장 생겨요!
         </Text>
       </View>
     </View>
-  ) : null;
+  );
 };
 
-export default AmericanoTwoOverlay;
+export default StampNearOverlay;

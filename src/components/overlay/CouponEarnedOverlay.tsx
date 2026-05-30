@@ -1,23 +1,15 @@
 import React, {useEffect, useRef} from 'react';
-import {
-  Animated,
-  Image,
-  Pressable,
-  Text,
-  View,
-} from 'react-native';
+import {Animated, Pressable, Text, View} from 'react-native';
 
-const PARTICLES = ['🧋', '✨', '🎉', '⭐', '🌟', '💫', '🎊', '🧋', '✨'];
+const PARTICLES = ['🎫', '✨', '🎉', '⭐', '🌟', '💫', '🎊', '🎫', '✨'];
 
-const BeverageCouponOverlay = ({
-  show,
-  onDismiss,
-  couponName,
-}: {
+type Props = {
   show: boolean;
   onDismiss?: () => void;
   couponName?: string;
-}) => {
+};
+
+const CouponEarnedOverlay = ({show, onDismiss, couponName}: Props) => {
   const scale = useRef(new Animated.Value(0.5)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const bgOpacity = useRef(new Animated.Value(0)).current;
@@ -63,23 +55,24 @@ const BeverageCouponOverlay = ({
         alignItems: 'center',
         zIndex: 10,
       }}>
-      {/* 어두운 배경 */}
       <Animated.View
         style={{
           position: 'absolute',
-          top: 0, left: 0, right: 0, bottom: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           backgroundColor: 'rgba(0,0,0,0.82)',
           opacity: bgOpacity,
         }}
       />
 
-      {/* 파티클 */}
       {PARTICLES.map((p, i) => (
         <Animated.Text
           key={i}
           style={{
             position: 'absolute',
-            top: `${8 + (i * 11) % 80}%`,
+            top: `${8 + ((i * 11) % 80)}%`,
             left: `${(i * 23) % 90}%`,
             fontSize: 20 + (i % 3) * 6,
             opacity: opacity,
@@ -89,7 +82,6 @@ const BeverageCouponOverlay = ({
         </Animated.Text>
       ))}
 
-      {/* 메인 카드 */}
       <Animated.View
         style={{
           alignItems: 'center',
@@ -97,10 +89,7 @@ const BeverageCouponOverlay = ({
           transform: [{scale}],
           opacity,
         }}>
-        <Image
-          source={require('../../assets/images/beverage_coupon.png')}
-          style={{width: 278, height: 278, marginBottom: 8}}
-        />
+        <Text style={{fontSize: 100, marginBottom: 8}}>🎫</Text>
         <Text
           style={{
             fontSize: 48,
@@ -119,10 +108,10 @@ const BeverageCouponOverlay = ({
             letterSpacing: -0.5,
             color: '#fff',
           }}>
-          다음 <Text style={{color: '#FF8400'}}>{couponName ?? '쿠폰 B'}</Text> 무료!
+          <Text style={{color: '#FF8400'}}>{couponName ?? '쿠폰'}</Text> 무료
+          사용 가능!
         </Text>
 
-        {/* 닫기 힌트 */}
         <View
           style={{
             marginTop: 16,
@@ -146,4 +135,4 @@ const BeverageCouponOverlay = ({
   );
 };
 
-export default BeverageCouponOverlay;
+export default CouponEarnedOverlay;

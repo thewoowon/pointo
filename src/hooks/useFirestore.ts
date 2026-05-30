@@ -84,6 +84,8 @@ const useFirestore = (storeCode?: string | null) => {
         level: 0,
         stamps: 0,
         phase: 'americano',
+        coupons: {},
+        // 레거시 호환
         americanoCoupons: 0,
         beverageCoupons: 0,
         hasRated: false,

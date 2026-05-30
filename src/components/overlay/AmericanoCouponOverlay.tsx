@@ -119,7 +119,7 @@ const AmericanoCouponOverlay = ({
             letterSpacing: -0.5,
             color: '#fff',
           }}>
-          다음 <Text style={{color: '#FF8400'}}>{couponName ?? '아메리카노'} 한 잔</Text>이 무료!
+          다음 <Text style={{color: '#FF8400'}}>{couponName ?? '쿠폰 A'}</Text> 무료!
         </Text>
 
         {/* 닫기 힌트 */}

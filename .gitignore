@@ -33,6 +33,7 @@ local.properties
 .cxx/
 *.keystore
 !debug.keystore
+.kotlin/
 
 # node.js
 #
@@ -79,7 +80,10 @@ yarn-error.log
 .env.*
 
 # firebase
+serviceAccountKey.json
 firebase.json
+scripts/node_modules/
+scripts/package-lock.json
 firebase-debug.log
 /ios/*/GoogleService-Info.plist
 /ios/GoogleService-Info.plist

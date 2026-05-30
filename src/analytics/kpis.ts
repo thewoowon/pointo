@@ -90,12 +90,10 @@ export function computePortfolioKpis(
 
   // ── 누적 쿠폰 발행 / 사용 ──
   // 현재 보유 + 이미 사용한 쿠폰 = 발행 총량
-  const heldAmericano = users.reduce(
-    (s, u) => s + (u.americanoCoupons ?? 0),
-    0,
-  );
-  const heldBeverage = users.reduce((s, u) => s + (u.beverageCoupons ?? 0), 0);
-  const heldTotal = heldAmericano + heldBeverage;
+  const heldTotal = users.reduce((s, u) => {
+    const coupons = u.coupons ?? {};
+    return s + Object.values(coupons).reduce((cs, v) => cs + (v ?? 0), 0);
+  }, 0);
 
   // stamp_used 1건의 stamp 필드는 실제 소진 스탬프 수.
   const totalCouponsRedeemed = usedLogs.reduce(

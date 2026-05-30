@@ -50,6 +50,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
   const storeConfig = useStoreConfig(storeCode);
   const {updateStoreConfig} = useFirestore(storeCode);
 
+  const [storeMode, setStoreMode] = useState<'stamp' | 'point'>(storeConfig.mode);
   const [stampsPerCoupon, setStampsPerCoupon] = useState(
     String(storeConfig.stampsPerCoupon),
   );
@@ -66,11 +67,22 @@ const StoreSettingsScreen = ({navigation}: any) => {
   const [welcomeLine2, setWelcomeLine2] = useState(storeConfig.welcomeLines[2] ?? '');
   const [guideLine0, setGuideLine0] = useState(storeConfig.guideLines[0] ?? '');
   const [guideLine1, setGuideLine1] = useState(storeConfig.guideLines[1] ?? '');
-  const [couponName0, setCouponName0] = useState(storeConfig.couponTypes[0]?.name ?? '');
-  const [couponName1, setCouponName1] = useState(storeConfig.couponTypes[1]?.name ?? '');
+  const [couponMode, setCouponMode] = useState<'single' | 'double'>(
+    storeConfig.couponTypes.length >= 2 ? 'double' : 'single',
+  );
+  const [couponNames, setCouponNames] = useState<Record<string, string>>(
+    Object.fromEntries(storeConfig.couponTypes.map(ct => [ct.id, ct.name])),
+  );
+  const [pointPresets, setPointPresets] = useState<PointPreset[]>(
+    storeConfig.pointPresets ?? [],
+  );
+  const [pointUnit, setPointUnit] = useState(storeConfig.pointUnit ?? '원');
+  const [newPresetName, setNewPresetName] = useState('');
+  const [newPresetPoints, setNewPresetPoints] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    setStoreMode(storeConfig.mode);
     setStampsPerCoupon(String(storeConfig.stampsPerCoupon));
     setSessionTimeout(String(storeConfig.sessionTimeoutSeconds));
     setIdleTimeout(String(storeConfig.idleTimeoutMs / 1000));
@@ -81,19 +93,39 @@ const StoreSettingsScreen = ({navigation}: any) => {
     setWelcomeLine2(storeConfig.welcomeLines[2] ?? '');
     setGuideLine0(storeConfig.guideLines[0] ?? '');
     setGuideLine1(storeConfig.guideLines[1] ?? '');
-    setCouponName0(storeConfig.couponTypes[0]?.name ?? '');
-    setCouponName1(storeConfig.couponTypes[1]?.name ?? '');
+    setCouponMode(storeConfig.couponTypes.length >= 2 ? 'double' : 'single');
+    setCouponNames(
+      Object.fromEntries(storeConfig.couponTypes.map(ct => [ct.id, ct.name])),
+    );
+    setPointPresets(storeConfig.pointPresets ?? []);
+    setPointUnit(storeConfig.pointUnit ?? '원');
   }, [storeConfig]);
 
+  const handleAddPreset = () => {
+    const name = newPresetName.trim();
+    const pts = parseInt(newPresetPoints, 10);
+    if (!name) {
+      Alert.alert('입력 오류', '프리셋 이름을 입력해주세요.');
+      return;
+    }
+    if (isNaN(pts) || pts < 1) {
+      Alert.alert('입력 오류', '포인트는 1 이상이어야 합니다.');
+      return;
+    }
+    const id = `preset_${Date.now()}`;
+    setPointPresets(prev => [...prev, {id, name, points: pts}]);
+    setNewPresetName('');
+    setNewPresetPoints('');
+  };
+
+  const handleRemovePreset = (id: string) => {
+    setPointPresets(prev => prev.filter(p => p.id !== id));
+  };
+
   const handleSave = async () => {
-    const spc = parseInt(stampsPerCoupon, 10);
     const st = parseInt(sessionTimeout, 10);
     const it = parseInt(idleTimeout, 10);
 
-    if (isNaN(spc) || spc < 1) {
-      Alert.alert('입력 오류', '쿠폰당 스탬프 수는 1 이상이어야 합니다.');
-      return;
-    }
     if (isNaN(st) || st < 10) {
       Alert.alert('입력 오류', '세션 유지 시간은 10초 이상이어야 합니다.');
       return;
@@ -103,8 +135,48 @@ const StoreSettingsScreen = ({navigation}: any) => {
       return;
     }
 
+    // 스탬프 모드 전용 검증 + 쿠폰 타입 결정
+    let spc = storeConfig.stampsPerCoupon;
+    let newCouponTypes = storeConfig.couponTypes;
+    let newCouponSequence = storeConfig.couponSequence;
+
+    if (storeMode === 'stamp') {
+      spc = parseInt(stampsPerCoupon, 10);
+      if (isNaN(spc) || spc < 1) {
+        Alert.alert('입력 오류', '쿠폰당 스탬프 수는 1 이상이어야 합니다.');
+        return;
+      }
+
+      if (couponMode === 'single') {
+        const id = storeConfig.couponTypes[0]?.id ?? 'coupon_a';
+        newCouponTypes = [{
+          id,
+          name: couponNames[id] ?? '무료 쿠폰',
+          description: '무료 쿠폰이 한장 생겨요!',
+        }];
+        newCouponSequence = [id];
+      } else {
+        const idA = storeConfig.couponTypes[0]?.id ?? 'coupon_a';
+        const idB = storeConfig.couponTypes[1]?.id ?? 'coupon_b';
+        newCouponTypes = [
+          {
+            id: idA,
+            name: couponNames[idA] ?? '쿠폰 A',
+            description: '무료 쿠폰이 한장 생겨요!',
+          },
+          {
+            id: idB,
+            name: couponNames[idB] ?? '쿠폰 B',
+            description: '무료 쿠폰이 한장 생겨요!',
+          },
+        ];
+        newCouponSequence = [idA, idB];
+      }
+    }
+
     const updatedConfig: StoreConfig = {
       ...storeConfig,
+      mode: storeMode,
       stampsPerCoupon: spc,
       sessionTimeoutSeconds: st,
       idleTimeoutMs: it * 1000,
@@ -112,10 +184,11 @@ const StoreSettingsScreen = ({navigation}: any) => {
       contactEmail,
       welcomeLines: [welcomeLine0, welcomeLine1, welcomeLine2].filter(l => l.length > 0),
       guideLines: [guideLine0, guideLine1].filter(l => l.length > 0),
-      couponTypes: storeConfig.couponTypes.map((c, i) => ({
-        ...c,
-        name: i === 0 ? couponName0 : couponName1,
-      })),
+      couponTypes: newCouponTypes,
+      couponSequence: newCouponSequence,
+      levelIncrementOn: newCouponSequence[0],
+      pointPresets,
+      pointUnit,
     };
 
     setIsSaving(true);
@@ -139,7 +212,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
             <LeftArrowIcon width={20} height={20} />
             <Text style={styles.backText}>뒤로</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>카페 설정</Text>
+          <Text style={styles.headerTitle}>매장 설정</Text>
           <Pressable
             style={[styles.saveButton, isSaving && {opacity: 0.5}]}
             onPress={handleSave}
@@ -153,30 +226,179 @@ const StoreSettingsScreen = ({navigation}: any) => {
         <ScrollView
           style={styles.scrollView}
           contentContainerStyle={styles.scrollContent}>
-          <Section title="스탬프 시스템">
-            <Field
-              label="쿠폰당 스탬프 수"
-              value={stampsPerCoupon}
-              onChangeText={setStampsPerCoupon}
-              keyboardType="numeric"
-              placeholder="10"
-            />
+
+          {/* ── 운영 모드 선택 ── */}
+          <Section title="운영 모드">
+            <View style={styles.field}>
+              <View style={styles.segmentContainer}>
+                <Pressable
+                  onPress={() => setStoreMode('stamp')}
+                  style={[
+                    styles.segmentButton,
+                    storeMode === 'stamp' && styles.segmentActive,
+                  ]}>
+                  <Text style={[
+                    styles.segmentText,
+                    storeMode === 'stamp' && styles.segmentTextActive,
+                  ]}>스탬프 카드</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setStoreMode('point')}
+                  style={[
+                    styles.segmentButton,
+                    storeMode === 'point' && styles.segmentActive,
+                  ]}>
+                  <Text style={[
+                    styles.segmentText,
+                    storeMode === 'point' && styles.segmentTextActive,
+                  ]}>포인트 적립</Text>
+                </Pressable>
+              </View>
+              <Text style={styles.segmentHint}>
+                {storeMode === 'stamp'
+                  ? '스탬프를 모아 쿠폰으로 교환하는 방식입니다.'
+                  : '포인트(적립금)를 직접 적립하고 사용하는 방식입니다.'}
+              </Text>
+            </View>
           </Section>
 
-          <Section title="쿠폰 설정">
-            <Field
-              label={`쿠폰 1 이름 (${storeConfig.couponTypes[0]?.id ?? 'americano'})`}
-              value={couponName0}
-              onChangeText={setCouponName0}
-              placeholder="아메리카노"
-            />
-            <Field
-              label={`쿠폰 2 이름 (${storeConfig.couponTypes[1]?.id ?? 'beverage'})`}
-              value={couponName1}
-              onChangeText={setCouponName1}
-              placeholder="조제음료"
-            />
-          </Section>
+          {/* ── 스탬프 모드 전용 섹션 ── */}
+          {storeMode === 'stamp' && (
+            <>
+              <Section title="스탬프 시스템">
+                <Field
+                  label="쿠폰당 스탬프 수"
+                  value={stampsPerCoupon}
+                  onChangeText={setStampsPerCoupon}
+                  keyboardType="numeric"
+                  placeholder="10"
+                />
+              </Section>
+
+              <Section title="쿠폰 설정">
+                <View style={styles.field}>
+                  <Text style={styles.fieldLabel}>쿠폰 모드</Text>
+                  <View style={styles.segmentContainer}>
+                    <Pressable
+                      onPress={() => setCouponMode('single')}
+                      style={[
+                        styles.segmentButton,
+                        couponMode === 'single' && styles.segmentActive,
+                      ]}>
+                      <Text style={[
+                        styles.segmentText,
+                        couponMode === 'single' && styles.segmentTextActive,
+                      ]}>싱글 (1종류)</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => {
+                        setCouponMode('double');
+                        const idB = storeConfig.couponTypes[1]?.id ?? 'coupon_b';
+                        if (!couponNames[idB]) {
+                          setCouponNames(prev => ({...prev, [idB]: '쿠폰 B'}));
+                        }
+                      }}
+                      style={[
+                        styles.segmentButton,
+                        couponMode === 'double' && styles.segmentActive,
+                      ]}>
+                      <Text style={[
+                        styles.segmentText,
+                        couponMode === 'double' && styles.segmentTextActive,
+                      ]}>더블 (2종류 교차)</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.segmentHint}>
+                    {couponMode === 'single'
+                      ? '스탬프를 모을 때마다 같은 쿠폰이 발급됩니다.'
+                      : '스탬프를 모을 때마다 두 종류의 쿠폰이 번갈아 발급됩니다.'}
+                  </Text>
+                </View>
+                <Field
+                  label="쿠폰 1 이름"
+                  value={couponNames[storeConfig.couponTypes[0]?.id ?? 'coupon_a'] ?? ''}
+                  onChangeText={text => {
+                    const id = storeConfig.couponTypes[0]?.id ?? 'coupon_a';
+                    setCouponNames(prev => ({...prev, [id]: text}));
+                  }}
+                  placeholder="무료 쿠폰"
+                />
+                {couponMode === 'double' && (
+                  <Field
+                    label="쿠폰 2 이름"
+                    value={couponNames[storeConfig.couponTypes[1]?.id ?? 'coupon_b'] ?? ''}
+                    onChangeText={text => {
+                      const id = storeConfig.couponTypes[1]?.id ?? 'coupon_b';
+                      setCouponNames(prev => ({...prev, [id]: text}));
+                    }}
+                    placeholder="쿠폰 B"
+                  />
+                )}
+              </Section>
+            </>
+          )}
+
+          {/* ── 포인트 모드 전용 섹션 ── */}
+          {storeMode === 'point' && (
+            <>
+              <Section title="포인트 단위">
+                <Field
+                  label="단위 표시"
+                  value={pointUnit}
+                  onChangeText={setPointUnit}
+                  placeholder="원"
+                />
+                <Text style={styles.segmentHint}>
+                  고객에게 표시되는 포인트 단위입니다. (예: 원, P, 점)
+                </Text>
+              </Section>
+
+              <Section title="포인트 프리셋">
+                <Text style={styles.segmentHint}>
+                  자주 사용하는 포인트를 미리 등록하면 한 번의 터치로 적립할 수 있습니다.
+                </Text>
+
+                {pointPresets.map(preset => (
+                  <View key={preset.id} style={styles.presetRow}>
+                    <View style={styles.presetInfo}>
+                      <Text style={styles.presetName}>{preset.name}</Text>
+                      <Text style={styles.presetPoints}>
+                        {preset.points.toLocaleString()}{pointUnit}
+                      </Text>
+                    </View>
+                    <Pressable
+                      onPress={() => handleRemovePreset(preset.id)}
+                      style={styles.presetDeleteButton}>
+                      <Text style={styles.presetDeleteText}>삭제</Text>
+                    </Pressable>
+                  </View>
+                ))}
+
+                <View style={styles.presetAddForm}>
+                  <View style={styles.presetAddFields}>
+                    <TextInput
+                      style={[styles.fieldInput, {flex: 1}]}
+                      value={newPresetName}
+                      onChangeText={setNewPresetName}
+                      placeholder="프리셋 이름"
+                      placeholderTextColor="#BBBBBB"
+                    />
+                    <TextInput
+                      style={[styles.fieldInput, {width: 100, textAlign: 'right'}]}
+                      value={newPresetPoints}
+                      onChangeText={setNewPresetPoints}
+                      placeholder={`0${pointUnit}`}
+                      placeholderTextColor="#BBBBBB"
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  <Pressable onPress={handleAddPreset} style={styles.presetAddButton}>
+                    <Text style={styles.presetAddButtonText}>추가</Text>
+                  </Pressable>
+                </View>
+              </Section>
+            </>
+          )}
 
           <Section title="세션 / 타이밍">
             <Field
@@ -313,6 +535,93 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Pretendard-Regular',
     color: '#191D2B',
+  },
+  segmentContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#EEEFF1',
+    borderRadius: 10,
+    padding: 3,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  segmentActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  segmentText: {
+    fontSize: 14,
+    fontFamily: 'Pretendard-Regular',
+    color: '#999',
+  },
+  segmentTextActive: {
+    fontFamily: 'Pretendard-SemiBold',
+    color: '#191D2B',
+  },
+  segmentHint: {
+    fontSize: 12,
+    fontFamily: 'Pretendard-Regular',
+    color: '#999',
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  presetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6F6F8',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  presetInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  presetName: {
+    fontSize: 15,
+    fontFamily: 'Pretendard-Medium',
+    color: '#191D2B',
+  },
+  presetPoints: {
+    fontSize: 15,
+    fontFamily: 'Pretendard-SemiBold',
+    color: '#D4845A',
+  },
+  presetDeleteButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 12,
+  },
+  presetDeleteText: {
+    fontSize: 13,
+    fontFamily: 'Pretendard-Medium',
+    color: '#E74C3C',
+  },
+  presetAddForm: {
+    gap: 10,
+  },
+  presetAddFields: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  presetAddButton: {
+    backgroundColor: '#D4845A',
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  presetAddButtonText: {
+    fontSize: 15,
+    fontFamily: 'Pretendard-SemiBold',
+    color: '#FFFFFF',
   },
 });
 

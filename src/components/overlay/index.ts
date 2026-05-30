@@ -1,4 +1,7 @@
 export {default as LoadingOverlay} from './LoadingOverlay';
+export {default as StampNearOverlay} from './StampNearOverlay';
+export {default as CouponEarnedOverlay} from './CouponEarnedOverlay';
+// 레거시 (하위 호환)
 export {default as AmericanoOneOverlay} from './AmericanoOneOverlay';
 export {default as AmericanoTwoOverlay} from './AmericanoTwoOverlay';
 export {default as AmericanoCouponOverlay} from './AmericanoCouponOverlay';

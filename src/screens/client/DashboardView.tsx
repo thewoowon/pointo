@@ -13,18 +13,13 @@ import {useAuth, useFirestore, useAnalytics, useStoreConfig} from '../../hooks';
 import {AnalyticsEvent, hashPhone} from '../../analytics/events';
 import {getFirestore, doc, onSnapshot} from '@react-native-firebase/firestore';
 import {
-  AmericanoIcon,
-  BeverageIcon,
   LeftArrowIcon,
 } from '../../components/Icons';
+import {normalizeUser} from '../../utils/coupons';
 import {AnimatedBall, SnowflakeEffect} from '../../components/decorations';
 import {
-  AmericanoCouponOverlay,
-  AmericanoOneOverlay,
-  AmericanoTwoOverlay,
-  BeverageCouponOverlay,
-  BeverageOneOverlay,
-  BeverageTwoOverlay,
+  StampNearOverlay,
+  CouponEarnedOverlay,
 } from '../../components/overlay';
 // import {BackgroundDeco} from '../../components/background';
 import LinearGradient from 'react-native-linear-gradient';
@@ -53,16 +48,16 @@ const getLastVisitMessage = (lastUsed: string): string => {
   return `${Math.floor(diff / 30)}달 만에 오셨네요!`;
 };
 
-const SPRING_COLORS = {
-  backgroundStart: '#FFFAF4',
-  backgroundEnd: '#ffead1ff',
-  accent: '#D4845A',
-  primary: '#3D2416',
-  petalPink: '#FFAA80',
-  warmCream: '#FFF8F0',
+const SUMMER_COLORS = {
+  backgroundStart: '#E8F4FD',
+  backgroundEnd: '#C5E3F6',
+  accent: '#0288D1',
+  primary: '#0D2137',
+  waveBlue: '#4FC3F7',
+  sandCream: '#FFF8E7',
 };
 
-// 봄 벚꽃 에디션 스탬프 (총 21개)
+// 여름 바다 에디션 스탬프 (총 21개)
 const BALL_POSITIONS: {
   position: {
     top?: number;
@@ -76,38 +71,38 @@ const BALL_POSITIONS: {
 }[] = [
   {
     position: {bottom: -11, left: -55},
-    color: '#FFCBA4',
+    color: '#FFEB3B',
     size: 171,
     zIndex: 1,
-  }, // 1 - 살구
-  {position: {bottom: -128, left: 45}, color: '#FFD9B5', size: 171, zIndex: 6}, // 2 - 연한 살구
-  {position: {bottom: -42, left: 177}, color: '#FFE8CC', size: 171, zIndex: 5}, // 3 - 크림 살구
-  {position: {bottom: -59, right: 78}, color: '#FFAA80', size: 171, zIndex: 3}, // 4 - 딥 살구
-  {position: {bottom: -34, right: -36}, color: '#FFCBA4', size: 171, zIndex: 4}, // 5 - 살구
+  }, // 1 - 노랑
+  {position: {bottom: -128, left: 45}, color: '#4FC3F7', size: 171, zIndex: 6}, // 2 - 하늘
+  {position: {bottom: -42, left: 177}, color: '#FF7043', size: 171, zIndex: 5}, // 3 - 오렌지
+  {position: {bottom: -59, right: 78}, color: '#E8F5E9', size: 171, zIndex: 3}, // 4 - 민트
+  {position: {bottom: -34, right: -36}, color: '#FFEB3B', size: 171, zIndex: 4}, // 5 - 노랑
 
-  {position: {bottom: 98, left: -48}, color: '#FFDBC2', size: 171, zIndex: 6}, // 6 - 페탈 살구
-  {position: {bottom: 13, left: 67}, color: '#FFD9B5', size: 171, zIndex: 13}, // 7 - 연한 살구
-  {position: {bottom: 70, left: 210}, color: '#FFF3E4', size: 171, zIndex: 2}, // 8 - 웜 크림
-  {position: {bottom: 78, right: 36}, color: '#FFCBA4', size: 171, zIndex: 7}, // 9 - 살구
+  {position: {bottom: 98, left: -48}, color: '#81D4FA', size: 171, zIndex: 6}, // 6 - 연하늘
+  {position: {bottom: 13, left: 67}, color: '#FF7043', size: 171, zIndex: 13}, // 7 - 오렌지
+  {position: {bottom: 70, left: 210}, color: '#B2EBF2', size: 171, zIndex: 2}, // 8 - 연민트
+  {position: {bottom: 78, right: 36}, color: '#FFEB3B', size: 171, zIndex: 7}, // 9 - 노랑
 
-  {position: {bottom: 191, left: -42}, color: '#FFE8CC', size: 171, zIndex: 4}, // 10 - 크림 살구
-  {position: {bottom: 160, left: 103}, color: '#FFAA80', size: 171, zIndex: 5}, // 11 - 딥 살구
-  {position: {bottom: 192, right: 62}, color: '#FFD9B5', size: 171, zIndex: 1}, // 12 - 연한 살구
-  {position: {bottom: 160, right: -57}, color: '#FFCBA4', size: 171, zIndex: 6}, // 13 - 살구
+  {position: {bottom: 191, left: -42}, color: '#4FC3F7', size: 171, zIndex: 4}, // 10 - 하늘
+  {position: {bottom: 160, left: 103}, color: '#E8F5E9', size: 171, zIndex: 5}, // 11 - 민트
+  {position: {bottom: 192, right: 62}, color: '#FF7043', size: 171, zIndex: 1}, // 12 - 오렌지
+  {position: {bottom: 160, right: -57}, color: '#81D4FA', size: 171, zIndex: 6}, // 13 - 연하늘
   {
     position: {bottom: 287, left: -53},
-    color: '#FFDBC2',
+    color: '#FFEB3B',
     size: 171,
     zIndex: 3,
-  }, // 14 - 페탈 살구
-  {position: {bottom: 262, left: 61}, color: '#FFAA80', size: 171, zIndex: 2}, // 15 - 딥 살구
-  {position: {bottom: 279, left: 167}, color: '#FFD9B5', size: 171, zIndex: 3}, // 16 - 연한 살구
-  {position: {bottom: 334, left: 278}, color: '#FFF3E4', size: 171, zIndex: 13}, // 17 - 웜 크림
-  {position: {bottom: 300, right: -38}, color: '#FFE8CC', size: 171, zIndex: 5}, // 18 - 크림 살구
+  }, // 14 - 노랑
+  {position: {bottom: 262, left: 61}, color: '#4FC3F7', size: 171, zIndex: 2}, // 15 - 하늘
+  {position: {bottom: 279, left: 167}, color: '#FF7043', size: 171, zIndex: 3}, // 16 - 오렌지
+  {position: {bottom: 334, left: 278}, color: '#B2EBF2', size: 171, zIndex: 13}, // 17 - 연민트
+  {position: {bottom: 300, right: -38}, color: '#E8F5E9', size: 171, zIndex: 5}, // 18 - 민트
 
-  {position: {top: 144, left: -5}, color: '#FFCBA4', size: 171, zIndex: 5}, // 19 - 살구
-  {position: {top: 172, left: 135}, color: '#FFDBC2', size: 171, zIndex: 1}, // 20 - 페탈 살구
-  {position: {top: 204, right: -31}, color: '#FFAA80', size: 171, zIndex: 5}, // 21 - 딥 살구
+  {position: {top: 144, left: -5}, color: '#FFEB3B', size: 171, zIndex: 5}, // 19 - 노랑
+  {position: {top: 172, left: 135}, color: '#81D4FA', size: 171, zIndex: 1}, // 20 - 연하늘
+  {position: {top: 204, right: -31}, color: '#4FC3F7', size: 171, zIndex: 5}, // 21 - 하늘
 ];
 
 type DashboardViewProps = {
@@ -120,13 +115,14 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
   const isCompact = screenWidth < 768;
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
+  const isPointMode = storeConfig.mode === 'point';
   const [timeLeft, setTimeLeft] = useState(60);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [prevUser, setPrevUser] = useState<User | null>(null);
   const [dStampOverlayContext, setDStampOverlayContext] = useState({
     show: false,
-    type: 'americano' as 'americano' | 'beverage',
+    type: 'americano' as string,
     dStamp: 'one' as 'one' | 'two' | 'coupon',
   });
 
@@ -164,35 +160,25 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
 
   const showOverlay = (overlayContext: {
     show: boolean;
-    type: 'americano' | 'beverage';
+    type: string;
     dStamp: 'one' | 'two' | 'coupon';
   }) => {
     const {show, type, dStamp} = overlayContext;
     const couponName = getCouponName(type);
 
-    if (type === 'americano') {
-      if (dStamp === 'one') {
-        return <AmericanoOneOverlay show={show} couponName={couponName} />;
-      } else if (dStamp === 'two') {
-        return <AmericanoTwoOverlay show={show} couponName={couponName} />;
-      } else if (dStamp === 'coupon') {
-        return <AmericanoCouponOverlay show={show} onDismiss={dismissOverlay} couponName={couponName} />;
-      }
-    } else if (type === 'beverage') {
-      if (dStamp === 'one') {
-        return <BeverageOneOverlay show={show} couponName={couponName} />;
-      } else if (dStamp === 'two') {
-        return <BeverageTwoOverlay show={show} couponName={couponName} />;
-      } else if (dStamp === 'coupon') {
-        return <BeverageCouponOverlay show={show} onDismiss={dismissOverlay} couponName={couponName} />;
-      }
+    if (dStamp === 'one') {
+      return <StampNearOverlay show={show} remaining={1} couponName={couponName} />;
+    } else if (dStamp === 'two') {
+      return <StampNearOverlay show={show} remaining={2} couponName={couponName} />;
+    } else if (dStamp === 'coupon') {
+      return <CouponEarnedOverlay show={show} onDismiss={dismissOverlay} couponName={couponName} />;
     }
 
     return null;
   };
 
   const delayBeforeUpdate = (
-    type: 'americano' | 'beverage',
+    type: string,
     dStamp: 'one' | 'two' | 'coupon',
   ) => {
     console.log('타이머 시작');
@@ -242,26 +228,32 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
 
           if (!userRef.current && !prevUserRef.current) {
             console.log('최초 사용자 정보 저장');
-            setUser(data as User);
+            setUser(normalizeUser(data, storeConfig.couponTypes));
             return;
           }
 
-          const updatedUser = data as User;
+          const updatedUser = normalizeUser(data, storeConfig.couponTypes);
 
           setPrevUser(userRef.current);
-          setUser(data as User);
+          setUser(updatedUser);
 
           console.log('updatedUser', updatedUser);
           console.log('userRef.current: ', userRef.current);
-          if (updatedUser.stamps > (userRef.current?.stamps || 0)) {
-            console.log('스탬프 증가 감지');
-            const remainder = updatedUser.stamps % storeConfig.stampsPerCoupon;
-            if (remainder === storeConfig.stampsPerCoupon - 1) {
-              delayBeforeUpdate(updatedUser.phase, 'one');
-            } else if (remainder === storeConfig.stampsPerCoupon - 2) {
-              delayBeforeUpdate(updatedUser.phase, 'two');
-            } else if (remainder === 0) {
+          // 포인트 모드에서는 쿠폰/오버레이 없음
+          if (!isPointMode) {
+            // 쿠폰 증가 감지 (스탬프 카드 모델: modulo로 stamps가 줄어도 쿠폰이 늘면 적립)
+            const prevTotal = Object.values(userRef.current?.coupons ?? {}).reduce((s, v) => s + v, 0);
+            const newTotal = Object.values(updatedUser.coupons).reduce((s, v) => s + v, 0);
+            if (newTotal > prevTotal) {
+              console.log('쿠폰 획득 감지');
               delayBeforeUpdate(updatedUser.phase, 'coupon');
+            } else if (updatedUser.stamps > (userRef.current?.stamps || 0)) {
+              console.log('스탬프 증가 감지');
+              if (updatedUser.stamps === storeConfig.stampsPerCoupon - 1) {
+                delayBeforeUpdate(updatedUser.phase, 'one');
+              } else if (updatedUser.stamps === storeConfig.stampsPerCoupon - 2) {
+                delayBeforeUpdate(updatedUser.phase, 'two');
+              }
             }
           }
         }
@@ -346,11 +338,11 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
 
   return (
     <LinearGradient
-      colors={[SPRING_COLORS.backgroundStart, SPRING_COLORS.backgroundEnd]}
+      colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
       style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor={SPRING_COLORS.backgroundStart}
+        backgroundColor={SUMMER_COLORS.backgroundStart}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>
@@ -365,7 +357,13 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
               },
               {gap: isCompact ? 0 : 60},
             ]}>
-            {!isCompact && (user && prevUser && user.stamps !== prevUser.stamps ? (
+            {!isCompact && (user && prevUser && (() => {
+              const prevCouponTotal = Object.values(prevUser.coupons).reduce((s, v) => s + v, 0);
+              const newCouponTotal = Object.values(user.coupons).reduce((s, v) => s + v, 0);
+              const stampsChanged = user.stamps !== prevUser.stamps;
+              const couponsChanged = newCouponTotal !== prevCouponTotal;
+              return stampsChanged || couponsChanged;
+            })() ? (
               <View
                 style={[
                   styles.flexColumnBox,
@@ -380,30 +378,73 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                   },
                 ]}>
                 <View style={styles.labelBox}>
-                  <Text style={styles.labelTitleText}>
-                    <Text
-                      style={[
-                        styles.labelTitleText,
-                        {
-                          color: SPRING_COLORS.accent,
-                        },
-                      ]}>
-                      스탬프 {Math.abs(user.stamps - prevUser.stamps)}개
-                    </Text>
-                    가
-                  </Text>
-                  <Text style={styles.labelTitleText}>
-                    {prevUser.stamps < user.stamps
-                      ? '적립되었습니다.'
-                      : '사용되었습니다.'}
-                  </Text>
+                  {(() => {
+                    if (isPointMode) {
+                      const diff = user.stamps - prevUser.stamps;
+                      if (diff > 0) {
+                        return (
+                          <>
+                            <Text style={styles.labelTitleText}>
+                              <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
+                                {diff.toLocaleString()}{storeConfig.pointUnit}
+                              </Text>
+                              이
+                            </Text>
+                            <Text style={styles.labelTitleText}>적립되었습니다.</Text>
+                          </>
+                        );
+                      }
+                      return (
+                        <>
+                          <Text style={styles.labelTitleText}>
+                            <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
+                              {Math.abs(diff).toLocaleString()}{storeConfig.pointUnit}
+                            </Text>
+                            이
+                          </Text>
+                          <Text style={styles.labelTitleText}>사용되었습니다.</Text>
+                        </>
+                      );
+                    }
+                    const prevCT = Object.values(prevUser.coupons).reduce((s, v) => s + v, 0);
+                    const newCT = Object.values(user.coupons).reduce((s, v) => s + v, 0);
+                    const couponsEarned = newCT - prevCT;
+                    if (user.stamps !== prevUser.stamps || couponsEarned > 0) {
+                      // 스탬프 적립 (modulo 보정)
+                      const earned = couponsEarned * storeConfig.stampsPerCoupon + user.stamps - prevUser.stamps;
+                      return (
+                        <>
+                          <Text style={styles.labelTitleText}>
+                            <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
+                              스탬프 {earned}개
+                            </Text>
+                            가
+                          </Text>
+                          <Text style={styles.labelTitleText}>적립되었습니다.</Text>
+                        </>
+                      );
+                    }
+                    // 쿠폰 사용 (스탬프 변동 없음)
+                    const used = prevCT - newCT;
+                    return (
+                      <>
+                        <Text style={styles.labelTitleText}>
+                          <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
+                            쿠폰 {used}장
+                          </Text>
+                          이
+                        </Text>
+                        <Text style={styles.labelTitleText}>사용되었습니다.</Text>
+                      </>
+                    );
+                  })()}
                 </View>
                 <View style={styles.labelBox}>
                   <Text
                     style={[
                       styles.labelTitleText,
                       {
-                        color: SPRING_COLORS.accent,
+                        color: SUMMER_COLORS.accent,
                       },
                     ]}>
                     감사합니다
@@ -438,12 +479,12 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                   },
                 ]}>
                 <Pressable style={[styles.flexBox, {gap: 7}]} onPress={goBack}>
-                  <LeftArrowIcon color={SPRING_COLORS.primary}/>
+                  <LeftArrowIcon color={SUMMER_COLORS.primary}/>
                   <Text
                     style={{
                       fontSize: 20,
                       fontFamily: 'Pretendard-Regular',
-                      color: SPRING_COLORS.primary,
+                      color: SUMMER_COLORS.primary,
                       lineHeight: 28,
                       letterSpacing: -1,
                     }}>
@@ -487,7 +528,7 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                       style={[
                         styles.labelSubText,
                         {
-                          color: SPRING_COLORS.accent,
+                          color: SUMMER_COLORS.accent,
                           fontFamily: 'SFUIDisplay-Semibold',
                         },
                       ]}>
@@ -517,49 +558,36 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                   )}
                 </View>
                 <View style={styles.beverageWrapper}>
-                  {user && user.beverageCoupons > 0 && (
-                    <View style={styles.beverageBox}>
-                      <View>
-                        <View
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            gap: 4,
-                            alignItems: 'center',
-                          }}>
-                          <BeverageIcon color={SPRING_COLORS.accent} />
+                  {isPointMode ? (
+                    user && (
+                      <View style={styles.beverageBox}>
+                        <View>
                           <Text style={styles.beverageTitleText}>
-                            {getCouponName('beverage') ?? '조제음료'} {user.beverageCoupons}잔 무료로 사용
-                            가능해요!
+                            💰 보유 포인트
+                          </Text>
+                          <Text style={styles.beverageBodyText}>
+                            {user.stamps.toLocaleString()}{storeConfig.pointUnit} 사용 가능
                           </Text>
                         </View>
-                        <Text style={styles.beverageBodyText}>
-                          스탬프 {storeConfig.stampsPerCoupon}개 소진
-                        </Text>
                       </View>
-                    </View>
-                  )}
-                  {user && user.americanoCoupons > 0 && (
-                    <View style={styles.beverageBox}>
-                      <View>
-                        <View
-                          style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            gap: 4,
-                            alignItems: 'center',
-                          }}>
-                          <AmericanoIcon color={SPRING_COLORS.accent} />
-                          <Text style={styles.beverageTitleText}>
-                            {getCouponName('americano') ?? '아메리카노'} {user.americanoCoupons}잔 무료로 사용
-                            가능해요!
-                          </Text>
+                    )
+                  ) : (
+                    user && storeConfig.couponTypes.map(ct => {
+                      const count = user.coupons[ct.id] ?? 0;
+                      if (count <= 0) return null;
+                      return (
+                        <View key={ct.id} style={styles.beverageBox}>
+                          <View>
+                            <Text style={styles.beverageTitleText}>
+                              🎫 {ct.name} {count}장 무료로 사용 가능해요!
+                            </Text>
+                            <Text style={styles.beverageBodyText}>
+                              스탬프 {storeConfig.stampsPerCoupon}개 소진
+                            </Text>
+                          </View>
                         </View>
-                        <Text style={styles.beverageBodyText}>
-                          스탬프 {storeConfig.stampsPerCoupon}개 소진
-                        </Text>
-                      </View>
-                    </View>
+                      );
+                    })
                   )}
                 </View>
               </View>
@@ -615,10 +643,10 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                       style={[
                         styles.labelSubText,
                         {
-                          color: SPRING_COLORS.primary,
+                          color: SUMMER_COLORS.primary,
                         },
                       ]}>
-                      현재 보유 스탬프
+                      {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
                     </Text>
                   </View>
                   <View
@@ -631,10 +659,21 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                       gap: 18,
                       zIndex: 100,
                     }}>
-                    <Text style={styles.stampLeftText}>
-                      {user ? user.stamps : 0}
-                    </Text>
-                    <Text style={styles.stampRightText}>/{storeConfig.stampsPerCoupon}개</Text>
+                    {isPointMode ? (
+                      <>
+                        <Text style={styles.stampLeftText}>
+                          {user ? user.stamps.toLocaleString() : 0}
+                        </Text>
+                        <Text style={styles.stampRightText}>{storeConfig.pointUnit}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.stampLeftText}>
+                          {user ? user.stamps % storeConfig.stampsPerCoupon : 0}
+                        </Text>
+                        <Text style={styles.stampRightText}>/{storeConfig.stampsPerCoupon}개</Text>
+                      </>
+                    )}
                   </View>
                 </View>
                 <View
@@ -644,7 +683,7 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
                     height: '100%',
                     overflow: 'hidden',
                   }}>
-                  {BALL_POSITIONS.slice(0, user?.stamps || 0).map(
+                  {!isPointMode && BALL_POSITIONS.slice(0, (user?.stamps ?? 0) % storeConfig.stampsPerCoupon).map(
                     (ball, index) => {
                       return (
                         <AnimatedBall key={index} index={index} ball={ball} />
@@ -711,10 +750,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    backgroundColor: 'rgba(212, 132, 90, 0.1)',
+    backgroundColor: 'rgba(2, 136, 209, 0.1)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.35)',
+    borderColor: 'rgba(2, 136, 209, 0.35)',
   },
   santaIconWrapper: {
     width: 52,
@@ -726,7 +765,7 @@ const styles = StyleSheet.create({
   },
   santaIcon: {
     fontSize: 30,
-    color: SPRING_COLORS.accent,
+    color: SUMMER_COLORS.accent,
   },
   santaTextWrapper: {
     flexShrink: 1,
@@ -740,29 +779,29 @@ const styles = StyleSheet.create({
   santaSubtitle: {
     fontSize: 14,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.75)',
+    color: 'rgba(13, 33, 55, 0.65)',
     lineHeight: 20,
   },
   holidayBadge: {
-    backgroundColor: 'rgba(212, 132, 90, 0.12)',
+    backgroundColor: 'rgba(2, 136, 209, 0.12)',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.4)',
+    borderColor: 'rgba(2, 136, 209, 0.4)',
     marginBottom: 10,
     gap: 4,
   },
   holidayBadgeText: {
     fontSize: 16,
     fontFamily: 'Pretendard-SemiBold',
-    color: SPRING_COLORS.accent,
+    color: SUMMER_COLORS.accent,
     letterSpacing: -0.5,
   },
   holidayBadgeSubText: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: SPRING_COLORS.primary,
+    color: SUMMER_COLORS.primary,
   },
   subLabelBox: {
     display: 'flex',
@@ -775,21 +814,21 @@ const styles = StyleSheet.create({
     fontFamily: 'Pretendard-Medium',
     lineHeight: 45,
     letterSpacing: -1,
-    color: SPRING_COLORS.primary,
+    color: SUMMER_COLORS.primary,
   },
   labelSubText: {
     fontSize: 20,
     fontFamily: 'Pretendard-Regular',
     lineHeight: 28,
     letterSpacing: -1,
-    color: 'rgba(61, 36, 22, 0.75)',
+    color: 'rgba(13, 33, 55, 0.65)',
   },
   stampLeftText: {
     fontSize: 76,
     fontFamily: 'Pretendard-Medium',
     lineHeight: 86,
     letterSpacing: -1,
-    color: SPRING_COLORS.accent,
+    color: SUMMER_COLORS.accent,
   },
   stampRightText: {
     fontSize: 28,
@@ -809,7 +848,7 @@ const styles = StyleSheet.create({
   beverageBox: {
     width: '100%',
     height: 98,
-    backgroundColor: 'rgba(212, 132, 90, 0.1)',
+    backgroundColor: 'rgba(2, 136, 209, 0.1)',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 16,
@@ -822,14 +861,14 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 28,
     fontFamily: 'Pretendard-Medium',
-    color: SPRING_COLORS.primary,
+    color: SUMMER_COLORS.primary,
     letterSpacing: -1,
   },
   beverageBodyText: {
     fontSize: 16,
     lineHeight: 26,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.75)',
+    color: 'rgba(13, 33, 55, 0.65)',
     letterSpacing: -1,
   },
 });

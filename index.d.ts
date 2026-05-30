@@ -17,9 +17,12 @@ interface User {
   last_used: string;
   level: number;
   stamps: number;
-  phase: 'americano' | 'beverage';
-  americanoCoupons: number;
-  beverageCoupons: number;
+  phase: string;
+  /** 동적 쿠폰 보유 현황 (coupon type id → 개수) */
+  coupons: Record<string, number>;
+  // Firestore 레거시 필드 (하위 호환)
+  americanoCoupons?: number;
+  beverageCoupons?: number;
   // 별점을 위해 추가된 속성
   hasRated?: boolean | null | undefined;
   // 코호트/리텐션 분석을 위한 가입일
@@ -28,20 +31,20 @@ interface User {
 }
 
 interface UserContext {
-  selectedCoupon: {
-    americano: number;
-    beverage: number;
-  };
-  possibleCoupons: {
-    americano: number;
-    beverage: number;
-  };
+  selectedCoupon: Record<string, number>;
+  possibleCoupons: Record<string, number>;
 }
 
 interface CouponType {
   id: string;
   name: string;
   description: string;
+}
+
+interface PointPreset {
+  id: string;
+  name: string;
+  points: number;
 }
 
 interface LevelTier {
@@ -53,11 +56,18 @@ interface LevelTier {
 }
 
 interface StoreConfig {
+  /** 'stamp' = 스탬프 카드 모델, 'point' = 포인트(적립금) 모델 */
+  mode: 'stamp' | 'point';
+  // ── 스탬프 모드 전용 ──
   stampsPerCoupon: number;
   couponTypes: CouponType[];
   couponSequence: string[];
-  levelTiers: LevelTier[];
   levelIncrementOn: string;
+  // ── 포인트 모드 전용 ──
+  pointPresets: PointPreset[];
+  pointUnit: string;
+  // ── 공통 ──
+  levelTiers: LevelTier[];
   sessionTimeoutSeconds: number;
   idleTimeoutMs: number;
   // 브랜딩

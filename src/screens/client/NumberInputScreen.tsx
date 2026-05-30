@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Animated,
+  Image,
   Pressable,
   SafeAreaView,
   StatusBar,
@@ -24,46 +25,27 @@ import dayjs from 'dayjs';
 import {
   CheckIcon,
   CircleXIcon,
+  ExitIcon,
   LeftBigArrowIcon,
   XIcon,
 } from '../../components/Icons';
 import LinearGradient from 'react-native-linear-gradient';
+import LottieView from 'lottie-react-native';
 // import {BackgroundDeco} from '../../components/background';
 import {useFocusEffect} from '@react-navigation/native';
 import {LoadingOverlay} from '../../components/overlay';
 import DashboardView from './DashboardView';
 
-const COMING_SOON_SLIDES = [
-  {
-    emoji: '☕',
-    title: '스마트 스탬프 적립',
-    subtitle: '방문할수록 쌓이는 혜택\n아메리카노·음료 쿠폰을 받아보세요',
-    badge: 'Now Live',
-    bg: ['rgba(255, 243, 228, 0.82)', 'rgba(255, 224, 194, 0.82)'],
-  },
-  {
-    emoji: '📊',
-    title: '점주 전용 대시보드',
-    subtitle: 'DAU·WAU·MAU, 재방문율, 쿠폰 성과를\n한눈에 확인하세요',
-    badge: 'Now Live',
-    bg: ['rgba(244, 240, 255, 0.82)', 'rgba(229, 220, 255, 0.82)'],
-  },
-  {
-    emoji: '🎉',
-    title: '이벤트 관리 기능',
-    subtitle: '특별 프로모션과 이벤트를\n직접 만들고 관리해보세요',
-    badge: 'Coming Soon',
-    bg: ['rgba(255, 240, 244, 0.82)', 'rgba(255, 214, 224, 0.82)'],
-  },
-];
+const POINTO_LOGO = require('../../../src/assets/images/pointo_1024.png');
+const APPSTORE_QR = require('../../../src/assets/images/pointo_appstore_qr.png');
 
-const SPRING_COLORS = {
-  backgroundStart: '#FFFAF4',
-  backgroundEnd: '#ffead1ff',
-  accent: '#D4845A',
-  primary: '#3D2416',
-  petalPink: '#FFAA80',
-  warmCream: '#FFF8F0',
+const SUMMER_COLORS = {
+  backgroundStart: '#E8F4FD',
+  backgroundEnd: '#C5E3F6',
+  accent: '#0288D1',
+  primary: '#0D2137',
+  waveBlue: '#4FC3F7',
+  sandCream: '#FFF8E7',
 };
 
 const NUMBER_SEQUENCE = [
@@ -75,7 +57,7 @@ const NUMBER_SEQUENCE = [
 const NumberInputScreen = ({navigation}: any) => {
   const {width: screenWidth} = useWindowDimensions();
   const isCompact = screenWidth < 768;
-  const {storeCode, storeName} = useAuth();
+  const {storeCode, storeName, setIsAuthenticated} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const [number, setNumber] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
@@ -95,10 +77,8 @@ const NumberInputScreen = ({navigation}: any) => {
   } = useFirestore(storeCode);
   const {track, identify} = useAnalytics();
 
-  // Coming Soon 아이들 슬라이더
+  // 유휴 프로모 오버레이
   const [idleVisible, setIdleVisible] = useState(false);
-  const [slideIndex, setSlideIndex] = useState(0);
-  const slideOpacity = useRef(new Animated.Value(1)).current;
   const hintOpacity = useRef(new Animated.Value(1)).current;
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -107,7 +87,6 @@ const NumberInputScreen = ({navigation}: any) => {
       clearTimeout(idleTimer.current);
     }
     idleTimer.current = setTimeout(() => {
-      setSlideIndex(0);
       setIdleVisible(true);
     }, storeConfig.idleTimeoutMs);
   }, [storeConfig.idleTimeoutMs]);
@@ -121,25 +100,11 @@ const NumberInputScreen = ({navigation}: any) => {
     };
   }, [resetIdleTimer]);
 
-  // 슬라이드 자동 전환 + hint pulse (idleVisible일 때만)
+  // hint pulse (idleVisible일 때만)
   useEffect(() => {
     if (!idleVisible) {
       return;
     }
-    const slideInterval = setInterval(() => {
-      Animated.timing(slideOpacity, {
-        toValue: 0,
-        duration: 400,
-        useNativeDriver: true,
-      }).start(() => {
-        setSlideIndex(prev => (prev + 1) % COMING_SOON_SLIDES.length);
-        Animated.timing(slideOpacity, {
-          toValue: 1,
-          duration: 400,
-          useNativeDriver: true,
-        }).start();
-      });
-    }, 4000);
 
     const pulse = Animated.loop(
       Animated.sequence([
@@ -158,10 +123,9 @@ const NumberInputScreen = ({navigation}: any) => {
     pulse.start();
 
     return () => {
-      clearInterval(slideInterval);
       pulse.stop();
     };
-  }, [idleVisible, slideOpacity, hintOpacity]);
+  }, [idleVisible, hintOpacity]);
 
   const onNumberPress = (value: number | string) => {
     resetIdleTimer();
@@ -352,11 +316,11 @@ const NumberInputScreen = ({navigation}: any) => {
 
   return (
     <LinearGradient
-      colors={[SPRING_COLORS.backgroundStart, SPRING_COLORS.backgroundEnd]}
+      colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
       style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor={SPRING_COLORS.backgroundStart}
+        backgroundColor={SUMMER_COLORS.backgroundStart}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>
@@ -403,6 +367,12 @@ const NumberInputScreen = ({navigation}: any) => {
                       <Text key={i} style={styles.labelSubText}>{line}</Text>
                     ))}
                   </View>
+                  <LottieView
+                    source={require('../../../lottie/coffee.json')}
+                    autoPlay
+                    loop
+                    style={{width: 200, height: 200, alignSelf: 'flex-start'}}
+                  />
                 </View>
                 <View
                   style={[
@@ -416,7 +386,7 @@ const NumberInputScreen = ({navigation}: any) => {
                   <Text
                     style={[
                       styles.labelSubText,
-                      {fontSize: 16, lineHeight: 24, color: '#FC4A00'},
+                      {fontSize: 16, lineHeight: 24, color: '#0277BD'},
                     ]}>
                     © 2025 {storeConfig.companyName}. All rights reserved.
                   </Text>
@@ -432,7 +402,7 @@ const NumberInputScreen = ({navigation}: any) => {
                         style={{
                           fontSize: 13,
                           fontFamily: 'Pretendard-Regular',
-                          color: 'rgba(61,36,22,0.5)',
+                          color: 'rgba(13,33,55,0.5)',
                         }}>
                         개인정보 처리방침
                       </Text>
@@ -442,9 +412,34 @@ const NumberInputScreen = ({navigation}: any) => {
                         style={{
                           fontSize: 13,
                           fontFamily: 'Pretendard-Regular',
-                          color: 'rgba(61,36,22,0.5)',
+                          color: 'rgba(13,33,55,0.5)',
                         }}>
                         회원 탈퇴
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
+                      onPress={() => {
+                        Alert.alert(
+                          '로그아웃',
+                          '고객 모드에서 로그아웃하시겠어요?',
+                          [
+                            {text: '취소', style: 'cancel'},
+                            {
+                              text: '로그아웃',
+                              onPress: () => setIsAuthenticated(false),
+                            },
+                          ],
+                        );
+                      }}>
+                      <ExitIcon width={14} height={14} color="rgba(13,33,55,0.5)" />
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontFamily: 'Pretendard-Regular',
+                          color: 'rgba(13,33,55,0.5)',
+                        }}>
+                        로그아웃
                       </Text>
                     </Pressable>
                   </View>
@@ -509,7 +504,7 @@ const NumberInputScreen = ({navigation}: any) => {
                         style={{
                           fontSize: 15,
                           fontFamily: 'Pretendard-SemiBold',
-                          color: '#D4845A',
+                          color: '#0288D1',
                         }}>
                         {storeName}
                       </Text>
@@ -559,7 +554,7 @@ const NumberInputScreen = ({navigation}: any) => {
                             style={({pressed}) => [
                               {
                                 backgroundColor: pressed
-                                  ? '#FFD4AE'
+                                  ? '#B3E5FC'
                                   : 'rgba(255, 255, 255, 0.96)',
                                 borderRadius: 10,
                               },
@@ -578,7 +573,7 @@ const NumberInputScreen = ({navigation}: any) => {
                         style={({pressed}) => [
                           {
                             backgroundColor: pressed
-                              ? '#FFD6E0'
+                              ? '#B3E5FC'
                               : 'rgba(255, 255, 255, 0.96)',
                             borderRadius: 10,
                           },
@@ -592,7 +587,7 @@ const NumberInputScreen = ({navigation}: any) => {
                         style={({pressed}) => [
                           {
                             backgroundColor: pressed
-                              ? '#FFD6E0'
+                              ? '#B3E5FC'
                               : 'rgba(255, 255, 255, 0.96)',
                             borderRadius: 10,
                           },
@@ -616,7 +611,7 @@ const NumberInputScreen = ({navigation}: any) => {
                     ]}
                     onPress={onConfirmPress}>
                     <LinearGradient
-                      colors={['#FFB884', '#fea265ff']}
+                      colors={['#4FC3F7', '#0288D1']}
                       locations={[0.2, 1]}
                       start={{x: 0, y: 0}}
                       end={{x: 1, y: 1}}
@@ -666,7 +661,7 @@ const NumberInputScreen = ({navigation}: any) => {
                     style={[
                       styles.welcomeText,
                       {
-                        color: '#FE7901',
+                        color: '#0288D1',
                         fontFamily: 'SFUIDisplay-Semibold',
                       },
                     ]}>
@@ -763,7 +758,7 @@ const NumberInputScreen = ({navigation}: any) => {
                     paddingLeft: 16,
                   }}
                   onPress={() => setAgree(!agree)}>
-                  <CheckIcon color={agree ? SPRING_COLORS.accent : '#CFCFCF'} />
+                  <CheckIcon color={agree ? SUMMER_COLORS.accent : '#CFCFCF'} />
                   <Text style={styles.bottomText}>
                     이용약관을 모두 읽었으며 해당 내용에 모두 동의합니다.
                   </Text>
@@ -773,7 +768,7 @@ const NumberInputScreen = ({navigation}: any) => {
                     style={{
                       fontSize: 13,
                       fontFamily: 'Pretendard-Regular',
-                      color: '#D4845A',
+                      color: '#0288D1',
                       textDecorationLine: 'underline',
                       marginTop: 4,
                       marginBottom: 8,
@@ -786,7 +781,7 @@ const NumberInputScreen = ({navigation}: any) => {
                     styles.confirmButton,
                     {
                       width: pressed ? '98%' : '100%',
-                      backgroundColor: agree ? SPRING_COLORS.accent : '#CFCFCF',
+                      backgroundColor: agree ? SUMMER_COLORS.accent : '#CFCFCF',
                       shadowOpacity: agree ? 0.45 : 0,
                     },
                   ]}
@@ -832,7 +827,7 @@ const NumberInputScreen = ({navigation}: any) => {
         </Modal>
       </SafeAreaView>
       {/* Coming Soon 아이들 오버레이 — 전체화면 그라디언트 */}
-      {false && (
+      {idleVisible && (
         <Pressable
           style={styles.idleOverlay}
           onPress={() => {
@@ -840,38 +835,37 @@ const NumberInputScreen = ({navigation}: any) => {
             resetIdleTimer();
           }}>
           <LinearGradient
-            colors={COMING_SOON_SLIDES[slideIndex].bg as [string, string]}
+            colors={['#E8F4FD', '#C5E3F6']}
             start={{x: 0, y: 0}}
             end={{x: 1, y: 1}}
             style={styles.idleGradient}>
-            <Animated.View
-              style={{opacity: slideOpacity, alignItems: 'center', gap: 16}}>
-              <View style={styles.idleBadge}>
-                <Text style={styles.idleBadgeText}>
-                  {COMING_SOON_SLIDES[slideIndex].badge}
-                </Text>
-              </View>
-              <Text style={styles.idleEmoji}>
-                {COMING_SOON_SLIDES[slideIndex].emoji}
+            <Image
+              source={POINTO_LOGO}
+              style={{width: 80, height: 80, borderRadius: 20}}
+            />
+            <View style={{alignItems: 'center', gap: 6}}>
+              <Text style={styles.idleTitle}>
+                {storeName ?? '우리 매장'}도
               </Text>
               <Text style={styles.idleTitle}>
-                {COMING_SOON_SLIDES[slideIndex].title}
+                포인토 쓰고 있어요
               </Text>
-              <Text style={styles.idleSubtitle}>
-                {COMING_SOON_SLIDES[slideIndex].subtitle}
-              </Text>
-            </Animated.View>
-            <View style={styles.idleDots}>
-              {COMING_SOON_SLIDES.map((_, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.idleDot,
-                    i === slideIndex && styles.idleDotActive,
-                  ]}
-                />
-              ))}
             </View>
+            <Text style={styles.idleSubtitle}>
+              종이 쿠폰 없이, 번호만으로 적립 끝.{'\n'}앱 하나면 어디서든 스탬프 관리.
+            </Text>
+            <Image
+              source={APPSTORE_QR}
+              style={{width: 140, height: 140, borderRadius: 12, marginTop: 8}}
+            />
+            <Text style={{
+              fontSize: 13,
+              fontFamily: 'Pretendard-Regular',
+              color: 'rgba(13,33,55,0.5)',
+              marginTop: 4,
+            }}>
+              QR을 스캔하면 앱스토어로 이동해요
+            </Text>
             <Animated.Text style={[styles.idleTapHint, {opacity: hintOpacity}]}>
               화면을 터치하면 돌아갑니다
             </Animated.Text>
@@ -924,25 +918,25 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   holidayBadge: {
-    backgroundColor: 'rgba(212, 132, 90, 0.12)',
+    backgroundColor: 'rgba(2, 136, 209, 0.12)',
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.4)',
+    borderColor: 'rgba(2, 136, 209, 0.4)',
     marginBottom: 10,
     gap: 4,
   },
   holidayBadgeText: {
     fontSize: 16,
     fontFamily: 'Pretendard-SemiBold',
-    color: SPRING_COLORS.accent,
+    color: SUMMER_COLORS.accent,
     letterSpacing: -0.5,
   },
   holidayBadgeSubText: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: SPRING_COLORS.primary,
+    color: SUMMER_COLORS.primary,
   },
   subLabelBox: {
     display: 'flex',
@@ -955,14 +949,14 @@ const styles = StyleSheet.create({
     fontFamily: 'Pretendard-Medium',
     lineHeight: 48,
     letterSpacing: -1,
-    color: SPRING_COLORS.primary,
+    color: SUMMER_COLORS.primary,
   },
   labelSubText: {
     fontSize: 24,
     fontFamily: 'Pretendard-Light',
     lineHeight: 32,
     letterSpacing: -1,
-    color: 'rgba(61, 36, 22, 0.75)',
+    color: 'rgba(13, 33, 55, 0.65)',
   },
   numberInputContainer: {
     width: '100%',
@@ -991,7 +985,7 @@ const styles = StyleSheet.create({
   },
   headerNumberText: {
     fontSize: 44,
-    color: SPRING_COLORS.primary,
+    color: SUMMER_COLORS.primary,
     fontFamily: 'SFUIDisplay-Medium',
     lineHeight: 48,
     letterSpacing: -1,
@@ -1002,22 +996,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     padding: 14,
-    backgroundColor: 'rgba(212, 132, 90, 0.1)',
+    backgroundColor: 'rgba(2, 136, 209, 0.1)',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.35)',
+    borderColor: 'rgba(2, 136, 209, 0.35)',
   },
   santaIconWrapper: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: 'rgba(255, 170, 128, 0.25)',
+    backgroundColor: 'rgba(79, 195, 247, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   santaIcon: {
     fontSize: 30,
-    color: SPRING_COLORS.accent,
+    color: SUMMER_COLORS.accent,
   },
   santaTextWrapper: {
     flexShrink: 1,
@@ -1031,7 +1025,7 @@ const styles = StyleSheet.create({
   santaSubtitle: {
     fontSize: 14,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.75)',
+    color: 'rgba(13, 33, 55, 0.65)',
     lineHeight: 20,
   },
   confirmContainer: {
@@ -1048,10 +1042,10 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 344,
     height: 64,
-    backgroundColor: '#FFCBA4',
+    backgroundColor: '#81D4FA',
     borderRadius: 24,
     // shadow
-    shadowColor: '#E8935A',
+    shadowColor: '#0277BD',
     shadowOffset: {
       width: 0,
       height: 4.5,
@@ -1068,7 +1062,7 @@ const styles = StyleSheet.create({
   divisor: {
     width: '100%',
     height: 0.5,
-    backgroundColor: '#D7E7DB',
+    backgroundColor: '#B3E5FC',
   },
   centeredView: {
     flex: 1,
@@ -1081,7 +1075,7 @@ const styles = StyleSheet.create({
     width: '90%',
     maxWidth: 634,
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    borderColor: SPRING_COLORS.accent,
+    borderColor: SUMMER_COLORS.accent,
     borderWidth: 1,
     borderRadius: 24,
     padding: 24,
@@ -1172,7 +1166,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 245, 235, 0.45)',
+    backgroundColor: 'rgba(232, 244, 253, 0.45)',
   },
   idleGradient: {
     flex: 1,
@@ -1181,56 +1175,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 24,
   },
-  idleBadge: {
-    backgroundColor: 'rgba(212, 132, 90, 0.15)',
-    borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.4)',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-  },
-  idleBadgeText: {
-    fontSize: 13,
-    fontFamily: 'Pretendard-SemiBold',
-    color: SPRING_COLORS.accent,
-    letterSpacing: 1,
-  },
-  idleEmoji: {
-    fontSize: 100,
-  },
   idleTitle: {
-    fontSize: 48,
-    fontFamily: 'Pretendard-Medium',
-    color: SPRING_COLORS.primary,
+    fontSize: 36,
+    fontFamily: 'Pretendard-SemiBold',
+    color: SUMMER_COLORS.primary,
     textAlign: 'center',
     letterSpacing: -1,
+    lineHeight: 50,
   },
   idleSubtitle: {
-    fontSize: 26,
+    fontSize: 20,
     fontFamily: 'Pretendard-Light',
-    color: 'rgba(61, 36, 22, 0.7)',
+    color: 'rgba(13, 33, 55, 0.6)',
     textAlign: 'center',
-    lineHeight: 38,
-  },
-  idleDots: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 8,
-  },
-  idleDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: 'rgba(212, 132, 90, 0.3)',
-  },
-  idleDotActive: {
-    backgroundColor: SPRING_COLORS.accent,
-    width: 24,
+    lineHeight: 32,
   },
   idleTapHint: {
     fontSize: 18,
     fontFamily: 'Pretendard-Light',
-    color: 'rgba(61, 36, 22, 1)',
+    color: 'rgba(13, 33, 55, 1)',
     marginTop: 8,
   },
 });
