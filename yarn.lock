@@ -2596,6 +2596,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@react-native-async-storage/async-storage@npm:^3.1.1":
+  version: 3.1.1
+  resolution: "@react-native-async-storage/async-storage@npm:3.1.1"
+  dependencies:
+    idb: 8.0.3
+  peerDependencies:
+    react: "*"
+    react-native: "*"
+  checksum: 4f2227cb7d7365bed1dc418404cb986aafcaefd7908671cc0f226fb7d264511b07c7d210699a997f7acda3c25f4ec23764f28ebf5e76cedd2438d5836fef9296
+  languageName: node
+  linkType: hard
+
 "@react-native-community/cli-clean@npm:20.0.0":
   version: 20.0.0
   resolution: "@react-native-community/cli-clean@npm:20.0.0"
@@ -2786,8 +2798,8 @@ __metadata:
   linkType: hard
 
 "@react-native-firebase/app@npm:^21.13.0":
-  version: 21.14.0
-  resolution: "@react-native-firebase/app@npm:21.14.0"
+  version: 21.13.0
+  resolution: "@react-native-firebase/app@npm:21.13.0"
   dependencies:
     firebase: 11.3.1
   peerDependencies:
@@ -2797,16 +2809,16 @@ __metadata:
   peerDependenciesMeta:
     expo:
       optional: true
-  checksum: 2af7c2eb36ae3eabd8a5c33e09232aca136347271470f6f0d56aabf3a1c497793570a3c183d57e310092ea226f6dab047cc406268f9308c59dbdecb225c2ba3a
+  checksum: 79635a4ad45ac6bc372df7ccf5dfa769fbaab3e85463285b8722ece979b1ff3c06af5e2d9b870d396e70f34ed05323b06ce0e4a85e3e5e4837c4fbd04a14d82b
   languageName: node
   linkType: hard
 
 "@react-native-firebase/firestore@npm:^21.13.0":
-  version: 21.14.0
-  resolution: "@react-native-firebase/firestore@npm:21.14.0"
+  version: 21.13.0
+  resolution: "@react-native-firebase/firestore@npm:21.13.0"
   peerDependencies:
-    "@react-native-firebase/app": 21.14.0
-  checksum: cd48ba04f61dca376c81a146eb2838b6694bfefaa2abef048e6a4567cc241e0d61f3c1d5017483231482a775253517124d9a18cffe2f0485be4f0cb01a9794f5
+    "@react-native-firebase/app": 21.13.0
+  checksum: 8fb68ee65a62643cd9b96c94abf12ad14e23fa6b415c94d36588cee832e5a08125d879cfa2a9553ad49a7c23391305be3ed62703baf1bfe769447a24d3c9c705
   languageName: node
   linkType: hard
 
@@ -3990,11 +4002,11 @@ __metadata:
   linkType: hard
 
 "baseline-browser-mapping@npm:^2.10.12":
-  version: 2.10.32
-  resolution: "baseline-browser-mapping@npm:2.10.32"
+  version: 2.10.33
+  resolution: "baseline-browser-mapping@npm:2.10.33"
   bin:
     baseline-browser-mapping: dist/cli.cjs
-  checksum: 2efb31c0b9ff426ae5d11646da7cdc23500cf21adffb66993778c38762499df5e537d3c9332542acf629675f8104073804f18115d5de5e6e4fb45abba096ec15
+  checksum: 7479b9a1aef3b3ddbb459eb15220db20c0414fc5d5dfb04f1e31cf4798138d1b07c62dfea107cd77bdc21720dbfb9882c9d2f13fc3d9a3ffadf66ad6d8831191
   languageName: node
   linkType: hard
 
@@ -6019,6 +6031,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"idb@npm:8.0.3":
+  version: 8.0.3
+  resolution: "idb@npm:8.0.3"
+  checksum: e0f160be2b9a3b031db25a3bd134b5187f1b51d7e2cdc85a0e5ec62b0f635a7e37847d4888c9d919e7de1e9d8646a9390ce42d249b6a0b30d538c651ab1c3852
+  languageName: node
+  linkType: hard
+
 "ieee754@npm:^1.1.13":
   version: 1.2.1
   resolution: "ieee754@npm:1.2.1"
@@ -7010,13 +7029,13 @@ __metadata:
   linkType: hard
 
 "js-yaml@npm:^4.1.0":
-  version: 4.1.1
-  resolution: "js-yaml@npm:4.1.1"
+  version: 4.2.0
+  resolution: "js-yaml@npm:4.2.0"
   dependencies:
     argparse: ^2.0.1
   bin:
     js-yaml: bin/js-yaml.js
-  checksum: ea2339c6930fe048ec31b007b3c90be2714ab3e7defcc2c27ebf30c74fd940358f29070b4345af0019ef151875bf3bc3f8644bea1bab0372652b5044813ac02d
+  checksum: 86bd35548a0c19cd1f5861147c09aa1f52eb0fc9464f34023524d22bbe079c62c30fd00750e63f632e8d12c12ad36ea0dd1e6bec5171c492ecad433d8db295eb
   languageName: node
   linkType: hard
 
@@ -7114,12 +7133,12 @@ __metadata:
   linkType: hard
 
 "launch-editor@npm:^2.9.1":
-  version: 2.14.0
-  resolution: "launch-editor@npm:2.14.0"
+  version: 2.14.1
+  resolution: "launch-editor@npm:2.14.1"
   dependencies:
     picocolors: ^1.1.1
     shell-quote: ^1.8.4
-  checksum: 279ade5f7a17bdafe8e41060b5cb305765fe77688b6984b36da3453b0624bd80c92bdf0a9ebbb4f4d80209ddf7a47ff8f385c706bae5a6e74fdae0e38431a36f
+  checksum: 232ea8a80146e7fec6c8ece7ebb600d58a82e9938f36111194980188d276935f424754b18e37d5b098f596d30580def723b231e093c27c3bcd703418278afc4c
   languageName: node
   linkType: hard
 
@@ -8160,6 +8179,7 @@ __metadata:
     "@babel/preset-env": ^7.25.3
     "@babel/runtime": ^7.25.0
     "@gorhom/bottom-sheet": ^5
+    "@react-native-async-storage/async-storage": ^3.1.1
     "@react-native-community/cli": 20.0.0
     "@react-native-community/cli-platform-android": 20.0.0
     "@react-native-community/cli-platform-ios": 20.0.0
@@ -8268,8 +8288,8 @@ __metadata:
   linkType: hard
 
 "protobufjs@npm:^7.2.5":
-  version: 7.6.1
-  resolution: "protobufjs@npm:7.6.1"
+  version: 7.6.2
+  resolution: "protobufjs@npm:7.6.2"
   dependencies:
     "@protobufjs/aspromise": ^1.1.2
     "@protobufjs/base64": ^1.1.2
@@ -8283,7 +8303,7 @@ __metadata:
     "@protobufjs/utf8": ^1.1.1
     "@types/node": ">=13.7.0"
     long: ^5.3.2
-  checksum: d143b02ae73d3d777f7239e1025e7b8a9b6e1234ee7fbcda4f6ca1e06902e0bd019475e8e26710e1e2b127ad4452b35dcec4815330ba2fa957c9c13c52501701
+  checksum: af5cb436ed453584edf1a7003676a55d9e6e1205f191e93cf671273c946963b2eff9ac80baf384d6e57fc0fc8b3436ef7bee0af39f361aae5de0297c4fa46ea5
   languageName: node
   linkType: hard
 
@@ -9458,12 +9478,12 @@ __metadata:
   linkType: hard
 
 "tinyglobby@npm:^0.2.12, tinyglobby@npm:^0.2.15":
-  version: 0.2.16
-  resolution: "tinyglobby@npm:0.2.16"
+  version: 0.2.17
+  resolution: "tinyglobby@npm:0.2.17"
   dependencies:
     fdir: ^6.5.0
     picomatch: ^4.0.4
-  checksum: db9d22ce1deb1095720a683c492cd5e80da0f71fed21ed697e2752f6f298edd8a1249dab197c86a26f001c180594a81bf532400fe519791ed2a2cb57b03bc337
+  checksum: 041e73eae568152c376551b21b8a27909d474166a8f405cdb0345991c50cf6afd0f878d7a387645d9c05d8ea2c9a55cc2fd2cfe6c5d5a5264770972b1adcad86
   languageName: node
   linkType: hard
 

@@ -12,7 +12,7 @@ import {getFirestore, doc, onSnapshot} from '@react-native-firebase/firestore';
 import {
   LeftArrowIcon,
 } from '../../components/Icons';
-import {normalizeUser} from '../../utils/coupons';
+import {normalizeUser, getEarliestExpiry, filterExpiredCoupons} from '../../utils/coupons';
 import {AnimatedBall} from '../../components/decorations';
 // import {BackgroundDeco} from '../../components/background';
 import LinearGradient from 'react-native-linear-gradient';
@@ -122,12 +122,16 @@ const DashboardScreen = ({navigation, route}: any) => {
 
           if (!userRef.current && !prevUserRef.current) {
             console.log('최초 사용자 정보 저장');
-            setUser(normalizeUser(data, storeConfig.couponTypes));
+            const initial = normalizeUser(data, storeConfig.couponTypes);
+            const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(initial.coupons, initial.couponIssuedAt, storeConfig.couponExpiryDays);
+            setUser({...initial, coupons: vc, couponIssuedAt: vi});
             return;
           }
 
           setPrevUser(userRef.current);
-          setUser(normalizeUser(data, storeConfig.couponTypes));
+          const raw = normalizeUser(data, storeConfig.couponTypes);
+          const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(raw.coupons, raw.couponIssuedAt, storeConfig.couponExpiryDays);
+          setUser({...raw, coupons: vc, couponIssuedAt: vi});
         }
       });
     };
@@ -420,6 +424,11 @@ const DashboardScreen = ({navigation, route}: any) => {
                     user && storeConfig.couponTypes.map(ct => {
                       const count = user.coupons[ct.id] ?? 0;
                       if (count <= 0) return null;
+                      const expiry = getEarliestExpiry(
+                        user.couponIssuedAt,
+                        ct.id,
+                        storeConfig.couponExpiryDays,
+                      );
                       return (
                         <View key={ct.id} style={styles.beverageBox}>
                           <View>
@@ -427,7 +436,7 @@ const DashboardScreen = ({navigation, route}: any) => {
                               🎫 {ct.name} {count}장 무료로 사용 가능해요!
                             </Text>
                             <Text style={styles.beverageBodyText}>
-                              스탬프 {storeConfig.stampsPerCoupon}개 소진
+                              {expiry ? `${expiry}까지 사용 가능` : `스탬프 ${storeConfig.stampsPerCoupon}개 소진`}
                             </Text>
                           </View>
                         </View>

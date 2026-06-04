@@ -60,6 +60,9 @@ const StoreSettingsScreen = ({navigation}: any) => {
   const [idleTimeout, setIdleTimeout] = useState(
     String(storeConfig.idleTimeoutMs / 1000),
   );
+  const [couponExpiryDays, setCouponExpiryDays] = useState(
+    String(storeConfig.couponExpiryDays ?? 180),
+  );
   const [companyName, setCompanyName] = useState(storeConfig.companyName);
   const [contactEmail, setContactEmail] = useState(storeConfig.contactEmail);
   const [welcomeLine0, setWelcomeLine0] = useState(storeConfig.welcomeLines[0] ?? '');
@@ -86,6 +89,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
     setStampsPerCoupon(String(storeConfig.stampsPerCoupon));
     setSessionTimeout(String(storeConfig.sessionTimeoutSeconds));
     setIdleTimeout(String(storeConfig.idleTimeoutMs / 1000));
+    setCouponExpiryDays(String(storeConfig.couponExpiryDays ?? 180));
     setCompanyName(storeConfig.companyName);
     setContactEmail(storeConfig.contactEmail);
     setWelcomeLine0(storeConfig.welcomeLines[0] ?? '');
@@ -174,10 +178,17 @@ const StoreSettingsScreen = ({navigation}: any) => {
       }
     }
 
+    const ced = parseInt(couponExpiryDays, 10);
+    if (isNaN(ced) || ced < 0) {
+      Alert.alert('입력 오류', '쿠폰 유효기간은 0 이상이어야 합니다. (0 = 무기한)');
+      return;
+    }
+
     const updatedConfig: StoreConfig = {
       ...storeConfig,
       mode: storeMode,
       stampsPerCoupon: spc,
+      couponExpiryDays: ced,
       sessionTimeoutSeconds: st,
       idleTimeoutMs: it * 1000,
       companyName,
@@ -334,6 +345,18 @@ const StoreSettingsScreen = ({navigation}: any) => {
                     placeholder="쿠폰 B"
                   />
                 )}
+                <Field
+                  label="쿠폰 유효기간 (일)"
+                  value={couponExpiryDays}
+                  onChangeText={setCouponExpiryDays}
+                  keyboardType="numeric"
+                  placeholder="180"
+                />
+                <Text style={styles.segmentHint}>
+                  {parseInt(couponExpiryDays, 10) === 0
+                    ? '쿠폰 유효기간이 없습니다. (무기한)'
+                    : `쿠폰 발급일로부터 ${couponExpiryDays}일 후 만료됩니다.`}
+                </Text>
               </Section>
             </>
           )}
