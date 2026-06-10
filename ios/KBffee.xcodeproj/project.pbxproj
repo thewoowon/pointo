@@ -580,7 +580,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = CXVHHLS2K4;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = KBffee/Info.plist;
@@ -591,7 +591,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.7;
+				MARKETING_VERSION = 2.4.2;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -616,7 +616,7 @@
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = CXVHHLS2K4;
 				INFOPLIST_FILE = KBffee/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "포인토";
@@ -626,7 +626,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1.7;
+				MARKETING_VERSION = 2.4.2;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",

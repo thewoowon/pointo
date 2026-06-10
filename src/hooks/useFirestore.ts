@@ -24,6 +24,10 @@ export function getUserDocId(
   return storeCode ? `${phoneNumber}_${storeCode}` : phoneNumber;
 }
 
+function normalizePhone(phone: string): string {
+  return phone.replace(/[^0-9]/g, '');
+}
+
 function generateStoreCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -155,10 +159,10 @@ const useFirestore = (storeCode?: string | null) => {
 
       await setDoc(doc(storesRef, newStoreCode), {
         name: data.name,
-        ownerPhone: data.ownerPhone,
+        ownerPhone: normalizePhone(data.ownerPhone),
         createdAt: now,
         last_logged: now.split('T')[0],
-        status: 'pending',
+        status: 'approved',
       });
 
       const sessionsRef = collection(db, 'sessions');
@@ -560,6 +564,23 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
+  async function findStoreByPhone(
+    phone: string,
+  ): Promise<{storeCode: string; name: string}[]> {
+    try {
+      const db = getFirestore();
+      const q = query(
+        collection(db, 'stores'),
+        where('ownerPhone', '==', normalizePhone(phone)),
+      );
+      const snapshot = await getDocs(q);
+      return snapshot.docs.map(d => ({storeCode: d.id, name: d.data().name}));
+    } catch (error) {
+      console.error('Error finding store by phone:', error);
+      return [];
+    }
+  }
+
   async function updateStoreConfig(config: StoreConfig) {
     if (!storeCode) throw new Error('storeCode is required');
     const db = getFirestore();
@@ -588,6 +609,7 @@ const useFirestore = (storeCode?: string | null) => {
     resolveUserDocId,
     migrateUsersStoreCode,
     updateStoreConfig,
+    findStoreByPhone,
   };
 };
 

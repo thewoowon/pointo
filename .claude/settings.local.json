@@ -100,7 +100,14 @@
       "Bash(xcodebuild -workspace ios/KBffee.xcworkspace -scheme KBffee -configuration Debug -sdk iphonesimulator -destination 'platform=iOS Simulator,id=89FC4A07-09E3-47E3-B469-9C877F6319FD' build)",
       "Bash(grep -n \"SPRING_COLORS\\\\|HOLIDAY_COLORS\\\\|PETAL_COLORS\" /Users/mac/rrn/KBffee/src/screens/client/*.tsx /Users/mac/rrn/KBffee/src/components/decorations/*.tsx)",
       "Bash(yarn add *)",
-      "Bash(kill %1)"
+      "Bash(kill %1)",
+      "Bash(ls /Users/mac/dev/pointo* /Users/mac/dev/generate-guide*)",
+      "Bash(xcodebuild -workspace KBffee.xcworkspace -scheme KBffee -sdk iphonesimulator -destination 'id=89FC4A07-09E3-47E3-B469-9C877F6319FD' -quiet build)",
+      "Bash(xcodebuild -workspace /Users/mac/rrn/KBffee/ios/KBffee.xcworkspace -scheme KBffee -sdk iphonesimulator -destination 'id=89FC4A07-09E3-47E3-B469-9C877F6319FD' -quiet build)",
+      "Bash(xcodebuild -workspace /Users/mac/rrn/KBffee/ios/KBffee.xcworkspace -scheme KBffee -sdk iphonesimulator -destination 'id=89FC4A07-09E3-47E3-B469-9C877F6319FD' build)",
+      "Bash(xcodebuild -workspace KBffee.xcworkspace -scheme KBffee -sdk iphonesimulator -destination 'id=89FC4A07-09E3-47E3-B469-9C877F6319FD' build)",
+      "Bash(xcrun simctl *)",
+      "Bash(grep -rn \"session_\\\\${storeCode}\\\\|doc\\(db.*storeCode\\\\|doc\\(db.*store\" /Users/mac/rrn/KBffee/src/screens/supervisor/)"
     ]
   }
 }

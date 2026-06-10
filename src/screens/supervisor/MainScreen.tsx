@@ -1,6 +1,7 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
+  InteractionManager,
   Modal,
   Pressable,
   SafeAreaView,
@@ -88,13 +89,18 @@ const MainScreen = ({navigation, route}: any) => {
   });
   const [customerSearchVisible, setCustomerSearchVisible] = useState(false);
   const [customerSearchInput, setCustomerSearchInput] = useState('');
-  // BottomSheet 애니메이션 값을 관리하는 shared value
+  const [bottomSheetReady, setBottomSheetReady] = useState(false);
   const bottomSheetTranslateY = useSharedValue(0);
   const [currentIndex, setCurrentIndex] = useState(-1);
-  // ref
   const bottomSheetRef = useRef<BottomSheet>(null);
-  // 바텀 시트의 snap 포인트 정의
   const snapPoints = useMemo(() => [256], []);
+
+  useEffect(() => {
+    const handle = InteractionManager.runAfterInteractions(() => {
+      setBottomSheetReady(true);
+    });
+    return () => handle.cancel();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -1076,96 +1082,94 @@ const MainScreen = ({navigation, route}: any) => {
             </View>}
           </View>
         </View>
-        <BottomSheet
-          ref={bottomSheetRef}
-          // BottomSheet는 처음에 펼쳐진 상태로 시작
-          index={-1}
-          // 일단 스냅 포인트는 300, 550으로 설정
-          handleIndicatorStyle={{
-            display: 'none',
-          }}
-          containerStyle={{
-            zIndex: 3,
-          }}
-          // dim 처리
-          snapPoints={snapPoints}
-          enablePanDownToClose
-          enableDynamicSizing={false}
-          onAnimate={(fromIndex, toIndex) => {
-            if (toIndex === 0) {
-              setCurrentIndex(0);
-              bottomSheetTranslateY.value = 0;
-            } else {
-              setCurrentIndex(-1);
-              bottomSheetTranslateY.value = 0;
-            }
-            ``;
-          }}>
-          <BottomSheetView
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              paddingHorizontal: 32,
-              paddingTop: 10,
-              paddingBottom: 44,
-              gap: 24,
+        {bottomSheetReady && (
+          <BottomSheet
+            ref={bottomSheetRef}
+            index={-1}
+            handleIndicatorStyle={{
+              display: 'none',
+            }}
+            containerStyle={{
+              zIndex: 3,
+            }}
+            snapPoints={snapPoints}
+            enablePanDownToClose
+            enableDynamicSizing={false}
+            onAnimate={(fromIndex, toIndex) => {
+              if (toIndex === 0) {
+                setCurrentIndex(0);
+                bottomSheetTranslateY.value = 0;
+              } else {
+                setCurrentIndex(-1);
+                bottomSheetTranslateY.value = 0;
+              }
             }}>
-            <Text
-              style={{
-                fontFamily: 'Pretendard-SemiBold ',
-                fontSize: 24,
-                lineHeight: 32,
-                letterSpacing: -1,
-                color: 'black',
-              }}>
-              내역 타입
-            </Text>
-            <View
+            <BottomSheetView
               style={{
                 flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 20,
+                paddingHorizontal: 32,
+                paddingTop: 10,
+                paddingBottom: 44,
+                gap: 24,
               }}>
-              {FILTER_LIST.map((item, index) => {
-                return (
-                  <Pressable
-                    key={index}
-                    onPress={() => {
-                      setSearchContext({
-                        ...searchContext,
-                        filter: item.value,
-                      });
-                      if (item.value === 'all') {
-                        setDisplayLogs(logs);
-                      } else {
-                        setDisplayLogs(
-                          logs.filter(
-                            log => log.action === `stamp_${item.value}`,
-                          ),
-                        );
-                      }
-                      bottomSheetRef.current?.close();
-                    }}>
-                    <Text
-                      style={{
-                        fontSize: 20,
-                        lineHeight: 28,
-                        fontFamily: 'Pretendard-Regular',
-                        color:
-                          searchContext.filter === item.value
-                            ? '#FE7901'
-                            : 'black',
+              <Text
+                style={{
+                  fontFamily: 'Pretendard-SemiBold ',
+                  fontSize: 24,
+                  lineHeight: 32,
+                  letterSpacing: -1,
+                  color: 'black',
+                }}>
+                내역 타입
+              </Text>
+              <View
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 20,
+                }}>
+                {FILTER_LIST.map((item, index) => {
+                  return (
+                    <Pressable
+                      key={index}
+                      onPress={() => {
+                        setSearchContext({
+                          ...searchContext,
+                          filter: item.value,
+                        });
+                        if (item.value === 'all') {
+                          setDisplayLogs(logs);
+                        } else {
+                          setDisplayLogs(
+                            logs.filter(
+                              log => log.action === `stamp_${item.value}`,
+                            ),
+                          );
+                        }
+                        bottomSheetRef.current?.close();
                       }}>
-                      {item.label}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </BottomSheetView>
-        </BottomSheet>
+                      <Text
+                        style={{
+                          fontSize: 20,
+                          lineHeight: 28,
+                          fontFamily: 'Pretendard-Regular',
+                          color:
+                            searchContext.filter === item.value
+                              ? '#FE7901'
+                              : 'black',
+                        }}>
+                        {item.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </BottomSheetView>
+          </BottomSheet>
+        )}
         {/* dim 처리 */}
         <Animated.View
           style={{

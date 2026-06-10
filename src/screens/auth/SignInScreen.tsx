@@ -21,12 +21,56 @@ const SignInScreen = ({navigation, route}: any) => {
   const title = mode === 'supervisor' ? '관리자 로그인' : '고객 로그인';
 
   const {setIsAuthenticated, setMode, initStoreCode, setStoreName} = useAuth();
-  const {getStores} = useFirestore();
+  const {getStores, findStoreByPhone} = useFirestore();
   const {track} = useAnalytics();
 
   const [storeCode, setStoreCode] = useState('');
+  const [findMode, setFindMode] = useState(false);
+  const [phone, setPhone] = useState('');
+  const [findLoading, setFindLoading] = useState(false);
   const handleChange = (text: string) => {
     setStoreCode(text);
+  };
+
+  const handleFindCode = async () => {
+    const trimmed = phone.trim();
+    if (!trimmed) {
+      Alert.alert('전화번호를 입력해주세요.');
+      return;
+    }
+    setFindLoading(true);
+    const results = await findStoreByPhone(trimmed);
+    setFindLoading(false);
+    if (results.length === 0) {
+      Alert.alert(
+        '조회 결과 없음',
+        '해당 전화번호로 등록된 스토어가 없습니다.',
+      );
+      return;
+    }
+    if (results.length === 1) {
+      Alert.alert(
+        '스토어 코드 찾기',
+        `${results[0].name}\n스토어 코드: ${results[0].storeCode}`,
+      );
+      setStoreCode(results[0].storeCode);
+      setFindMode(false);
+      return;
+    }
+    const message = results
+      .map(s => `${s.name} — ${s.storeCode}`)
+      .join('\n');
+    Alert.alert(
+      `등록된 스토어 ${results.length}개`,
+      message,
+      results.map(s => ({
+        text: s.name,
+        onPress: () => {
+          setStoreCode(s.storeCode);
+          setFindMode(false);
+        },
+      })),
+    );
   };
   const handleSignIn = async () => {
     if (storeCode === '') {
@@ -37,15 +81,6 @@ const SignInScreen = ({navigation, route}: any) => {
     const response = await getStores(storeCode);
     if (!response) {
       Alert.alert('존재하지 않는 스토어 코드입니다.');
-      return;
-    }
-
-    const storeStatus = response.status || 'approved';
-    if (storeStatus !== 'approved') {
-      Alert.alert(
-        '심사 중',
-        '스토어 등록 심사가 진행 중이에요.\n승인 완료 후 이용할 수 있습니다.',
-      );
       return;
     }
 
@@ -107,6 +142,39 @@ const SignInScreen = ({navigation, route}: any) => {
                 <Pressable style={styles.confirmButton} onPress={handleSignIn}>
                   <Text style={styles.confirmButtonText}>로그인</Text>
                 </Pressable>
+                {mode === 'supervisor' && !findMode && (
+                  <Pressable onPress={() => setFindMode(true)}>
+                    <Text style={styles.findCodeText}>
+                      스토어 코드를 잊으셨나요?
+                    </Text>
+                  </Pressable>
+                )}
+                {findMode && (
+                  <View style={styles.findCodeBox}>
+                    <Text style={styles.findCodeLabel}>
+                      가입 시 입력한 전화번호
+                    </Text>
+                    <TextInput
+                      style={styles.input}
+                      onChangeText={setPhone}
+                      value={phone}
+                      placeholder="01012345678"
+                      placeholderTextColor={'#6D6D6D'}
+                      keyboardType="phone-pad"
+                    />
+                    <Pressable
+                      style={[
+                        styles.confirmButton,
+                        styles.findButton,
+                      ]}
+                      onPress={handleFindCode}
+                      disabled={findLoading}>
+                      <Text style={styles.confirmButtonText}>
+                        {findLoading ? '조회 중...' : '스토어 코드 찾기'}
+                      </Text>
+                    </Pressable>
+                  </View>
+                )}
               </View>
             </View>
           </ScrollView>
@@ -216,6 +284,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
     fontFamily: 'Pretendard-Regular',
+  },
+  findCodeText: {
+    fontSize: 14,
+    color: '#6D6D6D',
+    fontFamily: 'Pretendard-Regular',
+    textDecorationLine: 'underline',
+  },
+  findCodeBox: {
+    width: '100%',
+    maxWidth: 391,
+    gap: 12,
+    alignItems: 'center',
+  },
+  findCodeLabel: {
+    fontSize: 16,
+    color: '#181818',
+    fontFamily: 'Pretendard-Medium',
+  },
+  findButton: {
+    backgroundColor: '#333',
+    shadowColor: '#333',
   },
 });
 

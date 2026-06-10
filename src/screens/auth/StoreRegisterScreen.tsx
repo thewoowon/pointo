@@ -14,7 +14,7 @@ import {
 import {useFirestore} from '../../hooks';
 
 const StoreRegisterScreen = ({navigation}: any) => {
-  const {registerStore} = useFirestore();
+  const {registerStore, findStoreByPhone} = useFirestore();
 
   const [storeName, setStoreName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
@@ -32,6 +32,41 @@ const StoreRegisterScreen = ({navigation}: any) => {
     }
 
     setIsLoading(true);
+
+    const existing = await findStoreByPhone(ownerPhone.trim());
+    if (existing.length > 0) {
+      setIsLoading(false);
+      const storeList = existing
+        .map(s => `${s.name} (${s.storeCode})`)
+        .join('\n');
+      return new Promise<void>(resolve => {
+        Alert.alert(
+          '이미 등록된 스토어가 있습니다',
+          `${storeList}\n\n새 스토어를 추가로 등록하시겠습니까?`,
+          [
+            {text: '취소', style: 'cancel', onPress: () => resolve()},
+            {
+              text: '새로 등록',
+              onPress: async () => {
+                setIsLoading(true);
+                const result = await registerStore({
+                  name: storeName.trim(),
+                  ownerPhone: ownerPhone.trim(),
+                });
+                setIsLoading(false);
+                if (!result) {
+                  Alert.alert('등록 중 오류가 발생했습니다. 다시 시도해주세요.');
+                } else {
+                  setRegisteredCode(result.storeCode);
+                }
+                resolve();
+              },
+            },
+          ],
+        );
+      });
+    }
+
     const result = await registerStore({
       name: storeName.trim(),
       ownerPhone: ownerPhone.trim(),
@@ -55,10 +90,10 @@ const StoreRegisterScreen = ({navigation}: any) => {
       <View style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
           <View style={styles.successContainer}>
-            <Text style={styles.successEmoji}>📋</Text>
-            <Text style={styles.successTitle}>등록 신청 완료</Text>
+            <Text style={styles.successEmoji}>🎉</Text>
+            <Text style={styles.successTitle}>등록 완료</Text>
             <Text style={styles.successSubtitle}>
-              심사가 완료되면 로그인할 수 있어요.{'\n'}보통 1~2일 내에 처리됩니다.
+              스토어가 개설되었어요.{'\n'}바로 로그인해서 사용할 수 있습니다.
             </Text>
 
             <View style={styles.codeBox}>
@@ -67,7 +102,7 @@ const StoreRegisterScreen = ({navigation}: any) => {
             </View>
 
             <Text style={styles.noticeText}>
-              스토어 코드를 꼭 기억해주세요.{'\n'}승인 후 로그인 시 필요합니다.
+              스토어 코드를 꼭 기억해주세요.{'\n'}관리자 로그인 시 필요합니다.
             </Text>
 
             <Pressable style={styles.confirmButton} onPress={handleGoHome}>

@@ -20,6 +20,8 @@ interface User {
   phase: string;
   /** 동적 쿠폰 보유 현황 (coupon type id → 개수) */
   coupons: Record<string, number>;
+  /** 쿠폰별 발급 시점 (coupon type id → ISO 날짜 배열, 오래된 순) */
+  couponIssuedAt?: Record<string, string[]>;
   // Firestore 레거시 필드 (하위 호환)
   americanoCoupons?: number;
   beverageCoupons?: number;
@@ -66,6 +68,8 @@ interface StoreConfig {
   // ── 포인트 모드 전용 ──
   pointPresets: PointPreset[];
   pointUnit: string;
+  /** 쿠폰 유효기간 (일). 0이면 무기한. */
+  couponExpiryDays: number;
   // ── 공통 ──
   levelTiers: LevelTier[];
   sessionTimeoutSeconds: number;

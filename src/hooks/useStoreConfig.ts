@@ -14,6 +14,7 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
     {id: 'coupon_a', name: '무료 쿠폰', description: '무료 쿠폰이 한장 생겨요!'},
   ],
   couponSequence: ['coupon_a'],
+  couponExpiryDays: 180,
   levelTiers: [
     {maxLevel: 0, emoji: '🌱', name: '새싹', color: '#6B9E78', bgColor: 'rgba(107,158,120,0.12)'},
     {maxLevel: 3, emoji: '⭐', name: '단골', color: '#D4845A', bgColor: 'rgba(212,132,90,0.12)'},

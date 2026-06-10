@@ -1,5 +1,5 @@
 import './gesture-handler.native';
-import React, {useEffect} from 'react';
+import React from 'react';
 
 import {NavigationContainer} from '@react-navigation/native';
 
@@ -7,7 +7,6 @@ import Toast, {BaseToast, ToastConfig} from 'react-native-toast-message';
 
 import {AuthProvider} from './src/contexts';
 import RootNavigator from './src/navigation/RootNavigator';
-import {useAuth} from './src/hooks';
 import MyCustomToast from './src/components/MyCustomToast';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
 
@@ -20,12 +19,6 @@ const toastConfig: ToastConfig = {
 };
 
 function App(): React.JSX.Element {
-  const {initializeAuth} = useAuth();
-
-  useEffect(() => {
-    initializeAuth();
-  }, []);
-
   return (
     <GestureHandlerRootView style={{flex: 1}}>
       <NavigationContainer

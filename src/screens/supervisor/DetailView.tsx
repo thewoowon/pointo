@@ -38,6 +38,9 @@ import {
   flattenCouponsForFirestore,
   makeUserContext,
   totalSelected,
+  addCouponTimestamp,
+  removeCouponTimestamps,
+  filterExpiredCoupons,
 } from '../../utils/coupons';
 
 const NUMBER_SEQUENCE = [
@@ -222,9 +225,11 @@ const DetailView = ({
     if (seq.indexOf(phase) === -1) {
       phase = seq[0];
     }
+    let issuedAt = user.couponIssuedAt;
     for (let index = 0; index < difference; index++) {
       const currentIdx = seq.indexOf(phase);
       coupons[phase] = (coupons[phase] ?? 0) + 1;
+      issuedAt = addCouponTimestamp(issuedAt, phase, 1);
       if (phase === storeConfig.levelIncrementOn) {
         level += 1;
       }
@@ -235,6 +240,7 @@ const DetailView = ({
       stamps: stampsTotal,
       phase,
       ...flattenCouponsForFirestore(coupons, storeConfig.couponTypes),
+      couponIssuedAt: issuedAt ?? {},
       level,
       last_used: new Date().toISOString().split('T')[0],
     };
@@ -333,8 +339,13 @@ const DetailView = ({
         (userContext.possibleCoupons[ct.id] ?? 0) -
         (userContext.selectedCoupon[ct.id] ?? 0);
     }
+    const remainingIssuedAt = removeCouponTimestamps(
+      user.couponIssuedAt,
+      userContext.selectedCoupon,
+    );
     await updateUser(phoneNumber, {
       ...flattenCouponsForFirestore(remainingCoupons, storeConfig.couponTypes),
+      couponIssuedAt: remainingIssuedAt,
     });
 
     const noteString = storeConfig.couponTypes
@@ -501,9 +512,15 @@ const DetailView = ({
               return;
             }
             const userProfile = normalizeUser(data, storeConfig.couponTypes);
-            setUser(userProfile);
+            const {coupons: validCoupons, issuedAt: validIssuedAt} = filterExpiredCoupons(
+              userProfile.coupons,
+              userProfile.couponIssuedAt,
+              storeConfig.couponExpiryDays,
+            );
+            const filtered = {...userProfile, coupons: validCoupons, couponIssuedAt: validIssuedAt};
+            setUser(filtered);
             setUserContext(
-              makeUserContext(userProfile.coupons, storeConfig.couponTypes),
+              makeUserContext(filtered.coupons, storeConfig.couponTypes),
             );
           }
         });

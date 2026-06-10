@@ -5,8 +5,9 @@ import {SwitcherScreen} from '../screens/common';
 
 const Tab = createBottomTabNavigator();
 
-const MainTab = () => (
+const MainTab = ({initialTab = 'Switcher'}: {initialTab?: string}) => (
   <Tab.Navigator
+    initialRouteName={initialTab}
     screenOptions={{
       // 간격 조정
       tabBarStyle: {
