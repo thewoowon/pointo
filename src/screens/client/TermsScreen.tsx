@@ -1,12 +1,12 @@
 import React from 'react';
 import {
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore} from '../../hooks';
 
 const TermsScreen = ({navigation, route}: any) => {

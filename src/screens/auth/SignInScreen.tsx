@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
 import {
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import {
   ScrollView,
   Platform,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useAnalytics} from '../../hooks';
 import {AnalyticsEvent} from '../../analytics/events';
 // import {BackgroundDeco} from '../../components/background';

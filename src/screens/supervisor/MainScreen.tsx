@@ -1,10 +1,8 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useState} from 'react';
 import {
   Alert,
-  InteractionManager,
   Modal,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -13,6 +11,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useAnalytics} from '../../hooks';
 import {AnalyticsEvent} from '../../analytics/events';
 import {doc, getFirestore, onSnapshot} from '@react-native-firebase/firestore';
@@ -33,8 +32,6 @@ import dayjs from 'dayjs';
 // import {BackgroundDeco} from '../../components/background';
 import DetailView from './DetailView';
 import {LoadingOverlay} from '../../components/overlay';
-import BottomSheet, {BottomSheetView} from '@gorhom/bottom-sheet';
-import Animated, {useSharedValue} from 'react-native-reanimated';
 
 const FILTER_LIST: {
   label: string;
@@ -89,18 +86,7 @@ const MainScreen = ({navigation, route}: any) => {
   });
   const [customerSearchVisible, setCustomerSearchVisible] = useState(false);
   const [customerSearchInput, setCustomerSearchInput] = useState('');
-  const [bottomSheetReady, setBottomSheetReady] = useState(false);
-  const bottomSheetTranslateY = useSharedValue(0);
-  const [currentIndex, setCurrentIndex] = useState(-1);
-  const bottomSheetRef = useRef<BottomSheet>(null);
-  const snapPoints = useMemo(() => [256], []);
-
-  useEffect(() => {
-    const handle = InteractionManager.runAfterInteractions(() => {
-      setBottomSheetReady(true);
-    });
-    return () => handle.cancel();
-  }, []);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -269,25 +255,25 @@ const MainScreen = ({navigation, route}: any) => {
               {
                 justifyContent: 'space-between',
                 backgroundColor: '#3D4C57',
-                paddingVertical: 18,
-                paddingHorizontal: 24,
+                paddingVertical: isCompact ? 10 : 18,
+                paddingHorizontal: isCompact ? 12 : 24,
               },
             ]}>
             {storeName ? (
-              <Text style={{color: '#FFFFFF', fontSize: 16, fontFamily: 'Pretendard-SemiBold'}}>{storeName}</Text>
+              <Text style={{color: '#FFFFFF', fontSize: isCompact ? 13 : 16, fontFamily: 'Pretendard-SemiBold'}}>{storeName}</Text>
             ) : <View />}
-            <View style={[styles.flexRowBox, {gap: 8}]}>
-              <Pressable style={styles.button} onPress={() => navigation.navigate('StoreSettings')}>
-                <GearIcon width={22} height={22} />
-                <Text style={styles.buttonText}>설정</Text>
+            <View style={[styles.flexRowBox, {gap: isCompact ? 6 : 8}]}>
+              <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={() => navigation.navigate('StoreSettings')}>
+                <GearIcon width={isCompact ? 16 : 22} height={isCompact ? 16 : 22} />
+                {!isCompact && <Text style={styles.buttonText}>설정</Text>}
               </Pressable>
-              <Pressable style={styles.button} onPress={handleStatistics}>
-                <StatisticIcon width={24} height={24} />
-                <Text style={styles.buttonText}>대시보드</Text>
+              <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={handleStatistics}>
+                <StatisticIcon width={isCompact ? 18 : 24} height={isCompact ? 18 : 24} />
+                {!isCompact && <Text style={styles.buttonText}>대시보드</Text>}
               </Pressable>
-              <Pressable style={styles.button} onPress={handleLogout}>
-                <Text style={styles.buttonText}>로그아웃</Text>
-                <ProfileIcon width={20} height={20} />
+              <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={handleLogout}>
+                {!isCompact && <Text style={styles.buttonText}>로그아웃</Text>}
+                <ProfileIcon width={isCompact ? 16 : 20} height={isCompact ? 16 : 20} />
               </Pressable>
             </View>
           </View>
@@ -321,7 +307,7 @@ const MainScreen = ({navigation, route}: any) => {
                   <Pressable
                     style={styles.filterBox}
                     onPress={() => {
-                      bottomSheetRef.current?.expand();
+                      setFilterModalVisible(true);
                     }}>
                     <Text style={styles.filterBoxText}>
                       {FILTER_MAP[searchContext.filter]}
@@ -364,36 +350,37 @@ const MainScreen = ({navigation, route}: any) => {
                     styles.flexRowBox,
                     {
                       justifyContent: 'space-between',
-                      marginBottom: 32,
+                      marginBottom: isCompact ? 16 : 32,
                       gap:
                         date.format('YYYY-MM-DD') !==
                         dayjs().format('YYYY-MM-DD')
                           ? 10
                           : 0,
+                      flexWrap: isCompact ? 'wrap' : undefined,
                     },
                   ]}>
                   <View
                     style={[
                       styles.flexRowBox,
                       {
-                        gap: 12,
+                        gap: isCompact ? 8 : 12,
                       },
                     ]}>
                     <View
                       style={[
                         styles.flexRowBox,
                         {
-                          gap: 12,
+                          gap: isCompact ? 6 : 12,
                         },
                       ]}>
-                      <Text style={styles.titleText}>적립내역</Text>
-                      <Text style={styles.titleSideText}>{logs.length}건</Text>
+                      <Text style={[styles.titleText, isCompact && {fontSize: 18}]}>적립내역</Text>
+                      <Text style={[styles.titleSideText, isCompact && {fontSize: 12}]}>{logs.length}건</Text>
                     </View>
                     <View
                       style={[
                         styles.flexRowBox,
                         {
-                          gap: 18,
+                          gap: isCompact ? 8 : 18,
                         },
                       ]}>
                       {date.format('YYYY-MM-DD') !==
@@ -404,17 +391,17 @@ const MainScreen = ({navigation, route}: any) => {
                             styles.flexRowBox,
                             {
                               backgroundColor: '#F3F3F3',
-                              width: 70,
-                              height: 32,
+                              width: isCompact ? 56 : 70,
+                              height: isCompact ? 28 : 32,
                               borderRadius: 6,
                               gap: 4,
                             },
                           ]}>
-                          <RefreshIcon width={16} height={16} />
+                          <RefreshIcon width={isCompact ? 12 : 16} height={isCompact ? 12 : 16} />
                           <Text
                             style={{
-                              fontSize: 16,
-                              lineHeight: 26,
+                              fontSize: isCompact ? 12 : 16,
+                              lineHeight: isCompact ? 18 : 26,
                               letterSpacing: -1,
                               fontFamily: 'Pretendard-Medium',
                               color: '#595959',
@@ -427,23 +414,23 @@ const MainScreen = ({navigation, route}: any) => {
                         style={[
                           styles.flexRowBox,
                           {
-                            gap: 12,
+                            gap: isCompact ? 6 : 12,
                           },
                         ]}>
                         <Pressable onPress={() => handleDateMinusChange(1)}>
-                          <ShortLeftArrowIcon width={24} height={24} />
+                          <ShortLeftArrowIcon width={isCompact ? 18 : 24} height={isCompact ? 18 : 24} />
                         </Pressable>
                         <Text
                           style={{
                             fontFamily: 'Pretendard-Medium',
-                            fontSize: 16,
-                            lineHeight: 26,
+                            fontSize: isCompact ? 13 : 16,
+                            lineHeight: isCompact ? 20 : 26,
                             letterSpacing: -1,
                           }}>
                           {date.format('MM월 DD일')}
                         </Text>
                         <Pressable onPress={() => handleDatePlusChange(1)}>
-                          <ShortRightArrowIcon width={24} height={24} />
+                          <ShortRightArrowIcon width={isCompact ? 18 : 24} height={isCompact ? 18 : 24} />
                         </Pressable>
                       </View>
                     </View>
@@ -477,6 +464,8 @@ const MainScreen = ({navigation, route}: any) => {
                   flex: 1,
                   paddingHorizontal: 12,
                 }}>
+                {/* 테이블 헤더 — tablet only */}
+                {!isCompact && (
                 <View
                   style={[
                     styles.flexRowBox,
@@ -540,15 +529,91 @@ const MainScreen = ({navigation, route}: any) => {
                     일시
                   </Text>
                 </View>
+                )}
                 <ScrollView style={styles.scrollView}>
                   <View
-                    style={{display: 'flex', flexDirection: 'column', gap: 16}}>
+                    style={{display: 'flex', flexDirection: 'column', gap: isCompact ? 8 : 16}}>
                     {displayLogs.length > 0 ? (
                       displayLogs
                         .filter(log =>
                           log.phone_number.startsWith(searchContext.searchText),
                         )
-                        .map((statistic, index) => (
+                        .map((statistic, index) =>
+                          isCompact ? (
+                          <Pressable
+                            key={index}
+                            style={{
+                              backgroundColor: '#FAFAFA',
+                              borderRadius: 10,
+                              padding: 12,
+                              gap: 6,
+                            }}
+                            onPress={() => handleClickLog(statistic)}>
+                            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+                              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
+                                <View
+                                  style={{
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    borderRadius: 5,
+                                    paddingHorizontal: 8,
+                                    height: 26,
+                                    backgroundColor:
+                                      statistic.action === 'stamp_saved'
+                                        ? '#FFEBD7'
+                                        : '#E8F1FF',
+                                  }}>
+                                  <Text
+                                    style={{
+                                      fontSize: 12,
+                                      fontFamily: 'Pretendard-Medium',
+                                      color:
+                                        statistic.action === 'stamp_saved'
+                                          ? '#FF8400'
+                                          : '#3F8CFF',
+                                    }}>
+                                    {statistic.action === 'stamp_saved'
+                                      ? '적립'
+                                      : '사용'}{' '}
+                                    {statistic.stamp}
+                                  </Text>
+                                </View>
+                                <Text
+                                  style={{
+                                    color: '#1B2128',
+                                    fontSize: 13,
+                                    fontFamily: 'Pretendard-Medium',
+                                    letterSpacing: -0.5,
+                                  }}>
+                                  {statistic.phone_number.replace(
+                                    /(\d{3})(\d{4})(\d{4})/,
+                                    '$1-$2-$3',
+                                  )}
+                                </Text>
+                              </View>
+                              <Text
+                                style={{
+                                  color: '#878B8F',
+                                  fontSize: 11,
+                                  letterSpacing: -0.5,
+                                }}>
+                                {dayjs(statistic.timestamp).format('HH:mm')}
+                              </Text>
+                            </View>
+                            {statistic.note ? (
+                              <Text
+                                style={{
+                                  color: '#666',
+                                  fontSize: 12,
+                                  fontFamily: 'Pretendard-Light',
+                                  letterSpacing: -0.3,
+                                }}
+                                numberOfLines={1}>
+                                {statistic.note}
+                              </Text>
+                            ) : null}
+                          </Pressable>
+                          ) : (
                           <Pressable
                             key={index}
                             style={styles.listBox}
@@ -603,13 +668,10 @@ const MainScreen = ({navigation, route}: any) => {
                                   letterSpacing: -1,
                                   fontFamily: 'Pretendard-Medium',
                                 }}>
-                                {
-                                  // 3자리 , 4자리 ,4자리
-                                  statistic.phone_number.replace(
-                                    /(\d{3})(\d{4})(\d{4})/,
-                                    '$1-$2-$3',
-                                  )
-                                }
+                                {statistic.phone_number.replace(
+                                  /(\d{3})(\d{4})(\d{4})/,
+                                  '$1-$2-$3',
+                                )}
                               </Text>
                               <Text
                                 style={{
@@ -635,7 +697,8 @@ const MainScreen = ({navigation, route}: any) => {
                               )}
                             </Text>
                           </Pressable>
-                        ))
+                          ),
+                        )
                     ) : (
                       <View
                         style={{
@@ -1082,41 +1145,32 @@ const MainScreen = ({navigation, route}: any) => {
             </View>}
           </View>
         </View>
-        {bottomSheetReady && (
-          <BottomSheet
-            ref={bottomSheetRef}
-            index={-1}
-            handleIndicatorStyle={{
-              display: 'none',
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={filterModalVisible}
+          onRequestClose={() => setFilterModalVisible(false)}>
+          <Pressable
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.5)',
+              justifyContent: 'flex-end',
             }}
-            containerStyle={{
-              zIndex: 3,
-            }}
-            snapPoints={snapPoints}
-            enablePanDownToClose
-            enableDynamicSizing={false}
-            onAnimate={(fromIndex, toIndex) => {
-              if (toIndex === 0) {
-                setCurrentIndex(0);
-                bottomSheetTranslateY.value = 0;
-              } else {
-                setCurrentIndex(-1);
-                bottomSheetTranslateY.value = 0;
-              }
-            }}>
-            <BottomSheetView
+            onPress={() => setFilterModalVisible(false)}>
+            <Pressable
               style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
+                backgroundColor: 'white',
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
                 paddingHorizontal: 32,
-                paddingTop: 10,
+                paddingTop: 24,
                 paddingBottom: 44,
                 gap: 24,
-              }}>
+              }}
+              onPress={e => e.stopPropagation()}>
               <Text
                 style={{
-                  fontFamily: 'Pretendard-SemiBold ',
+                  fontFamily: 'Pretendard-SemiBold',
                   fontSize: 24,
                   lineHeight: 32,
                   letterSpacing: -1,
@@ -1126,8 +1180,6 @@ const MainScreen = ({navigation, route}: any) => {
               </Text>
               <View
                 style={{
-                  flex: 1,
-                  display: 'flex',
                   flexDirection: 'column',
                   gap: 20,
                 }}>
@@ -1149,7 +1201,7 @@ const MainScreen = ({navigation, route}: any) => {
                             ),
                           );
                         }
-                        bottomSheetRef.current?.close();
+                        setFilterModalVisible(false);
                       }}>
                       <Text
                         style={{
@@ -1167,22 +1219,9 @@ const MainScreen = ({navigation, route}: any) => {
                   );
                 })}
               </View>
-            </BottomSheetView>
-          </BottomSheet>
-        )}
-        {/* dim 처리 */}
-        <Animated.View
-          style={{
-            ...StyleSheet.absoluteFillObject,
-            backgroundColor: 'rgba(0,0,0,0.5)',
-            zIndex: 2,
-            // bottomSheetRef가 열리면 dim 처리
-            display: currentIndex === 0 ? 'flex' : 'none',
-          }}
-          onTouchStart={() => {
-            bottomSheetRef.current?.close();
-          }}
-        />
+            </Pressable>
+          </Pressable>
+        </Modal>
         {/* 고객 조회 모달 */}
         <Modal
           animationType="fade"
@@ -1375,6 +1414,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.07,
     shadowRadius: 22,
     elevation: 6,
+  },
+  buttonCompact: {
+    width: 40,
+    height: 34,
+    gap: 0,
   },
   buttonText: {
     color: '#191D2B',

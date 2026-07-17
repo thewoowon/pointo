@@ -107,7 +107,16 @@
       "Bash(xcodebuild -workspace /Users/mac/rrn/KBffee/ios/KBffee.xcworkspace -scheme KBffee -sdk iphonesimulator -destination 'id=89FC4A07-09E3-47E3-B469-9C877F6319FD' build)",
       "Bash(xcodebuild -workspace KBffee.xcworkspace -scheme KBffee -sdk iphonesimulator -destination 'id=89FC4A07-09E3-47E3-B469-9C877F6319FD' build)",
       "Bash(xcrun simctl *)",
-      "Bash(grep -rn \"session_\\\\${storeCode}\\\\|doc\\(db.*storeCode\\\\|doc\\(db.*store\" /Users/mac/rrn/KBffee/src/screens/supervisor/)"
+      "Bash(grep -rn \"session_\\\\${storeCode}\\\\|doc\\(db.*storeCode\\\\|doc\\(db.*store\" /Users/mac/rrn/KBffee/src/screens/supervisor/)",
+      "Bash(grep -E \"\\\\.\\(ts|tsx\\)$\")",
+      "Bash(npx eslint *)",
+      "Bash(LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 xcodebuild -workspace ios/KBffee.xcworkspace -list)",
+      "Bash(LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8 xcodebuild -workspace ios/KBffee.xcworkspace -scheme KBffee -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath ios/build CODE_SIGNING_ALLOWED=NO build > /tmp/kbffee_build.log 2>&1; echo \"EXIT_CODE=$?\")",
+      "Bash(awk '{print \"검증 빌드 폴더: \"$1\" 회수\"}')",
+      "Bash(awk 'NR==2{print \"  \"$4}')"
+    ],
+    "additionalDirectories": [
+      "/tmp"
     ]
   }
 }

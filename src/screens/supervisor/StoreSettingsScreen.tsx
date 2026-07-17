@@ -2,7 +2,6 @@ import React, {useEffect, useState} from 'react';
 import {
   Alert,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useStoreConfig} from '../../hooks';
 import {LeftArrowIcon} from '../../components/Icons';
 

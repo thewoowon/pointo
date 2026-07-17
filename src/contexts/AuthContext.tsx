@@ -7,6 +7,9 @@ type AuthSession = {
   storeCode: string;
   storeName: string | null;
   mode: 'supervisor' | 'client';
+  // 이메일 계정으로 로그인한 경우의 식별자 (스토어 코드 로그인은 없음 → 옵셔널)
+  ownerUid?: string | null;
+  ownerEmail?: string | null;
 };
 
 type AuthContextType = {
@@ -19,6 +22,11 @@ type AuthContextType = {
   initStoreCode: React.Dispatch<React.SetStateAction<string | null>>;
   storeName: string | null;
   setStoreName: React.Dispatch<React.SetStateAction<string | null>>;
+  // 이메일 계정 식별자. 스토어 코드 로그인 시에는 null (하위호환)
+  ownerUid: string | null;
+  setOwnerUid: React.Dispatch<React.SetStateAction<string | null>>;
+  ownerEmail: string | null;
+  setOwnerEmail: React.Dispatch<React.SetStateAction<string | null>>;
   isLoading: boolean;
 };
 
@@ -33,6 +41,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   const [mode, setMode] = useState<'supervisor' | 'client'>('supervisor');
   const [storeCode, initStoreCode] = useState<string | null>(null);
   const [storeName, setStoreName] = useState<string | null>(null);
+  const [ownerUid, setOwnerUid] = useState<string | null>(null);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const persistSession = useCallback(async (session: AuthSession | null) => {
@@ -53,6 +63,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         initStoreCode(session.storeCode);
         setStoreName(session.storeName);
         setMode(session.mode);
+        // 기존(필드 없는) 세션도 안전하게 복원 — 옵셔널 체이닝으로 undefined 허용
+        setOwnerUid(session.ownerUid ?? null);
+        setOwnerEmail(session.ownerEmail ?? null);
         setIsAuthenticated(true);
       }
     } catch {
@@ -69,11 +82,20 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated && storeCode) {
-      persistSession({storeCode, storeName, mode});
+      persistSession({storeCode, storeName, mode, ownerUid, ownerEmail});
     } else if (!isAuthenticated) {
       persistSession(null);
     }
-  }, [isAuthenticated, storeCode, storeName, mode, isLoading, persistSession]);
+  }, [
+    isAuthenticated,
+    storeCode,
+    storeName,
+    mode,
+    ownerUid,
+    ownerEmail,
+    isLoading,
+    persistSession,
+  ]);
 
   return (
     <AuthContext.Provider
@@ -87,6 +109,10 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         initStoreCode,
         storeName,
         setStoreName,
+        ownerUid,
+        setOwnerUid,
+        ownerEmail,
+        setOwnerEmail,
         isLoading,
       }}>
       {children}

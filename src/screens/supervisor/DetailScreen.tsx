@@ -1,7 +1,6 @@
 import React, {useCallback, useState} from 'react';
 import {
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -9,6 +8,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useStoreConfig} from '../../hooks';
 import {
   doc,

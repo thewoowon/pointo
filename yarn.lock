@@ -2786,18 +2786,18 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-firebase/analytics@npm:^21.13.0":
-  version: 21.14.0
-  resolution: "@react-native-firebase/analytics@npm:21.14.0"
+"@react-native-firebase/analytics@npm:21.13.0":
+  version: 21.13.0
+  resolution: "@react-native-firebase/analytics@npm:21.13.0"
   dependencies:
     superstruct: ^2.0.2
   peerDependencies:
-    "@react-native-firebase/app": 21.14.0
-  checksum: 09420b578457075540f4fea4c2e9b3de8b58f3d3c36c4cb568d5ecf525c76b4ba1ba3178364c61c38d24b32a1dca8c4f9e9b335830c3e7500d7472e157316c1d
+    "@react-native-firebase/app": 21.13.0
+  checksum: 91dee54f886bec0ab32a0937d4af9943eef3469b0e3f2929a74361601a6f3ccf6ff67a881dbb9a0546b7d2c4db80c51ca7c1b09cdce1ecff989add41049d70bb
   languageName: node
   linkType: hard
 
-"@react-native-firebase/app@npm:^21.13.0":
+"@react-native-firebase/app@npm:21.13.0":
   version: 21.13.0
   resolution: "@react-native-firebase/app@npm:21.13.0"
   dependencies:
@@ -2813,7 +2813,22 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@react-native-firebase/firestore@npm:^21.13.0":
+"@react-native-firebase/auth@npm:21.13.0":
+  version: 21.13.0
+  resolution: "@react-native-firebase/auth@npm:21.13.0"
+  dependencies:
+    plist: ^3.1.0
+  peerDependencies:
+    "@react-native-firebase/app": 21.13.0
+    expo: ">=47.0.0"
+  peerDependenciesMeta:
+    expo:
+      optional: true
+  checksum: 9c089a1a4a6781d883b25187ff2a619e69a7a2903c71a30b737a11f233fca0f48328eaa7c6e017271c8e5e6bc70ed7df1e4fe99b21be3b8476f4fce434b4a0bb
+  languageName: node
+  linkType: hard
+
+"@react-native-firebase/firestore@npm:21.13.0":
   version: 21.13.0
   resolution: "@react-native-firebase/firestore@npm:21.13.0"
   peerDependencies:
@@ -3496,6 +3511,13 @@ __metadata:
   version: 9.3.2
   resolution: "@vscode/sudo-prompt@npm:9.3.2"
   checksum: 811ff9bd99efc3e814e6bd1da8064452a1f2b0057f08d1c7a18428e04c13ac3db356a1cdcf8011a35ac84a47d3d351b8bb8b776dea0f9caac16e6f26b6611496
+  languageName: node
+  linkType: hard
+
+"@xmldom/xmldom@npm:^0.9.10":
+  version: 0.9.10
+  resolution: "@xmldom/xmldom@npm:0.9.10"
+  checksum: 420f3ba52316163384ce626cda087d06b0eb5888d393b00bbc5f56489bbaccc8633e9b078942ee05facda93fbf813b209a5deb5044f89a6e04373305a0e573c0
   languageName: node
   linkType: hard
 
@@ -8171,6 +8193,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"plist@npm:^3.1.0":
+  version: 3.1.1
+  resolution: "plist@npm:3.1.1"
+  dependencies:
+    "@xmldom/xmldom": ^0.9.10
+    base64-js: ^1.5.1
+    xmlbuilder: ^15.1.1
+  checksum: 775b2befb6df97b145193e5c241dc63929c58c89673eebc51e06b4b5b3403d15d921140278644ddf6f51a6936d46450d35903a84fc4cba071c46d9c33141817d
+  languageName: node
+  linkType: hard
+
 "pointo@workspace:.":
   version: 0.0.0-use.local
   resolution: "pointo@workspace:."
@@ -8183,9 +8216,10 @@ __metadata:
     "@react-native-community/cli": 20.0.0
     "@react-native-community/cli-platform-android": 20.0.0
     "@react-native-community/cli-platform-ios": 20.0.0
-    "@react-native-firebase/analytics": ^21.13.0
-    "@react-native-firebase/app": ^21.13.0
-    "@react-native-firebase/firestore": ^21.13.0
+    "@react-native-firebase/analytics": 21.13.0
+    "@react-native-firebase/app": 21.13.0
+    "@react-native-firebase/auth": 21.13.0
+    "@react-native-firebase/firestore": 21.13.0
     "@react-native/babel-preset": 0.82.1
     "@react-native/eslint-config": 0.82.1
     "@react-native/metro-config": 0.82.1
@@ -10011,6 +10045,13 @@ __metadata:
     utf-8-validate:
       optional: true
   checksum: 3f32457a6019e6875cc0c2a037d4b4789da22a55b7be278e78845ec7614d28eaab9b36994cfdf9a18a48fe02f11c496168354b96b6ce202f65fe414cdf96f08c
+  languageName: node
+  linkType: hard
+
+"xmlbuilder@npm:^15.1.1":
+  version: 15.1.1
+  resolution: "xmlbuilder@npm:15.1.1"
+  checksum: 14f7302402e28d1f32823583d121594a9dca36408d40320b33f598bd589ca5163a352d076489c9c64d2dc1da19a790926a07bf4191275330d4de2b0d85bb1843
   languageName: node
   linkType: hard
 

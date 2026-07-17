@@ -1,12 +1,12 @@
 import React, {useCallback} from 'react';
 import {
   Image,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {doc, getFirestore, onSnapshot} from '@react-native-firebase/firestore';
 import {useAuth} from '../../hooks';
 import {useFocusEffect} from '@react-navigation/native';

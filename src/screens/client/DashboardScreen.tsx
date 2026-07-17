@@ -1,20 +1,18 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
   Pressable,
-  SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import {useAuth, useFirestore, useStoreConfig} from '../../hooks';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {useAuth, useFirestore, useStoreConfig, useDeviceType} from '../../hooks';
 import {getFirestore, doc, onSnapshot} from '@react-native-firebase/firestore';
-import {
-  LeftArrowIcon,
-} from '../../components/Icons';
+import {LeftArrowIcon} from '../../components/Icons';
 import {normalizeUser, getEarliestExpiry, filterExpiredCoupons} from '../../utils/coupons';
 import {AnimatedBall} from '../../components/decorations';
-// import {BackgroundDeco} from '../../components/background';
 import LinearGradient from 'react-native-linear-gradient';
 
 const SUMMER_COLORS = {
@@ -25,38 +23,25 @@ const SUMMER_COLORS = {
   softSky: '#B3E5FC',
 };
 
-// 여름 바다 에디션 (총 13개)
 const BALL_POSITIONS: {
-  position: {
-    top?: number;
-    left?: number;
-    right?: number;
-    bottom?: number;
-  };
+  position: {top?: number; left?: number; right?: number; bottom?: number};
   color: string;
   size: number;
   zIndex: number;
 }[] = [
-  {
-    position: {bottom: -4, left: -59},
-    color: '#FFEB3B',
-    size: 140,
-    zIndex: 1,
-  }, // 1 - 노랑
-  {position: {bottom: -100, left: 23}, color: '#4FC3F7', size: 140, zIndex: 6}, // 2 - 하늘
-  {position: {bottom: -30, left: 131}, color: '#FF7043', size: 140, zIndex: 5}, // 3 - 오렌지
-  {position: {bottom: -44, left: 219}, color: '#E8F5E9', size: 140, zIndex: 3}, // 4 - 민트
-  {position: {bottom: -23, right: -32}, color: '#81D4FA', size: 140, zIndex: 4}, // 5 - 연하늘
-
-  {position: {bottom: 85, left: -53}, color: '#B2EBF2', size: 140, zIndex: 6}, // 6 - 연민트
-  {position: {bottom: 15, left: 41}, color: '#FFEB3B', size: 140, zIndex: 13}, // 7 - 노랑
-  {position: {bottom: 62, left: 158}, color: '#4FC3F7', size: 140, zIndex: 1}, // 8 - 하늘
-  {position: {bottom: 85, right: 7}, color: '#FF7043', size: 140, zIndex: 5}, // 9 - 오렌지
-  {position: {bottom: 161, left: -48}, color: '#E8F5E9', size: 140, zIndex: 4}, // 10 - 민트
-
-  {position: {bottom: 136, left: 70}, color: '#81D4FA', size: 140, zIndex: 5}, // 11 - 연하늘
-  {position: {bottom: 123, left: 172}, color: '#FFEB3B', size: 140, zIndex: 1}, // 12 - 노랑
-  {position: {bottom: 193, right: -49}, color: '#4FC3F7', size: 140, zIndex: 1}, // 13 - 하늘
+  {position: {bottom: -11, left: -55}, color: '#FFEB3B', size: 128, zIndex: 1},
+  {position: {bottom: -90, left: 30}, color: '#4FC3F7', size: 128, zIndex: 6},
+  {position: {bottom: -30, left: 130}, color: '#FF7043', size: 128, zIndex: 5},
+  {position: {bottom: -40, right: 60}, color: '#E8F5E9', size: 128, zIndex: 3},
+  {position: {bottom: -20, right: -30}, color: '#FFEB3B', size: 128, zIndex: 4},
+  {position: {bottom: 75, left: -35}, color: '#81D4FA', size: 128, zIndex: 6},
+  {position: {bottom: 10, left: 50}, color: '#FF7043', size: 128, zIndex: 13},
+  {position: {bottom: 55, left: 160}, color: '#B2EBF2', size: 128, zIndex: 2},
+  {position: {bottom: 60, right: 28}, color: '#FFEB3B', size: 128, zIndex: 7},
+  {position: {bottom: 145, left: -30}, color: '#4FC3F7', size: 128, zIndex: 4},
+  {position: {bottom: 120, left: 78}, color: '#E8F5E9', size: 128, zIndex: 5},
+  {position: {bottom: 145, right: 47}, color: '#FF7043', size: 128, zIndex: 1},
+  {position: {bottom: 120, right: -43}, color: '#81D4FA', size: 128, zIndex: 6},
 ];
 
 const DashboardScreen = ({navigation, route}: any) => {
@@ -64,12 +49,15 @@ const DashboardScreen = ({navigation, route}: any) => {
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const isPointMode = storeConfig.mode === 'point';
+  const deviceType = useDeviceType();
+  const isPhone = deviceType === 'phone';
+
   const [timeLeft, setTimeLeft] = useState(60);
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [prevUser, setPrevUser] = useState<User | null>(null);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const userRef = useRef<User | null>(null);
   const prevUserRef = useRef<User | null>(null);
 
@@ -77,15 +65,60 @@ const DashboardScreen = ({navigation, route}: any) => {
 
   const phoneNumberLabel = () => {
     if (!phoneNumber || phoneNumber.length < 7) return phoneNumber || '';
-    return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(
-      3,
-      7,
-    )}-${phoneNumber.slice(7)}`;
+    return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(3, 7)}-${phoneNumber.slice(7)}`;
   };
 
   const goBack = async () => {
     setTimeLeft(3);
   };
+
+  const hasChange =
+    user &&
+    prevUser &&
+    (() => {
+      const prevCT = Object.values(prevUser.coupons).reduce((s, v) => s + v, 0);
+      const newCT = Object.values(user.coupons).reduce((s, v) => s + v, 0);
+      return user.stamps !== prevUser.stamps || newCT !== prevCT;
+    })();
+
+  const changeSummary = (() => {
+    if (!user || !prevUser || !hasChange) return null;
+    if (isPointMode) {
+      const diff = user.stamps - prevUser.stamps;
+      return {
+        type: diff > 0 ? ('earn' as const) : ('use' as const),
+        amount: Math.abs(diff),
+        unit: storeConfig.pointUnit,
+      };
+    }
+    const prevCT = Object.values(prevUser.coupons).reduce((s, v) => s + v, 0);
+    const newCT = Object.values(user.coupons).reduce((s, v) => s + v, 0);
+    const couponsEarned = newCT - prevCT;
+    if (user.stamps !== prevUser.stamps || couponsEarned > 0) {
+      const earned =
+        couponsEarned * storeConfig.stampsPerCoupon +
+        user.stamps -
+        prevUser.stamps;
+      return {type: 'earn' as const, amount: earned, unit: '개'};
+    }
+    const used = prevCT - newCT;
+    return {type: 'use' as const, amount: used, unit: '장'};
+  })();
+
+  const availableCoupons = user
+    ? storeConfig.couponTypes
+        .map(ct => {
+          const count = user.coupons[ct.id] ?? 0;
+          if (count <= 0) return null;
+          const expiry = getEarliestExpiry(
+            user.couponIssuedAt,
+            ct.id,
+            storeConfig.couponExpiryDays,
+          );
+          return {id: ct.id, name: ct.name, count, expiry};
+        })
+        .filter(Boolean)
+    : [];
 
   useEffect(() => {
     setTimeLeft(storeConfig.sessionTimeoutSeconds);
@@ -111,26 +144,29 @@ const DashboardScreen = ({navigation, route}: any) => {
       if (cancelled) return;
       const _userRef = doc(db, 'users', docId);
 
-      unsubscribe = onSnapshot(_userRef, doc => {
-        if (doc.exists) {
-          const data = doc.data();
-          console.log('Dashboard Current User data: ', data);
-          if (!data) {
-            console.log('No data found');
-            return;
-          }
+      unsubscribe = onSnapshot(_userRef, docSnap => {
+        if (docSnap.exists) {
+          const data = docSnap.data();
+          if (!data) return;
 
           if (!userRef.current && !prevUserRef.current) {
-            console.log('최초 사용자 정보 저장');
             const initial = normalizeUser(data, storeConfig.couponTypes);
-            const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(initial.coupons, initial.couponIssuedAt, storeConfig.couponExpiryDays);
+            const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(
+              initial.coupons,
+              initial.couponIssuedAt,
+              storeConfig.couponExpiryDays,
+            );
             setUser({...initial, coupons: vc, couponIssuedAt: vi});
             return;
           }
 
           setPrevUser(userRef.current);
           const raw = normalizeUser(data, storeConfig.couponTypes);
-          const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(raw.coupons, raw.couponIssuedAt, storeConfig.couponExpiryDays);
+          const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(
+            raw.coupons,
+            raw.couponIssuedAt,
+            storeConfig.couponExpiryDays,
+          );
           setUser({...raw, coupons: vc, couponIssuedAt: vi});
         }
       });
@@ -150,26 +186,20 @@ const DashboardScreen = ({navigation, route}: any) => {
     const db = getFirestore();
     const sessionRef = doc(db, 'sessions', `session_${storeCode}`);
 
-    const unsubscribe = onSnapshot(sessionRef, doc => {
-      if (doc.exists) {
-        const data = doc.data();
-        console.log('Dashboard Current Session data: ', data);
-        if (!data) {
-          console.log('No data found');
-          return;
-        }
+    const unsubscribe = onSnapshot(sessionRef, docSnap => {
+      if (docSnap.exists) {
+        const data = docSnap.data();
+        if (!data) return;
 
         if (data.phone === '' && data.mode === 'waiting') {
-          setTimeLeft(3); // 즉시 종료 처리
+          setTimeLeft(3);
         }
 
         setSession(data as Session);
       }
     });
 
-    return () => {
-      unsubscribe(); // 🧹 리스너 정리
-    };
+    return () => unsubscribe();
   }, [storeCode]);
 
   useEffect(() => {
@@ -204,41 +234,280 @@ const DashboardScreen = ({navigation, route}: any) => {
     };
   }, [timeLeft]);
 
-  useEffect(() => {
-    console.log('📱 DashboardScreen mounted');
-    return () => {
-      console.log('🧹 DashboardScreen unmounted');
-    };
-  }, []);
+  // --- Change Info Panel ---
+  const renderChangeInfo = () => {
+    if (!changeSummary) return null;
+    return (
+      <View style={s.labelBox}>
+        {(() => {
+          if (isPointMode) {
+            return (
+              <>
+                <Text style={[s.labelTitleText, isPhone && {fontSize: 24, lineHeight: 34}]}>
+                  <Text style={{color: SUMMER_COLORS.accent}}>
+                    {changeSummary.amount.toLocaleString()}
+                    {changeSummary.unit}
+                  </Text>
+                  이
+                </Text>
+                <Text style={[s.labelTitleText, isPhone && {fontSize: 24, lineHeight: 34}]}>
+                  {changeSummary.type === 'earn'
+                    ? '적립되었습니다.'
+                    : '사용되었습니다.'}
+                </Text>
+              </>
+            );
+          }
+          return (
+            <>
+              <Text style={[s.labelTitleText, isPhone && {fontSize: 24, lineHeight: 34}]}>
+                <Text style={{color: SUMMER_COLORS.accent}}>
+                  {changeSummary.type === 'earn'
+                    ? `스탬프 ${changeSummary.amount}개`
+                    : `쿠폰 ${changeSummary.amount}장`}
+                </Text>
+                {changeSummary.type === 'earn' ? '가' : '이'}
+              </Text>
+              <Text style={[s.labelTitleText, isPhone && {fontSize: 24, lineHeight: 34}]}>
+                {changeSummary.type === 'earn'
+                  ? '적립되었습니다.'
+                  : '사용되었습니다.'}
+              </Text>
+            </>
+          );
+        })()}
+      </View>
+    );
+  };
 
+  // --- Coupon/Point Info ---
+  const renderRewardInfo = () => (
+    <View style={s.beverageWrapper}>
+      {isPointMode
+        ? user && (
+            <View style={[s.beverageBox, isPhone && {height: 72}]}>
+              <View>
+                <Text style={[s.beverageTitleText, isPhone && {fontSize: 16}]}>
+                  💰 보유 포인트
+                </Text>
+                <Text style={[s.beverageBodyText, isPhone && {fontSize: 13}]}>
+                  {user.stamps.toLocaleString()}
+                  {storeConfig.pointUnit} 사용 가능
+                </Text>
+              </View>
+            </View>
+          )
+        : availableCoupons.map((c: any) => (
+            <View key={c.id} style={[s.beverageBox, isPhone && {height: 72}]}>
+              <View>
+                <Text style={[s.beverageTitleText, isPhone && {fontSize: 16}]}>
+                  🎫 {c.name} {c.count}장 무료로 사용 가능해요!
+                </Text>
+                <Text style={[s.beverageBodyText, isPhone && {fontSize: 13}]}>
+                  {c.expiry
+                    ? `${c.expiry}까지 사용 가능`
+                    : `스탬프 ${storeConfig.stampsPerCoupon}개 소진`}
+                </Text>
+              </View>
+            </View>
+          ))}
+    </View>
+  );
+
+  // --- Stamp Card ---
+  const renderStampCard = () => {
+    const cardSize = isPhone
+      ? {width: '100%' as const, height: 280}
+      : {width: '90%' as const, maxWidth: 420, height: 552};
+    const stampFont = isPhone ? 52 : 76;
+    const stampLine = isPhone ? 62 : 86;
+    const unitFont = isPhone ? 20 : 28;
+
+    return (
+      <View
+        style={[
+          {
+            borderRadius: 35,
+            backgroundColor: '#ffffff',
+            shadowColor: '#000000',
+            shadowOffset: {width: 0, height: 4.5},
+            shadowOpacity: 0.07,
+            shadowRadius: 22,
+            elevation: 6,
+            position: 'relative',
+          },
+          cardSize,
+        ]}>
+        <View
+          style={{
+            flex: 1,
+            paddingTop: isPhone ? 24 : 59,
+            paddingLeft: isPhone ? 24 : 37,
+            paddingRight: isPhone ? 24 : 37,
+            paddingBottom: isPhone ? 16 : 28,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 4,
+          }}>
+          <View
+            style={{
+              width: '100%',
+              flexDirection: 'row',
+              justifyContent: 'flex-start',
+              alignItems: 'center',
+            }}>
+            <Text style={[s.labelSubText, {color: '#0D2137', fontSize: isPhone ? 16 : 20}]}>
+              {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
+            </Text>
+          </View>
+          <View
+            style={{
+              width: '100%',
+              flexDirection: 'row',
+              justifyContent: 'flex-end',
+              alignItems: 'baseline',
+              gap: 18,
+            }}>
+            {isPointMode ? (
+              <>
+                <Text style={[s.stampLeftText, {fontSize: stampFont, lineHeight: stampLine}]}>
+                  {user ? user.stamps.toLocaleString() : 0}
+                </Text>
+                <Text style={[s.stampRightText, {fontSize: unitFont}]}>
+                  {storeConfig.pointUnit}
+                </Text>
+              </>
+            ) : (
+              <>
+                <Text style={[s.stampLeftText, {fontSize: stampFont, lineHeight: stampLine}]}>
+                  {user ? user.stamps % storeConfig.stampsPerCoupon : 0}
+                </Text>
+                <Text style={[s.stampRightText, {fontSize: unitFont}]}>
+                  /{storeConfig.stampsPerCoupon}개
+                </Text>
+              </>
+            )}
+          </View>
+        </View>
+        <View
+          style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            overflow: 'hidden',
+            borderRadius: 35,
+          }}>
+          {!isPointMode &&
+            BALL_POSITIONS.slice(
+              0,
+              (user?.stamps ?? 0) % storeConfig.stampsPerCoupon,
+            ).map((ball, index) => (
+              <AnimatedBall key={index} index={index} ball={ball} />
+            ))}
+        </View>
+      </View>
+    );
+  };
+
+  // --- Phone Layout ---
+  if (isPhone) {
+    return (
+      <LinearGradient
+        colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
+        style={s.container}>
+        <StatusBar
+          barStyle="dark-content"
+          backgroundColor={SUMMER_COLORS.backgroundStart}
+          translucent={false}
+        />
+        <SafeAreaView style={s.backgroundStyle}>
+          <ScrollView
+            contentContainerStyle={{paddingBottom: 40, gap: 20}}
+            showsVerticalScrollIndicator={false}>
+            {/* Header */}
+            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+              <Pressable style={{flexDirection: 'row', alignItems: 'center', gap: 7}} onPress={goBack}>
+                <LeftArrowIcon color={SUMMER_COLORS.primary} />
+                <Text style={{fontSize: 16, fontFamily: 'Pretendard-Regular', color: SUMMER_COLORS.primary}}>
+                  뒤로가기
+                </Text>
+              </Pressable>
+              {timeLeft < 15 && (
+                <Text style={{fontSize: 14, fontFamily: 'Pretendard-Regular', color: 'rgba(13,33,55,0.5)'}}>
+                  <Text style={{fontFamily: 'Pretendard-SemiBold'}}>{timeLeft}</Text>초
+                </Text>
+              )}
+            </View>
+
+            {/* Holiday badge */}
+            <View style={s.holidayBadge}>
+              <Text style={s.holidayBadgeText}>Summer vibes 🏖️</Text>
+              <Text style={[s.holidayBadgeSubText, {color: SUMMER_COLORS.primary}]}>
+                시원한 여름 바다 느낌으로 즐겨보세요
+              </Text>
+            </View>
+
+            {/* User Info */}
+            <View style={{gap: 4}}>
+              <Text style={{fontSize: 16, fontFamily: 'Pretendard-Regular', color: 'rgba(13,33,55,0.65)', letterSpacing: -0.5}}>
+                <Text style={{color: SUMMER_COLORS.accent, fontFamily: 'SFUIDisplay-Semibold'}}>
+                  {phoneNumberLabel()}
+                </Text>
+                {' 님 반갑습니다.'}
+              </Text>
+              <Text style={{fontSize: 24, fontFamily: 'Pretendard-Medium', color: SUMMER_COLORS.primary, letterSpacing: -1, lineHeight: 34}}>
+                오늘도 좋은 하루 되세요 {'><'}
+              </Text>
+            </View>
+
+            {/* Change summary */}
+            {hasChange && (
+              <View style={{backgroundColor: 'rgba(2,136,209,0.08)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(2,136,209,0.2)'}}>
+                {renderChangeInfo()}
+              </View>
+            )}
+
+            {/* Stamp Card */}
+            <View style={{alignItems: 'center'}}>
+              {renderStampCard()}
+            </View>
+
+            {/* Reward Info */}
+            {renderRewardInfo()}
+
+            {/* Timer */}
+            <View style={{alignItems: 'center', paddingVertical: 8}}>
+              <Text style={{fontSize: 14, fontFamily: 'Pretendard-Regular', color: 'rgba(13,33,55,0.45)'}}>
+                <Text style={{fontFamily: 'Pretendard-SemiBold'}}>{timeLeft}</Text>초 후 화면이 종료됩니다
+              </Text>
+            </View>
+          </ScrollView>
+        </SafeAreaView>
+      </LinearGradient>
+    );
+  }
+
+  // --- Tablet Layout ---
   return (
     <LinearGradient
       colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
-      style={styles.container}>
+      style={s.container}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor={SUMMER_COLORS.backgroundStart}
         translucent={false}
       />
-      <SafeAreaView style={styles.backgroundStyle}>
-        <View style={[styles.flexRowBox]}>
+      <SafeAreaView style={s.backgroundStyle}>
+        <View style={[s.flexRowBox]}>
           <View
             style={[
-              {
-                display: 'flex',
-                flexDirection: 'row',
-                justifyContent: 'center',
-              },
+              {display: 'flex', flexDirection: 'row', justifyContent: 'center'},
               {gap: 110},
             ]}>
-            {user && prevUser && (() => {
-              const prevCT = Object.values(prevUser.coupons).reduce((s, v) => s + v, 0);
-              const newCT = Object.values(user.coupons).reduce((s, v) => s + v, 0);
-              return user.stamps !== prevUser.stamps || newCT !== prevCT;
-            })() ? (
+            {hasChange ? (
               <View
                 style={[
-                  styles.flexColumnBox,
+                  s.flexColumnBox,
                   {
                     height: 'auto',
                     gap: 39,
@@ -249,90 +518,22 @@ const DashboardScreen = ({navigation, route}: any) => {
                     paddingTop: 104,
                   },
                 ]}>
-                <View style={styles.holidayBadge}>
-                  <Text style={styles.holidayBadgeText}>Summer vibes 🏖️</Text>
-                  <Text style={styles.holidayBadgeSubText}>
+                <View style={s.holidayBadge}>
+                  <Text style={s.holidayBadgeText}>Summer vibes 🏖️</Text>
+                  <Text style={s.holidayBadgeSubText}>
                     시원한 여름 바다 느낌으로 즐겨보세요
                   </Text>
                 </View>
-                <View style={styles.labelBox}>
-                  {(() => {
-                    if (isPointMode) {
-                      const diff = user.stamps - prevUser.stamps;
-                      if (diff > 0) {
-                        return (
-                          <>
-                            <Text style={styles.labelTitleText}>
-                              <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
-                                {diff.toLocaleString()}{storeConfig.pointUnit}
-                              </Text>
-                              이
-                            </Text>
-                            <Text style={styles.labelTitleText}>적립되었습니다.</Text>
-                          </>
-                        );
-                      }
-                      return (
-                        <>
-                          <Text style={styles.labelTitleText}>
-                            <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
-                              {Math.abs(diff).toLocaleString()}{storeConfig.pointUnit}
-                            </Text>
-                            이
-                          </Text>
-                          <Text style={styles.labelTitleText}>사용되었습니다.</Text>
-                        </>
-                      );
-                    }
-                    const prevCT = Object.values(prevUser.coupons).reduce((s, v) => s + v, 0);
-                    const newCT = Object.values(user.coupons).reduce((s, v) => s + v, 0);
-                    const couponsEarned = newCT - prevCT;
-                    if (user.stamps !== prevUser.stamps || couponsEarned > 0) {
-                      const earned = couponsEarned * storeConfig.stampsPerCoupon + user.stamps - prevUser.stamps;
-                      return (
-                        <>
-                          <Text style={styles.labelTitleText}>
-                            <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
-                              스탬프 {earned}개
-                            </Text>
-                            가
-                          </Text>
-                          <Text style={styles.labelTitleText}>적립되었습니다.</Text>
-                        </>
-                      );
-                    }
-                    const used = prevCT - newCT;
-                    return (
-                      <>
-                        <Text style={styles.labelTitleText}>
-                          <Text style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
-                            쿠폰 {used}장
-                          </Text>
-                          이
-                        </Text>
-                        <Text style={styles.labelTitleText}>사용되었습니다.</Text>
-                      </>
-                    );
-                  })()}
-                </View>
-                <View style={styles.labelBox}>
-                  <Text
-                    style={[
-                      styles.labelTitleText,
-                      {
-                        color: SUMMER_COLORS.accent,
-                      },
-                    ]}>
+                {renderChangeInfo()}
+                <View style={s.labelBox}>
+                  <Text style={[s.labelTitleText, {color: SUMMER_COLORS.accent}]}>
                     감사합니다
                   </Text>
-                  <Text style={styles.labelSubText}>
+                  <Text style={s.labelSubText}>
                     <Text
                       style={[
-                        styles.labelSubText,
-                        {
-                          width: 24,
-                          fontFamily: 'Pretendard-SemiBold',
-                        },
+                        s.labelSubText,
+                        {width: 24, fontFamily: 'Pretendard-SemiBold'},
                       ]}>
                       {timeLeft}
                     </Text>{' '}
@@ -343,7 +544,7 @@ const DashboardScreen = ({navigation, route}: any) => {
             ) : (
               <View
                 style={[
-                  styles.flexColumnBox,
+                  s.flexColumnBox,
                   {
                     height: 'auto',
                     gap: 58,
@@ -354,13 +555,15 @@ const DashboardScreen = ({navigation, route}: any) => {
                     paddingTop: 28,
                   },
                 ]}>
-                <View style={styles.holidayBadge}>
-                  <Text style={styles.holidayBadgeText}>Summer vibes 🏖️</Text>
-                  <Text style={styles.holidayBadgeSubText}>
+                <View style={s.holidayBadge}>
+                  <Text style={s.holidayBadgeText}>Summer vibes 🏖️</Text>
+                  <Text style={s.holidayBadgeSubText}>
                     시원한 여름 바다 느낌으로 즐겨보세요
                   </Text>
                 </View>
-                <Pressable style={[styles.flexBox, {gap: 7}]} onPress={goBack}>
+                <Pressable
+                  style={[s.flexBox, {gap: 7}]}
+                  onPress={goBack}>
                   <LeftArrowIcon />
                   <Text
                     style={{
@@ -373,11 +576,11 @@ const DashboardScreen = ({navigation, route}: any) => {
                     뒤로가기
                   </Text>
                 </Pressable>
-                <View style={styles.labelBox}>
-                  <Text style={styles.labelSubText}>
+                <View style={s.labelBox}>
+                  <Text style={s.labelSubText}>
                     <Text
                       style={[
-                        styles.labelSubText,
+                        s.labelSubText,
                         {
                           color: SUMMER_COLORS.accent,
                           fontFamily: 'SFUIDisplay-Semibold',
@@ -385,20 +588,17 @@ const DashboardScreen = ({navigation, route}: any) => {
                       ]}>
                       {phoneNumberLabel()}
                     </Text>
-                    {` 님 반갑습니다.`}
+                    {' 님 반갑습니다.'}
                   </Text>
-                  <Text style={styles.labelTitleText}>
+                  <Text style={s.labelTitleText}>
                     오늘도 좋은 하루 되세요 {'><'}
                   </Text>
                   {timeLeft < 10 && (
                     <Text>
                       <Text
                         style={[
-                          styles.labelSubText,
-                          {
-                            width: 24,
-                            fontFamily: 'Pretendard-SemiBold',
-                          },
+                          s.labelSubText,
+                          {width: 24, fontFamily: 'Pretendard-SemiBold'},
                         ]}>
                         {timeLeft}
                       </Text>{' '}
@@ -406,147 +606,19 @@ const DashboardScreen = ({navigation, route}: any) => {
                     </Text>
                   )}
                 </View>
-                <View style={styles.beverageWrapper}>
-                  {isPointMode ? (
-                    user && (
-                      <View style={styles.beverageBox}>
-                        <View>
-                          <Text style={styles.beverageTitleText}>
-                            💰 보유 포인트
-                          </Text>
-                          <Text style={styles.beverageBodyText}>
-                            {user.stamps.toLocaleString()}{storeConfig.pointUnit} 사용 가능
-                          </Text>
-                        </View>
-                      </View>
-                    )
-                  ) : (
-                    user && storeConfig.couponTypes.map(ct => {
-                      const count = user.coupons[ct.id] ?? 0;
-                      if (count <= 0) return null;
-                      const expiry = getEarliestExpiry(
-                        user.couponIssuedAt,
-                        ct.id,
-                        storeConfig.couponExpiryDays,
-                      );
-                      return (
-                        <View key={ct.id} style={styles.beverageBox}>
-                          <View>
-                            <Text style={styles.beverageTitleText}>
-                              🎫 {ct.name} {count}장 무료로 사용 가능해요!
-                            </Text>
-                            <Text style={styles.beverageBodyText}>
-                              {expiry ? `${expiry}까지 사용 가능` : `스탬프 ${storeConfig.stampsPerCoupon}개 소진`}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })
-                  )}
-                </View>
+                {renderRewardInfo()}
               </View>
             )}
 
-            <View
-              style={[
-                {
-                  borderRadius: 35,
-                  width: '90%',
-                  maxWidth: 420,
-                  height: 552,
-                  backgroundColor: '#ffffff',
-                  shadowColor: '#000000',
-                  shadowOffset: {
-                    width: 0,
-                    height: 4.5,
-                  },
-                  shadowOpacity: 0.07,
-                  shadowRadius: 22,
-                  elevation: 6,
-                  position: 'relative',
-                },
-              ]}>
-              <View
-                style={{
-                  flex: 1,
-                  paddingTop: 59,
-                  paddingLeft: 37,
-                  paddingRight: 37,
-                  paddingBottom: 28,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 4,
-                }}>
-                <View
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'flex-start',
-                    alignItems: 'center',
-                  }}>
-                  <Text
-                    style={[
-                      styles.labelSubText,
-                      {
-                        color: '#0D2137',
-                      },
-                    ]}>
-                    {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
-                  </Text>
-                </View>
-                <View
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'flex-end',
-                    alignItems: 'baseline',
-                    gap: 18,
-                  }}>
-                  {isPointMode ? (
-                    <>
-                      <Text style={styles.stampLeftText}>
-                        {user ? user.stamps.toLocaleString() : 0}
-                      </Text>
-                      <Text style={styles.stampRightText}>{storeConfig.pointUnit}</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Text style={styles.stampLeftText}>
-                        {user ? user.stamps % storeConfig.stampsPerCoupon : 0}
-                      </Text>
-                      <Text style={styles.stampRightText}>/{storeConfig.stampsPerCoupon}개</Text>
-                    </>
-                  )}
-                </View>
-              </View>
-              <View
-                style={{
-                  position: 'absolute',
-                  width: '100%',
-                  height: '100%',
-                  overflow: 'hidden',
-                  borderRadius: 35,
-                }}>
-                {!isPointMode && BALL_POSITIONS.slice(0, (user?.stamps ?? 0) % storeConfig.stampsPerCoupon).map(
-                  (ball, index) => {
-                    return (
-                      <AnimatedBall key={index} index={index} ball={ball} />
-                    );
-                  },
-                )}
-              </View>
-            </View>
+            {renderStampCard()}
           </View>
         </View>
-        {/* <BackgroundDeco /> */}
       </SafeAreaView>
     </LinearGradient>
   );
 };
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -602,12 +674,6 @@ const styles = StyleSheet.create({
     fontFamily: 'Pretendard-Regular',
     color: SUMMER_COLORS.softSky,
   },
-  subLabelBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
   labelTitleText: {
     fontSize: 32,
     fontFamily: 'Pretendard-Medium',
@@ -640,7 +706,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'flex-start',
     gap: 12,
-    marginTop: 40,
+    marginTop: 20,
   },
   beverageBox: {
     width: '100%',

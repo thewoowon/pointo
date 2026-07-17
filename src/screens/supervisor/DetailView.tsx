@@ -1,7 +1,6 @@
 import React, {useCallback, useState} from 'react';
 import {
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   Alert,
   useWindowDimensions,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useAnalytics, useStoreConfig} from '../../hooks';
 import {
   doc,
@@ -414,9 +414,12 @@ const DetailView = ({
     if (mode === 'use' && !isPointMode) return;
 
     if (typeof value === 'number') {
-      if (number.length > 3) {
+      const maxLen = isPointMode ? 7 : 3;
+      if (number.length > maxLen) {
         Alert.alert(
-          '적립하는 스탬프의 수가 많은 것 같아요',
+          isPointMode
+            ? '적립하는 포인트가 많은 것 같아요'
+            : '적립하는 스탬프의 수가 많은 것 같아요',
           '한 번 더 확인해주세요.',
         );
         return;
@@ -435,9 +438,12 @@ const DetailView = ({
       }
 
       if (value === '+10') {
-        if (number.length > 3) {
+        const maxLen = isPointMode ? 7 : 3;
+        if (number.length > maxLen) {
           Alert.alert(
-            '적립하는 스탬프의 수가 많은 것 같아요',
+            isPointMode
+              ? '적립하는 포인트가 많은 것 같아요'
+              : '적립하는 스탬프의 수가 많은 것 같아요',
             '한 번 더 확인해주세요.',
           );
           return;
@@ -512,12 +518,17 @@ const DetailView = ({
               return;
             }
             const userProfile = normalizeUser(data, storeConfig.couponTypes);
-            const {coupons: validCoupons, issuedAt: validIssuedAt} = filterExpiredCoupons(
-              userProfile.coupons,
-              userProfile.couponIssuedAt,
-              storeConfig.couponExpiryDays,
-            );
-            const filtered = {...userProfile, coupons: validCoupons, couponIssuedAt: validIssuedAt};
+            const {coupons: validCoupons, issuedAt: validIssuedAt} =
+              filterExpiredCoupons(
+                userProfile.coupons,
+                userProfile.couponIssuedAt,
+                storeConfig.couponExpiryDays,
+              );
+            const filtered = {
+              ...userProfile,
+              coupons: validCoupons,
+              couponIssuedAt: validIssuedAt,
+            };
             setUser(filtered);
             setUserContext(
               makeUserContext(filtered.coupons, storeConfig.couponTypes),
@@ -559,34 +570,40 @@ const DetailView = ({
                 shadowRadius: 8,
                 elevation: 10,
                 borderRadius: 35,
+                paddingVertical: isCompact ? 48 : 0,
+                paddingHorizontal: isCompact ? 24 : 0,
               },
             ]}>
             <Pressable
               onPress={close}
               style={[
                 styles.flexBox,
-                {gap: 6, position: 'absolute', top: 32, right: 32},
+                {gap: 4, position: 'absolute', top: isCompact ? 24 : 32, right: isCompact ? 24 : 32, zIndex: 10},
               ]}>
               <Text
                 style={{
-                  fontSize: 20,
+                  fontSize: isCompact ? 14 : 20,
                   fontFamily: 'Pretendard-Regular',
                   color: '#4E5056',
-                  lineHeight: 28,
+                  lineHeight: isCompact ? 20 : 28,
                 }}>
                 닫기
               </Text>
-              <NewXIcon width={20} height={20} />
+              <NewXIcon width={isCompact ? 16 : 20} height={isCompact ? 16 : 20} />
             </Pressable>
             <ScrollView
+              // 스크롤 할 때 스크롤바가 보이지 않도록 설정
+              showsVerticalScrollIndicator={false}
+              style={{flex: 1}}
               contentContainerStyle={[
                 {
                   display: 'flex',
                   flexDirection: isCompact ? 'column' : 'row',
                   justifyContent: 'center',
                   alignItems: isCompact ? 'center' : undefined,
-                  gap: isCompact ? 24 : 110,
-                  paddingBottom: isCompact ? 40 : 0,
+                  gap: isCompact ? 16 : 110,
+                  paddingBottom: isCompact ? 24 : 0,
+                  paddingHorizontal: isCompact ? 4 : 0,
                 },
               ]}>
               <View
@@ -595,13 +612,13 @@ const DetailView = ({
                   {
                     width: isCompact ? '100%' : 320,
                     height: 'auto',
-                    gap: 10,
+                    gap: isCompact ? 6 : 10,
                     alignItems: 'flex-start',
                     justifyContent: 'flex-start',
-                    paddingTop: isCompact ? 16 : 54,
+                    paddingTop: isCompact ? 8 : 54,
                   },
                 ]}>
-                <Text style={styles.labelSubText}>
+                <Text style={[styles.labelSubText, isCompact && {fontSize: 14, lineHeight: 20}]}>
                   {`고객번호: `}
                   <Text
                     style={[
@@ -610,6 +627,7 @@ const DetailView = ({
                         color: '#FE7901',
                         fontFamily: 'SFUIDisplay-Semibold',
                       },
+                      isCompact && {fontSize: 14, lineHeight: 20},
                     ]}>
                     {phoneNumberLabel()}
                   </Text>
@@ -618,17 +636,17 @@ const DetailView = ({
                   style={{
                     flexDirection: 'row',
                     backgroundColor: '#F0F0F0',
-                    borderRadius: 14,
-                    padding: 4,
+                    borderRadius: isCompact ? 10 : 14,
+                    padding: isCompact ? 3 : 4,
                     alignSelf: 'stretch',
-                    marginBottom: 4,
+                    marginBottom: isCompact ? 2 : 4,
                   }}>
                   <Pressable
                     onPress={() => switchMode('earn')}
                     style={{
                       flex: 1,
-                      paddingVertical: 10,
-                      borderRadius: 11,
+                      paddingVertical: isCompact ? 7 : 10,
+                      borderRadius: isCompact ? 8 : 11,
                       backgroundColor:
                         mode === 'earn' ? '#FFFFFF' : 'transparent',
                       shadowColor: mode === 'earn' ? '#000' : 'transparent',
@@ -640,7 +658,7 @@ const DetailView = ({
                     }}>
                     <Text
                       style={{
-                        fontSize: 18,
+                        fontSize: isCompact ? 14 : 18,
                         fontFamily:
                           mode === 'earn'
                             ? 'Pretendard-Bold'
@@ -655,8 +673,8 @@ const DetailView = ({
                     onPress={() => switchMode('use')}
                     style={{
                       flex: 1,
-                      paddingVertical: 10,
-                      borderRadius: 11,
+                      paddingVertical: isCompact ? 7 : 10,
+                      borderRadius: isCompact ? 8 : 11,
                       backgroundColor:
                         mode === 'use' ? '#FFFFFF' : 'transparent',
                       shadowColor: mode === 'use' ? '#000' : 'transparent',
@@ -668,7 +686,7 @@ const DetailView = ({
                     }}>
                     <Text
                       style={{
-                        fontSize: 18,
+                        fontSize: isCompact ? 14 : 18,
                         fontFamily:
                           mode === 'use'
                             ? 'Pretendard-Bold'
@@ -681,13 +699,21 @@ const DetailView = ({
                   </Pressable>
                 </View>
                 <View style={styles.labelBox}>
-                  <Text style={styles.labelTitleText}>
+                  <Text style={[styles.labelTitleText, isCompact && {fontSize: 20, lineHeight: 28}]}>
                     {mode === 'earn'
-                      ? isPointMode ? '적립할 포인트를' : '적립할 스탬프 개수를'
-                      : isPointMode ? '사용할 포인트를' : '사용할 쿠폰을'}
+                      ? isPointMode
+                        ? '적립할 포인트를'
+                        : '적립할 스탬프 개수를'
+                      : isPointMode
+                      ? '사용할 포인트를'
+                      : '사용할 쿠폰을'}
                   </Text>
-                  <Text style={styles.labelTitleText}>
-                    {mode === 'earn' ? '입력해주세요' : isPointMode ? '입력해주세요' : '선택해주세요'}
+                  <Text style={[styles.labelTitleText, isCompact && {fontSize: 20, lineHeight: 28}]}>
+                    {mode === 'earn'
+                      ? '입력해주세요'
+                      : isPointMode
+                      ? '입력해주세요'
+                      : '선택해주세요'}
                   </Text>
                 </View>
                 {mode === 'use' && !isPointMode && (
@@ -708,9 +734,7 @@ const DetailView = ({
                             </Text>
                           </View>
                           <Pressable onPress={onClickCoupon(ct.id)}>
-                            <Text style={styles.beverageButtonText}>
-                              선택
-                            </Text>
+                            <Text style={styles.beverageButtonText}>선택</Text>
                           </Pressable>
                           {remaining > 1 && (
                             <View style={styles.countBadge}>
@@ -740,53 +764,75 @@ const DetailView = ({
                     })}
                   </View>
                 )}
-                {isPointMode && mode === 'earn' && storeConfig.pointPresets.length > 0 && (
-                  <View style={styles.beverageWrapper}>
-                    <Text style={styles.beverageBodyText}>빠른 적립</Text>
-                    <View style={{flexDirection: 'row', flexWrap: 'wrap', gap: 10, width: '100%'}}>
-                      {storeConfig.pointPresets.map(preset => (
-                        <Pressable
-                          key={preset.id}
-                          onPress={() => setNumber(String(preset.points))}
-                          style={({pressed}) => ({
-                            backgroundColor: number === String(preset.points) ? '#FE7901' : pressed ? '#E8E8E8' : '#F5F5F5',
-                            paddingHorizontal: 20,
-                            paddingVertical: 14,
-                            borderRadius: 14,
-                            minWidth: 100,
-                            alignItems: 'center',
-                          })}>
-                          <Text style={{
-                            fontSize: 16,
-                            fontFamily: 'Pretendard-SemiBold',
-                            color: number === String(preset.points) ? '#FFFFFF' : '#191D2B',
-                            letterSpacing: -0.2,
-                          }}>
-                            {preset.name}
-                          </Text>
-                          <Text style={{
-                            fontSize: 14,
-                            fontFamily: 'Pretendard-Regular',
-                            color: number === String(preset.points) ? 'rgba(255,255,255,0.8)' : '#999',
-                            marginTop: 2,
-                          }}>
-                            {preset.points.toLocaleString()}{storeConfig.pointUnit}
-                          </Text>
-                        </Pressable>
-                      ))}
+                {isPointMode &&
+                  mode === 'earn' &&
+                  storeConfig.pointPresets.length > 0 && (
+                    <View style={styles.beverageWrapper}>
+                      <Text style={styles.beverageBodyText}>빠른 적립</Text>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          flexWrap: 'wrap',
+                          gap: 10,
+                          width: '100%',
+                        }}>
+                        {storeConfig.pointPresets.map(preset => (
+                          <Pressable
+                            key={preset.id}
+                            onPress={() => setNumber(String(preset.points))}
+                            style={({pressed}) => ({
+                              backgroundColor:
+                                number === String(preset.points)
+                                  ? '#FE7901'
+                                  : pressed
+                                  ? '#E8E8E8'
+                                  : '#F5F5F5',
+                              paddingHorizontal: 20,
+                              paddingVertical: 14,
+                              borderRadius: 14,
+                              minWidth: 100,
+                              alignItems: 'center',
+                            })}>
+                            <Text
+                              style={{
+                                fontSize: 16,
+                                fontFamily: 'Pretendard-SemiBold',
+                                color:
+                                  number === String(preset.points)
+                                    ? '#FFFFFF'
+                                    : '#191D2B',
+                                letterSpacing: -0.2,
+                              }}>
+                              {preset.name}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontFamily: 'Pretendard-Regular',
+                                color:
+                                  number === String(preset.points)
+                                    ? 'rgba(255,255,255,0.8)'
+                                    : '#999',
+                                marginTop: 2,
+                              }}>
+                              {preset.points.toLocaleString()}
+                              {storeConfig.pointUnit}
+                            </Text>
+                          </Pressable>
+                        ))}
+                      </View>
                     </View>
-                  </View>
-                )}
+                  )}
               </View>
               <View
                 style={[
                   styles.flexColumnBox,
                   {
-                    paddingLeft: 15,
-                    paddingRight: 15,
-                    borderRadius: 35,
+                    paddingLeft: isCompact ? 10 : 15,
+                    paddingRight: isCompact ? 10 : 15,
+                    borderRadius: isCompact ? 24 : 35,
                     width: '100%',
-                    maxWidth: 420,
+                    maxWidth: isCompact ? 340 : 420,
                     height: 'auto',
                     backgroundColor: '#ffffff',
                   },
@@ -796,7 +842,7 @@ const DetailView = ({
                     styles.flexColumnBox,
                     {
                       width: '100%',
-                      maxWidth: 320,
+                      maxWidth: isCompact ? 280 : 320,
                       height: 'auto',
                     },
                   ]}>
@@ -805,32 +851,36 @@ const DetailView = ({
                       styles.subLabelBox,
                       {
                         width: '100%',
-                        gap: 120,
-                        marginBottom: 9,
+                        gap: isCompact ? 40 : 120,
+                        marginBottom: isCompact ? 4 : 9,
                         justifyContent: 'flex-end',
-                        paddingRight: 9,
+                        paddingRight: isCompact ? 4 : 9,
                       },
                     ]}>
                     <Text
                       style={{
                         fontFamily: 'Prentendard-Semibold',
                         color: '#4E5056',
-                        fontSize: 16,
-                        lineHeight: 26,
+                        fontSize: isCompact ? 13 : 16,
+                        lineHeight: isCompact ? 20 : 26,
                         letterSpacing: -0.2,
                       }}>
                       {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
                     </Text>
                     <Text
                       style={{
-                        fontSize: 24,
-                        lineHeight: 32,
+                        fontSize: isCompact ? 18 : 24,
+                        lineHeight: isCompact ? 26 : 32,
                         fontFamily: 'Prentendard-Semibold',
                         color: '#FE7901',
                       }}>
                       {isPointMode
-                        ? `${user.stamps.toLocaleString()}${storeConfig.pointUnit}`
-                        : `${user.stamps % storeConfig.stampsPerCoupon}/${storeConfig.stampsPerCoupon}개`}
+                        ? `${user.stamps.toLocaleString()}${
+                            storeConfig.pointUnit
+                          }`
+                        : `${user.stamps % storeConfig.stampsPerCoupon}/${
+                            storeConfig.stampsPerCoupon
+                          }개`}
                     </Text>
                   </View>
                   <View
@@ -854,10 +904,12 @@ const DetailView = ({
                           width: '100%',
                           justifyContent: 'flex-end',
                           alignItems: 'center',
+                          gap: isCompact ? 4 : 8,
                         },
                       ]}>
                       <View style={styles.headerNumberContainer}>
-                        {mode === 'use' && !isPointMode &&
+                        {mode === 'use' &&
+                          !isPointMode &&
                           totalSelected(userContext.selectedCoupon) > 0 && (
                             <Text
                               style={{
@@ -882,8 +934,8 @@ const DetailView = ({
                           style={[
                             styles.headerNumberText,
                             {
-                              fontSize: 38,
-                              lineHeight: 48,
+                              fontSize: isCompact ? 28 : 38,
+                              lineHeight: isCompact ? 36 : 48,
                               color: number.length > 0 ? '#191D2B' : '#E3E3E3',
                             },
                           ]}>
@@ -896,14 +948,20 @@ const DetailView = ({
                               fontFamily: 'Pretendard-Semibold',
                             },
                           ]}>
-                          {isPointMode ? storeConfig.pointUnit : mode === 'use' ? '장' : '개'}
+                          {isPointMode
+                            ? storeConfig.pointUnit
+                            : mode === 'use'
+                            ? '장'
+                            : '개'}
                         </Text>
                       </View>
                     </View>
                     <View style={styles.divisor}></View>
                   </View>
                   <View
-                    pointerEvents={mode === 'use' && !isPointMode ? 'none' : 'auto'}
+                    pointerEvents={
+                      mode === 'use' && !isPointMode ? 'none' : 'auto'
+                    }
                     style={[
                       {
                         width: '100%',
@@ -911,12 +969,12 @@ const DetailView = ({
                         flexDirection: 'column',
                         justifyContent: 'center',
                         alignItems: 'flex-start',
-                        gap: 12,
+                        gap: isCompact ? 6 : 12,
                         opacity: mode === 'use' && !isPointMode ? 0.25 : 1,
                       },
                     ]}>
                     {NUMBER_SEQUENCE.map((row, rowIndex) => (
-                      <View key={rowIndex} style={styles.numberInputContainer}>
+                      <View key={rowIndex} style={[styles.numberInputContainer, isCompact && {gap: 8}]}>
                         {row.map((number, numberIndex) => (
                           <Pressable
                             key={numberIndex}
@@ -926,15 +984,16 @@ const DetailView = ({
                                 borderRadius: 10,
                               },
                               styles.numberInputButton,
+                              isCompact && {width: 64, height: 44},
                             ]}
                             onPress={() => onNumberPress(number)}>
-                            <Text style={styles.numberInputText}>{number}</Text>
+                            <Text style={[styles.numberInputText, isCompact && {fontSize: 26}]}>{number}</Text>
                           </Pressable>
                         ))}
                       </View>
                     ))}
-                    <View style={styles.numberInputContainer}>
-                      <Pressable style={styles.numberInputButton}></Pressable>
+                    <View style={[styles.numberInputContainer, isCompact && {gap: 8}]}>
+                      <Pressable style={[styles.numberInputButton, isCompact && {width: 64, height: 44}]}></Pressable>
                       <Pressable
                         style={({pressed}) => [
                           {
@@ -942,9 +1001,10 @@ const DetailView = ({
                             borderRadius: 10,
                           },
                           styles.numberInputButton,
+                          isCompact && {width: 64, height: 44},
                         ]}
                         onPress={() => onNumberPress(0)}>
-                        <Text style={styles.numberInputText}>0</Text>
+                        <Text style={[styles.numberInputText, isCompact && {fontSize: 26}]}>0</Text>
                       </Pressable>
                       <Pressable
                         style={({pressed}) => [
@@ -953,6 +1013,7 @@ const DetailView = ({
                             borderRadius: 10,
                           },
                           styles.numberInputButton,
+                          isCompact && {width: 64, height: 44},
                         ]}
                         onPress={() => onNumberPress('c')}>
                         <LeftArrowIcon />
@@ -963,39 +1024,47 @@ const DetailView = ({
                     {mode === 'use' ? (
                       <>
                         {!isPointMode && (
-                        <Pressable
-                          style={({pressed}) => [
-                            styles.confirmButton,
-                            {
-                              width: pressed ? 142 : 150,
-                              backgroundColor: '#EDEDED',
-                              shadowColor: '#EDEDED',
-                              gap: 6,
-                            },
-                          ]}
-                          onPress={refresh}>
-                          <RefreshIcon />
-                          <Text
-                            style={[
-                              styles.confirmButtonText,
+                          <Pressable
+                            style={({pressed}) => [
+                              styles.confirmButton,
                               {
-                                color: '#373737',
+                                width: pressed ? 142 : 150,
+                                backgroundColor: '#EDEDED',
+                                shadowColor: '#EDEDED',
+                                gap: 6,
                               },
-                            ]}>
-                            입력 초기화
-                          </Text>
-                        </Pressable>
+                            ]}
+                            onPress={refresh}>
+                            <RefreshIcon />
+                            <Text
+                              style={[
+                                styles.confirmButtonText,
+                                {
+                                  color: '#373737',
+                                },
+                              ]}>
+                              입력 초기화
+                            </Text>
+                          </Pressable>
                         )}
                         <Pressable
                           style={({pressed}) => [
                             styles.confirmButton,
                             {
-                              width: isPointMode ? (pressed ? '98%' : '100%') : (pressed ? 142 : 150),
+                              width: isPointMode
+                                ? pressed
+                                  ? '98%'
+                                  : '100%'
+                                : pressed
+                                ? 142
+                                : 150,
                               backgroundColor: '#0090FE',
                               shadowColor: '#0090FE',
                             },
                           ]}
-                          onPress={isPointMode ? handleUsingPoint : handleUsing}>
+                          onPress={
+                            isPointMode ? handleUsingPoint : handleUsing
+                          }>
                           <LinearGradient
                             colors={['#0090FE', '#003FFC']}
                             locations={[0.3, 1]}
@@ -1028,7 +1097,9 @@ const DetailView = ({
                             shadowColor: '#FE6A00',
                           },
                         ]}
-                        onPress={isPointMode ? handleApprovePoint : handleApprove}>
+                        onPress={
+                          isPointMode ? handleApprovePoint : handleApprove
+                        }>
                         <LinearGradient
                           colors={['#FE6A00', '#FC0000']}
                           locations={[0.3, 1]}
@@ -1064,18 +1135,27 @@ const DetailView = ({
                     {mode === 'earn' ? (
                       <Text style={styles.beverageBodyText}>
                         {isPointMode
-                          ? `적립 후 포인트: ${(user.stamps + (parseInt(number, 10) || 0)).toLocaleString()}${storeConfig.pointUnit}`
-                          : `적립 후 스탬프: ${(user.stamps + (parseInt(number, 10) || 0)) % storeConfig.stampsPerCoupon}/${storeConfig.stampsPerCoupon}개`}
+                          ? `적립 후 포인트: ${(
+                              user.stamps + (parseInt(number, 10) || 0)
+                            ).toLocaleString()}${storeConfig.pointUnit}`
+                          : `적립 후 스탬프: ${
+                              (user.stamps + (parseInt(number, 10) || 0)) %
+                              storeConfig.stampsPerCoupon
+                            }/${storeConfig.stampsPerCoupon}개`}
                       </Text>
                     ) : (
                       <Text style={styles.beverageBodyText}>
                         {isPointMode
                           ? (parseInt(number, 10) || 0) > 0
-                            ? `${(parseInt(number, 10) || 0).toLocaleString()}${storeConfig.pointUnit} 사용 예정`
+                            ? `${(parseInt(number, 10) || 0).toLocaleString()}${
+                                storeConfig.pointUnit
+                              } 사용 예정`
                             : '사용할 포인트를 입력해주세요'
                           : totalSelected(userContext.selectedCoupon) > 0
-                            ? `쿠폰 ${totalSelected(userContext.selectedCoupon)}장 사용 예정`
-                            : '쿠폰을 선택해주세요'}
+                          ? `쿠폰 ${totalSelected(
+                              userContext.selectedCoupon,
+                            )}장 사용 예정`
+                          : '쿠폰을 선택해주세요'}
                       </Text>
                     )}
                   </View>
@@ -1263,15 +1343,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 30,
-    gap: 20,
+    marginTop: 20,
+    gap: 12,
   },
   confirmButton: {
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    height: 72,
+    height: 56,
     backgroundColor: '#FE8300',
     borderRadius: 24,
     // shadow

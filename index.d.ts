@@ -88,6 +88,24 @@ interface Store {
   createdAt?: string;
   status?: 'pending' | 'approved';
   config?: StoreConfig;
+  /** 이메일 계정(점주)에 연결된 경우의 소유자 uid. 미연결 스토어는 없음 */
+  ownerId?: string;
+}
+
+/** 이메일 계정으로 로그인하는 점주. Firestore `owners/{uid}` (uid = Firebase Auth uid) */
+interface Owner {
+  email: string;
+  createdAt: string;
+  /** 소유 스토어 코드 목록 */
+  storeCodes: string[];
+  /** 개설 가능한 최대 스토어 수 (기본 3, 구독 시 10) */
+  slotLimit: number;
+  /** 구독 정보 (Phase 2에서 결제 연동) */
+  subscription?: {
+    status: 'active' | 'expired' | 'none';
+    productId?: string;
+    expiresAt?: string;
+  } | null;
 }
 
 interface Log {

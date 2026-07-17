@@ -4,22 +4,31 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFirestore} from '../../hooks';
 
-const StoreRegisterScreen = ({navigation}: any) => {
-  const {registerStore, findStoreByPhone} = useFirestore();
+const StoreRegisterScreen = ({navigation, route}: any) => {
+  const ownerUid: string | undefined = route?.params?.ownerUid;
+  const {registerStore, findStoreByPhone, linkStoreToOwner} = useFirestore();
 
   const [storeName, setStoreName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [registeredCode, setRegisteredCode] = useState<string | null>(null);
+
+  /** 등록 완료 처리 — 점주 계정에서 들어온 경우 계정에 연결 */
+  const finalizeStore = async (code: string) => {
+    if (ownerUid) {
+      await linkStoreToOwner(ownerUid, code);
+    }
+    setRegisteredCode(code);
+  };
 
   const handleRegister = async () => {
     if (!storeName.trim()) {
@@ -57,7 +66,7 @@ const StoreRegisterScreen = ({navigation}: any) => {
                 if (!result) {
                   Alert.alert('등록 중 오류가 발생했습니다. 다시 시도해주세요.');
                 } else {
-                  setRegisteredCode(result.storeCode);
+                  await finalizeStore(result.storeCode);
                 }
                 resolve();
               },
@@ -78,11 +87,15 @@ const StoreRegisterScreen = ({navigation}: any) => {
       return;
     }
 
-    setRegisteredCode(result.storeCode);
+    await finalizeStore(result.storeCode);
   };
 
   const handleGoHome = () => {
-    navigation.navigate('ModeSelection');
+    if (ownerUid) {
+      navigation.navigate('Switcher');
+    } else {
+      navigation.navigate('ModeSelection');
+    }
   };
 
   if (registeredCode) {

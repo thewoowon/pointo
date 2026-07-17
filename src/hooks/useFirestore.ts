@@ -37,6 +37,10 @@ function generateStoreCode(): string {
   return result;
 }
 
+/** 이메일 계정당 기본 스토어 슬롯 수. 구독 시 확장(Phase 2). */
+export const DEFAULT_SLOT_LIMIT = 3;
+export const SUBSCRIBED_SLOT_LIMIT = 10;
+
 const useFirestore = (storeCode?: string | null) => {
   const storeFilter = storeCode
     ? [where('store_code', '==', storeCode)]
@@ -588,6 +592,150 @@ const useFirestore = (storeCode?: string | null) => {
     await updateDoc(storeRef, {config});
   }
 
+  // ─── 이메일 계정(점주) — owners/{uid} ──────────────────────────
+
+  /** 계정 프로필 조회 */
+  async function getOwnerProfile(uid: string): Promise<Owner | undefined> {
+    try {
+      const db = getFirestore();
+      const snap = await getDoc(doc(db, 'owners', uid));
+      return snap.exists ? (snap.data() as Owner) : undefined;
+    } catch (error) {
+      console.error('Error getting owner profile:', error);
+      return undefined;
+    }
+  }
+
+  /** 계정 최초 생성 (이미 있으면 기존 프로필 반환) */
+  async function ensureOwnerProfile(uid: string, email: string): Promise<Owner> {
+    const db = getFirestore();
+    const ref = doc(db, 'owners', uid);
+    const snap = await getDoc(ref);
+    if (snap.exists) return snap.data() as Owner;
+    const owner: Owner = {
+      email,
+      createdAt: new Date().toISOString(),
+      storeCodes: [],
+      slotLimit: DEFAULT_SLOT_LIMIT,
+      subscription: null,
+    };
+    await setDoc(ref, owner);
+    return owner;
+  }
+
+  /**
+   * 전화번호로 등록된 기존 스토어를 계정에 흡수(claim).
+   * 아직 주인이 없거나(레거시) 본인 소유인 스토어만 연결한다.
+   * 기존 다점포 점주는 보유 수만큼 슬롯을 grandfather 한다.
+   * @returns 새로 연결된 스토어 코드 목록
+   */
+  async function claimStoresByPhone(
+    uid: string,
+    phone: string,
+  ): Promise<string[]> {
+    try {
+      const db = getFirestore();
+      const normalized = normalizePhone(phone);
+      const snapshot = await getDocs(
+        query(
+          collection(db, 'stores'),
+          where('ownerPhone', '==', normalized),
+        ),
+      );
+      const claimable = snapshot.docs.filter(d => {
+        const owner = d.data().ownerId;
+        return !owner || owner === uid;
+      });
+      if (claimable.length === 0) return [];
+
+      const ownerRef = doc(db, 'owners', uid);
+      const ownerSnap = await getDoc(ownerRef);
+      const existingCodes: string[] = ownerSnap.exists
+        ? ownerSnap.data()?.storeCodes ?? []
+        : [];
+      const merged = Array.from(
+        new Set([...existingCodes, ...claimable.map(d => d.id)]),
+      );
+      const currentLimit: number = ownerSnap.exists
+        ? ownerSnap.data()?.slotLimit ?? DEFAULT_SLOT_LIMIT
+        : DEFAULT_SLOT_LIMIT;
+
+      const batch = db.batch();
+      claimable.forEach(d => batch.update(d.ref, {ownerId: uid}));
+      batch.update(ownerRef, {
+        storeCodes: merged,
+        slotLimit: Math.max(currentLimit, merged.length),
+      });
+      await batch.commit();
+
+      return claimable.map(d => d.id);
+    } catch (error) {
+      console.error('Error claiming stores by phone:', error);
+      return [];
+    }
+  }
+
+  /** 슬롯 여유 확인 */
+  async function getOwnerSlotInfo(
+    uid: string,
+  ): Promise<{current: number; limit: number; canAdd: boolean}> {
+    const owner = await getOwnerProfile(uid);
+    const current = owner?.storeCodes?.length ?? 0;
+    const limit = owner?.slotLimit ?? DEFAULT_SLOT_LIMIT;
+    return {current, limit, canAdd: current < limit};
+  }
+
+  /** 스토어를 계정에 연결 (슬롯 초과 시 false). 이미 연결돼 있으면 true. */
+  async function linkStoreToOwner(
+    uid: string,
+    code: string,
+  ): Promise<boolean> {
+    try {
+      const db = getFirestore();
+      const ownerRef = doc(db, 'owners', uid);
+      const ownerSnap = await getDoc(ownerRef);
+      const codes: string[] = ownerSnap.exists
+        ? ownerSnap.data()?.storeCodes ?? []
+        : [];
+      if (codes.includes(code)) return true;
+      const limit: number = ownerSnap.exists
+        ? ownerSnap.data()?.slotLimit ?? DEFAULT_SLOT_LIMIT
+        : DEFAULT_SLOT_LIMIT;
+      if (codes.length >= limit) return false;
+
+      const batch = db.batch();
+      batch.update(doc(db, 'stores', code), {ownerId: uid});
+      batch.update(ownerRef, {storeCodes: [...codes, code]});
+      await batch.commit();
+      return true;
+    } catch (error) {
+      console.error('Error linking store to owner:', error);
+      return false;
+    }
+  }
+
+  /** 계정에 연결된 스토어 목록 (스위처용) */
+  async function getOwnerStores(
+    uid: string,
+  ): Promise<{storeCode: string; name: string}[]> {
+    try {
+      const owner = await getOwnerProfile(uid);
+      const codes = owner?.storeCodes ?? [];
+      const db = getFirestore();
+      const results: {storeCode: string; name: string}[] = [];
+      for (const code of codes) {
+        const snap = await getDoc(doc(db, 'stores', code));
+        if (snap.exists) {
+          results.push({storeCode: code, name: snap.data()?.name ?? code});
+        }
+      }
+      return results;
+    } catch (error) {
+      console.error('Error getting owner stores:', error);
+      return [];
+    }
+  }
+
   return {
     addUser,
     getUser,
@@ -610,6 +758,13 @@ const useFirestore = (storeCode?: string | null) => {
     migrateUsersStoreCode,
     updateStoreConfig,
     findStoreByPhone,
+    // 이메일 계정(점주)
+    getOwnerProfile,
+    ensureOwnerProfile,
+    claimStoresByPhone,
+    getOwnerSlotInfo,
+    linkStoreToOwner,
+    getOwnerStores,
   };
 };
 

@@ -1,0 +1,332 @@
+Incident Identifier: 4F4C7876-7678-4F69-8382-13385C5DA4D5
+Distributor ID:      com.apple.TestFlight
+Hardware Model:      iPad12,1
+Process:             KBffee [5907]
+Path:                /private/var/containers/Bundle/Application/08CE0C81-8CFA-4307-AAD5-E43DC1C76F70/KBffee.app/KBffee
+Identifier:          com.thewoowon.pointo
+Version:             2.4.2 (2)
+AppStoreTools:       17F41
+AppVariant:          1:iPad12,1:18
+Beta:                YES
+Code Type:           ARM-64 (Native)
+Role:                Foreground
+Parent Process:      launchd [1]
+Coalition:           com.thewoowon.pointo [1882]
+
+Date/Time:           2026-06-10 16:37:57.9929 +0900
+Launch Time:         2026-06-10 16:37:57.4079 +0900
+OS Version:          iPhone OS 18.7.8 (22H352)
+Release Type:        User
+Report Version:      104
+
+Exception Type:  EXC_CRASH (SIGABRT)
+Exception Codes: 0x0000000000000000, 0x0000000000000000
+Termination Reason: SIGNAL 6 Abort trap: 6
+Terminating Process: KBffee [5907]
+
+Triggered by Thread:  0
+
+
+Thread 0 name:
+Thread 0 Crashed:
+0   libsystem_kernel.dylib        	0x00000001e3c941dc __pthread_kill + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d217c1c pthread_kill + 268 (pthread.c:1721)
+2   libsystem_c.dylib             	0x000000019ae1309c abort + 124 (abort.c:122)
+3   libc++abi.dylib               	0x000000021d1415a0 abort_message + 132 (abort_message.cpp:78)
+4   libc++abi.dylib               	0x000000021d12fef4 demangling_terminate_handler() + 316 (cxa_default_handlers.cpp:72)
+5   libobjc.A.dylib               	0x000000019036fc08 _objc_terminate() + 172 (objc-exception.mm:499)
+6   libc++abi.dylib               	0x000000021d1408b4 std::__terminate(void (*)()) + 16 (cxa_handlers.cpp:59)
+7   libc++abi.dylib               	0x000000021d143e1c __cxxabiv1::failed_throw(__cxxabiv1::__cxa_exception*) + 88 (cxa_exception.cpp:152)
+8   libc++abi.dylib               	0x000000021d143dc4 __cxa_throw + 92 (cxa_exception.cpp:299)
+9   hermesvm                      	0x00000001022ffc3c facebook::hermes::(anonymous namespace)::HermesRuntimeImpl::throwPendingError() + 560 (hermes.cpp:2771)
+10  hermesvm                      	0x00000001022fa560 facebook::hermes::(anonymous namespace)::HermesRuntimeImpl::checkStatus(hermes::vm::ExecutionStatus) + 8 (hermes.cpp:2682)
+11  hermesvm                      	0x00000001022fa560 facebook::hermes::(anonymous namespace)::HermesRuntimeImpl::call(facebook::jsi::Function const&, facebook::jsi::Value const&, facebook::jsi::Value const*, unsigned long) + 424 (hermes.cpp:2568)
+12  KBffee                        	0x0000000100e20290 facebook::jsi::WithRuntimeDecorator<worklets::AroundLock, facebook::jsi::Runtime, facebook::jsi::Runtime>::call(facebook::jsi::Function const&, facebook::jsi::Value const&, facebook::jsi::Value con... + 96 (decorator.h:983)
+13  KBffee                        	0x0000000100e029dc facebook::jsi::Value worklets::runOnRuntimeGuarded<>(facebook::jsi::Runtime&, facebook::jsi::Value const&) + 96 (Shareables.h:35)
+14  KBffee                        	0x0000000100e04a78 std::__1::__function::__func<reanimated::ReanimatedModuleProxy::scheduleOnUI(facebook::jsi::Runtime&, facebook::jsi::Value const&)::$_0, void ()>::operator()() + 108 (function.h:174)
+15  KBffee                        	0x0000000100e1cac4 worklets::UIScheduler::triggerUI() + 92 (UIScheduler.cpp:16)
+16  libdispatch.dylib             	0x000000019ad57aac _dispatch_call_block_and_release + 32 (init.c:1575)
+17  libdispatch.dylib             	0x000000019ad71584 _dispatch_client_callout + 16 (client_callout.mm:85)
+18  libdispatch.dylib             	0x000000019ad8e5c8 _dispatch_main_queue_drain.cold.5 + 812 (queue.c:8104)
+19  libdispatch.dylib             	0x000000019ad66d30 _dispatch_main_queue_drain + 180 (queue.c:8085)
+20  libdispatch.dylib             	0x000000019ad66c6c _dispatch_main_queue_callback_4CF + 44 (queue.c:8264)
+21  CoreFoundation                	0x0000000192e24b74 __CFRUNLOOP_IS_SERVICING_THE_MAIN_DISPATCH_QUEUE__ + 16 (CFRunLoop.c:1793)
+22  CoreFoundation                	0x0000000192dc82c4 __CFRunLoopRun + 1980 (CFRunLoop.c:3163)
+23  CoreFoundation                	0x0000000192dc9a0c CFRunLoopRunSpecific + 572 (CFRunLoop.c:3434)
+24  GraphicsServices              	0x00000001dfc51454 GSEventRunModal + 168 (GSEvent.c:2196)
+25  UIKitCore                     	0x00000001957e91a4 -[UIApplication _run] + 816 (UIApplication.m:3845)
+26  UIKitCore                     	0x00000001957b4a28 UIApplicationMain + 336 (UIApplication.m:5540)
+27  UIKitCore                     	0x0000000195896098 UIApplicationMain(_:_:_:_:) + 104 (UIKit.swift:565)
+28  KBffee                        	0x0000000100960b38 main + 120 (AppDelegate.swift:0)
+29  dyld                          	0x00000001b98b6f08 start + 6040 (dyldMain.cpp:1450)
+
+Thread 1:
+0   libsystem_pthread.dylib       	0x000000021d210aa4 start_wqthread + 0 (:-1)
+
+Thread 2:
+0   libsystem_pthread.dylib       	0x000000021d210aa4 start_wqthread + 0 (:-1)
+
+Thread 3:
+0   libsystem_pthread.dylib       	0x000000021d210aa4 start_wqthread + 0 (:-1)
+
+Thread 4:
+0   libsystem_pthread.dylib       	0x000000021d210aa4 start_wqthread + 0 (:-1)
+
+Thread 5 name:
+Thread 5:
+0   libsystem_kernel.dylib        	0x00000001e3c9de78 poll + 8 (:-1)
+1   KBffee                        	0x00000001014afe10 pollset_work(grpc_pollset*, grpc_pollset_worker**, grpc_core::Timestamp) + 1280 (ev_poll_posix.cc:1024)
+2   KBffee                        	0x0000000101486e78 cq_next(grpc_completion_queue*, gpr_timespec, void*) + 336 (completion_queue.cc:1040)
+3   KBffee                        	0x000000010169922c grpc::CompletionQueue::AsyncNextInternal(void**, bool*, gpr_timespec) + 60 (completion_queue_cc.cc:147)
+4   KBffee                        	0x00000001009d601c firebase::firestore::remote::Datastore::PollGrpcQueue() + 80 (datastore.cc:143)
+5   KBffee                        	0x0000000100ad1320 firebase::firestore::util::Task::ExecuteAndRelease() + 192 (task.cc:102)
+6   libdispatch.dylib             	0x000000019ad71584 _dispatch_client_callout + 16 (client_callout.mm:85)
+7   libdispatch.dylib             	0x000000019ad602d0 _dispatch_lane_serial_drain + 740 (queue.c:3939)
+8   libdispatch.dylib             	0x000000019ad60dac _dispatch_lane_invoke + 388 (queue.c:4030)
+9   libdispatch.dylib             	0x000000019ad6b1dc _dispatch_root_queue_drain_deferred_wlh + 292 (queue.c:7198)
+10  libdispatch.dylib             	0x000000019ad6aa60 _dispatch_workloop_worker_thread + 540 (queue.c:6792)
+11  libsystem_pthread.dylib       	0x000000021d210a0c _pthread_wqthread + 292 (pthread.c:2696)
+12  libsystem_pthread.dylib       	0x000000021d210aac start_wqthread + 8 (:-1)
+
+Thread 6:
+0   libsystem_pthread.dylib       	0x000000021d210aa4 start_wqthread + 0 (:-1)
+
+Thread 7:
+0   libsystem_pthread.dylib       	0x000000021d210aa4 start_wqthread + 0 (:-1)
+
+Thread 8 name:
+Thread 8:
+0   libsystem_kernel.dylib        	0x00000001e3c89ce4 mach_msg2_trap + 8 (:-1)
+1   libsystem_kernel.dylib        	0x00000001e3c8d39c mach_msg2_internal + 76 (mach_msg.c:201)
+2   libsystem_kernel.dylib        	0x00000001e3c8d2b8 mach_msg_overwrite + 428 (mach_msg.c:0)
+3   libsystem_kernel.dylib        	0x00000001e3c8d100 mach_msg + 24 (mach_msg.c:323)
+4   CoreFoundation                	0x0000000192dc96d0 __CFRunLoopServiceMachPort + 160 (CFRunLoop.c:2637)
+5   CoreFoundation                	0x0000000192dc7fc0 __CFRunLoopRun + 1208 (CFRunLoop.c:3021)
+6   CoreFoundation                	0x0000000192dc9a0c CFRunLoopRunSpecific + 572 (CFRunLoop.c:3434)
+7   Foundation                    	0x0000000191a3e79c -[NSRunLoop(NSRunLoop) runMode:beforeDate:] + 212 (NSRunLoop.m:375)
+8   Foundation                    	0x0000000191a44020 -[NSRunLoop(NSRunLoop) runUntilDate:] + 64 (NSRunLoop.m:422)
+9   UIKitCore                     	0x00000001957d349c -[UIEventFetcher threadMain] + 424 (UIEventFetcher.m:1351)
+10  Foundation                    	0x0000000191aa4804 __NSThread__start__ + 732 (NSThread.m:991)
+11  libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+12  libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 9 name:
+Thread 9:
+0   libsystem_kernel.dylib        	0x00000001e3c89ce4 mach_msg2_trap + 8 (:-1)
+1   libsystem_kernel.dylib        	0x00000001e3c8d39c mach_msg2_internal + 76 (mach_msg.c:201)
+2   libsystem_kernel.dylib        	0x00000001e3c8d2b8 mach_msg_overwrite + 428 (mach_msg.c:0)
+3   libsystem_kernel.dylib        	0x00000001e3c8d100 mach_msg + 24 (mach_msg.c:323)
+4   CoreFoundation                	0x0000000192dc96d0 __CFRunLoopServiceMachPort + 160 (CFRunLoop.c:2637)
+5   CoreFoundation                	0x0000000192dc7fc0 __CFRunLoopRun + 1208 (CFRunLoop.c:3021)
+6   CoreFoundation                	0x0000000192dc9a0c CFRunLoopRunSpecific + 572 (CFRunLoop.c:3434)
+7   KBffee                        	0x0000000101053c84 +[RCTJSThreadManager runRunLoop] + 212 (RCTJSThreadManager.mm:102)
+8   Foundation                    	0x0000000191aa4804 __NSThread__start__ + 732 (NSThread.m:991)
+9   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+10  libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 10 name:
+Thread 10:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   libc++.1.dylib                	0x00000001a374b294 std::__1::condition_variable::wait(std::__1::unique_lock<std::__1::mutex>&) + 32 (condition_variable.cpp:30)
+3   hermesvm                      	0x00000001023bf538 void std::__1::condition_variable::wait<hermes::vm::HadesGC::Executor::worker()::'lambda'()>(std::__1::unique_lock<std::__1::mutex>&, hermes::vm::HadesGC::Executor::worker()::'lambda'()) + 28 (condition_variable.h:146)
+4   hermesvm                      	0x00000001023bf538 hermes::vm::HadesGC::Executor::worker() + 116 (HadesGC.cpp:1062)
+5   hermesvm                      	0x00000001023bf4a0 hermes::vm::HadesGC::Executor::Executor()::'lambda'()::operator()() const + 4 (HadesGC.cpp:1033)
+6   hermesvm                      	0x00000001023bf4a0 decltype(std::declval<hermes::vm::HadesGC::Executor::Executor()::'lambda'()>()()) std::__1::__invoke[abi:nn180100]<hermes::vm::HadesGC::Executor::Executor()::'lambda'()>(hermes::vm::HadesGC::Execut... + 4 (invoke.h:344)
+7   hermesvm                      	0x00000001023bf4a0 void std::__1::__thread_execute[abi:nn180100]<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, hermes::vm::HadesGC::Executor::Executor()::'lambd... + 4 (thread.h:199)
+8   hermesvm                      	0x00000001023bf4a0 void* std::__1::__thread_proxy[abi:nn180100]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, hermes::vm::HadesGC::Executor::Exe... + 44 (thread.h:208)
+9   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+10  libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 11 name:
+Thread 11:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   libc++.1.dylib                	0x00000001a374b294 std::__1::condition_variable::wait(std::__1::unique_lock<std::__1::mutex>&) + 32 (condition_variable.cpp:30)
+3   hermesvm                      	0x00000001023bf538 void std::__1::condition_variable::wait<hermes::vm::HadesGC::Executor::worker()::'lambda'()>(std::__1::unique_lock<std::__1::mutex>&, hermes::vm::HadesGC::Executor::worker()::'lambda'()) + 28 (condition_variable.h:146)
+4   hermesvm                      	0x00000001023bf538 hermes::vm::HadesGC::Executor::worker() + 116 (HadesGC.cpp:1062)
+5   hermesvm                      	0x00000001023bf4a0 hermes::vm::HadesGC::Executor::Executor()::'lambda'()::operator()() const + 4 (HadesGC.cpp:1033)
+6   hermesvm                      	0x00000001023bf4a0 decltype(std::declval<hermes::vm::HadesGC::Executor::Executor()::'lambda'()>()()) std::__1::__invoke[abi:nn180100]<hermes::vm::HadesGC::Executor::Executor()::'lambda'()>(hermes::vm::HadesGC::Execut... + 4 (invoke.h:344)
+7   hermesvm                      	0x00000001023bf4a0 void std::__1::__thread_execute[abi:nn180100]<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, hermes::vm::HadesGC::Executor::Executor()::'lambd... + 4 (thread.h:199)
+8   hermesvm                      	0x00000001023bf4a0 void* std::__1::__thread_proxy[abi:nn180100]<std::__1::tuple<std::__1::unique_ptr<std::__1::__thread_struct, std::__1::default_delete<std::__1::__thread_struct>>, hermes::vm::HadesGC::Executor::Exe... + 44 (thread.h:208)
+9   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+10  libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 12:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec5a0 gpr_cv_wait + 160 (sync.cc:113)
+3   KBffee                        	0x00000001014b9e3c grpc_core::Executor::ThreadMain(void*) + 208 (executor.cc:225)
+4   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+5   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+6   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 13:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec5a0 gpr_cv_wait + 160 (sync.cc:113)
+3   KBffee                        	0x00000001014b9e3c grpc_core::Executor::ThreadMain(void*) + 208 (executor.cc:225)
+4   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+5   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+6   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 14:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x0000000101601ae0 timer_thread(void*) + 572 (timer_manager.cc:273)
+4   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+5   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+6   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 15:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x00000001016007a0 grpc_event_engine::experimental::TimerManager::WaitUntil(grpc_core::Timestamp) + 276 (timer_manager.cc:57)
+4   KBffee                        	0x0000000101601354 void absl::lts_20240722::internal_any_invocable::RemoteInvoker<false, void, grpc_event_engine::experimental::TimerManager::MainLoop()::$_0&>(absl::lts_20240722::internal_any_invocable::TypeErasedSt... + 40 (any_invocable.h:368)
+5   KBffee                        	0x000000010140bbbc grpc_event_engine::experimental::SelfDeletingClosure::Run() + 28 (common_closures.h:55)
+6   KBffee                        	0x000000010161f818 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::Step() + 128 (work_stealing_thread_pool.cc:525)
+7   KBffee                        	0x000000010161f694 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::ThreadBody() + 152 (work_stealing_thread_pool.cc:488)
+8   KBffee                        	0x000000010161fc84 grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::StartThread()::$_0::__invoke(void*) + 20 (work_stealing_thread_pool.cc:256)
+9   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+10  libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+11  libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 16:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x000000010161fb54 grpc_event_engine::experimental::WorkStealingThreadPool::WorkSignal::WaitWithTimeout(grpc_core::Duration) + 124 (work_stealing_thread_pool.cc:620)
+4   KBffee                        	0x000000010161f8c8 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::Step() + 304 (work_stealing_thread_pool.cc:556)
+5   KBffee                        	0x000000010161f694 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::ThreadBody() + 152 (work_stealing_thread_pool.cc:488)
+6   KBffee                        	0x000000010161fc84 grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::StartThread()::$_0::__invoke(void*) + 20 (work_stealing_thread_pool.cc:256)
+7   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+8   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+9   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 17:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x000000010161fb54 grpc_event_engine::experimental::WorkStealingThreadPool::WorkSignal::WaitWithTimeout(grpc_core::Duration) + 124 (work_stealing_thread_pool.cc:620)
+4   KBffee                        	0x000000010161f8c8 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::Step() + 304 (work_stealing_thread_pool.cc:556)
+5   KBffee                        	0x000000010161f694 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::ThreadBody() + 152 (work_stealing_thread_pool.cc:488)
+6   KBffee                        	0x000000010161fc84 grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::StartThread()::$_0::__invoke(void*) + 20 (work_stealing_thread_pool.cc:256)
+7   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+8   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+9   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 18:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x000000010161fb54 grpc_event_engine::experimental::WorkStealingThreadPool::WorkSignal::WaitWithTimeout(grpc_core::Duration) + 124 (work_stealing_thread_pool.cc:620)
+4   KBffee                        	0x000000010161f8c8 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::Step() + 304 (work_stealing_thread_pool.cc:556)
+5   KBffee                        	0x000000010161f694 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::ThreadBody() + 152 (work_stealing_thread_pool.cc:488)
+6   KBffee                        	0x000000010161fc84 grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::StartThread()::$_0::__invoke(void*) + 20 (work_stealing_thread_pool.cc:256)
+7   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+8   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+9   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 19:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x000000010161fb54 grpc_event_engine::experimental::WorkStealingThreadPool::WorkSignal::WaitWithTimeout(grpc_core::Duration) + 124 (work_stealing_thread_pool.cc:620)
+4   KBffee                        	0x000000010161f8c8 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::Step() + 304 (work_stealing_thread_pool.cc:556)
+5   KBffee                        	0x000000010161f694 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::ThreadBody() + 152 (work_stealing_thread_pool.cc:488)
+6   KBffee                        	0x000000010161fc84 grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::StartThread()::$_0::__invoke(void*) + 20 (work_stealing_thread_pool.cc:256)
+7   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+8   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+9   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 20:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x000000010161fb54 grpc_event_engine::experimental::WorkStealingThreadPool::WorkSignal::WaitWithTimeout(grpc_core::Duration) + 124 (work_stealing_thread_pool.cc:620)
+4   KBffee                        	0x000000010161f8c8 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::Step() + 304 (work_stealing_thread_pool.cc:556)
+5   KBffee                        	0x000000010161f694 grpc_event_engine::experimental::WorkStealingThreadPool::ThreadState::ThreadBody() + 152 (work_stealing_thread_pool.cc:488)
+6   KBffee                        	0x000000010161fc84 grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::StartThread()::$_0::__invoke(void*) + 20 (work_stealing_thread_pool.cc:256)
+7   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+8   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+9   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 21:
+0   libsystem_kernel.dylib        	0x00000001e3c8f438 __psynch_cvwait + 8 (:-1)
+1   libsystem_pthread.dylib       	0x000000021d211e50 _pthread_cond_wait + 984 (pthread_cond.c:862)
+2   KBffee                        	0x00000001015ec590 gpr_cv_wait + 144 (sync.cc:128)
+3   KBffee                        	0x000000010161f04c grpc_core::Notification::WaitForNotificationWithTimeout(absl::lts_20240722::Duration) + 216 (notification.h:47)
+4   KBffee                        	0x000000010161ef3c grpc_event_engine::experimental::WorkStealingThreadPool::WorkStealingThreadPoolImpl::Lifeguard::LifeguardMain() + 172 (work_stealing_thread_pool.cc:400)
+5   KBffee                        	0x00000001015fbd10 grpc_core::(anonymous namespace)::ThreadInternalsPosix::ThreadInternalsPosix(char const*, void (*)(void*), void*, bool*, grpc_core::Thread::Options const&)::'lambda'(void*)::__invoke(void*) + 132 (thd.cc:115)
+6   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+7   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 22 name:
+Thread 22:
+0   libsystem_kernel.dylib        	0x00000001e3c89ce4 mach_msg2_trap + 8 (:-1)
+1   libsystem_kernel.dylib        	0x00000001e3c8d39c mach_msg2_internal + 76 (mach_msg.c:201)
+2   libsystem_kernel.dylib        	0x00000001e3c8d2b8 mach_msg_overwrite + 428 (mach_msg.c:0)
+3   libsystem_kernel.dylib        	0x00000001e3c8d100 mach_msg + 24 (mach_msg.c:323)
+4   CoreFoundation                	0x0000000192dc96d0 __CFRunLoopServiceMachPort + 160 (CFRunLoop.c:2637)
+5   CoreFoundation                	0x0000000192dc7fc0 __CFRunLoopRun + 1208 (CFRunLoop.c:3021)
+6   CoreFoundation                	0x0000000192dc9a0c CFRunLoopRunSpecific + 572 (CFRunLoop.c:3434)
+7   CoreFoundation                	0x0000000192ea3d90 _legacyStreamRunLoop_workThread + 300 (CFStream.c:1776)
+8   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+9   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 23 name:
+Thread 23:
+0   libsystem_kernel.dylib        	0x00000001e3c89ce4 mach_msg2_trap + 8 (:-1)
+1   libsystem_kernel.dylib        	0x00000001e3c8d39c mach_msg2_internal + 76 (mach_msg.c:201)
+2   libsystem_kernel.dylib        	0x00000001e3c8d2b8 mach_msg_overwrite + 428 (mach_msg.c:0)
+3   libsystem_kernel.dylib        	0x00000001e3c8d100 mach_msg + 24 (mach_msg.c:323)
+4   CoreFoundation                	0x0000000192dc96d0 __CFRunLoopServiceMachPort + 160 (CFRunLoop.c:2637)
+5   CoreFoundation                	0x0000000192dc7fc0 __CFRunLoopRun + 1208 (CFRunLoop.c:3021)
+6   CoreFoundation                	0x0000000192dc9a0c CFRunLoopRunSpecific + 572 (CFRunLoop.c:3434)
+7   CFNetwork                     	0x00000001943f7db8 +[__CFN_CoreSchedulingSetRunnable _run:] + 416 (CoreSchedulingSet.mm:1473)
+8   Foundation                    	0x0000000191aa4804 __NSThread__start__ + 732 (NSThread.m:991)
+9   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+10  libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+Thread 24 name:
+Thread 24:
+0   libsystem_kernel.dylib        	0x00000001e3c9132c __select + 8 (:-1)
+1   CoreFoundation                	0x0000000192e4f868 __CFSocketManager + 704 (CFSocket.c:1341)
+2   libsystem_pthread.dylib       	0x000000021d213344 _pthread_start + 136 (pthread.c:931)
+3   libsystem_pthread.dylib       	0x000000021d210ab8 thread_start + 8 (:-1)
+
+
+Thread 0 crashed with ARM Thread State (64-bit):
+    x0: 0x0000000000000000   x1: 0x0000000000000000   x2: 0x0000000000000000   x3: 0x0000000000000000
+    x4: 0x00000000029e527a   x5: 0x000000000000001a   x6: 0x0000000000013140   x7: 0x7d0cc53d4caed35a
+    x8: 0x07c64f0471e9213c   x9: 0x07c64f058c7c39fc  x10: 0x0000000000000002  x11: 0x0000010000000000
+   x12: 0x00000000fffffffd  x13: 0x0000000000000000  x14: 0x0000000000000000  x15: 0x0000000000000000
+   x16: 0x0000000000000148  x17: 0x00000001fd9518c0  x18: 0x0000000000000000  x19: 0x0000000000000006
+   x20: 0x0000000000000103  x21: 0x00000001fd9519a0  x22: 0x000000016f4a1f70  x23: 0x000000016f4a1f80
+   x24: 0x000000016f4a2270  x25: 0x0000000106c00000  x26: 0xffff000107127d20  x27: 0x000000016f4a20e0
+   x28: 0xffffffff76ffffff   fp: 0x000000016f4a1d70   lr: 0x000000021d217c1c
+    sp: 0x000000016f4a1d50   pc: 0x00000001e3c941dc cpsr: 0x40000000
+   esr: 0x56000080  Address size fault
+
+
+Binary Images:
+        0x10095c000 -         0x101b87fff KBffee arm64  <147febb78ab03250bfc0a2d02c24c1ff> /var/containers/Bundle/Application/08CE0C81-8CFA-4307-AAD5-E43DC1C76F70/KBffee.app/KBffee
+        0x10211c000 -         0x102127fff libobjc-trampolines.dylib arm64e  <bc772703524d32ed813bad64762fcf7d> /private/preboot/Cryptexes/OS/usr/lib/libobjc-trampolines.dylib
+        0x1022f0000 -         0x1024f3fff hermesvm arm64  <c5fdda8d39df30dc9a24ef9999bb4541> /private/var/containers/Bundle/Application/08CE0C81-8CFA-4307-AAD5-E43DC1C76F70/KBffee.app/Frameworks/hermesvm.framework/hermesvm
+        0x19033c000 -         0x19038dbb3 libobjc.A.dylib arm64e  <a79bb6c812433b499db1500c3da8e2a0> /usr/lib/libobjc.A.dylib
+        0x191a2f000 -         0x1926a30df Foundation arm64e  <37e8b254bf2a327e8765aced0377652b> /System/Library/Frameworks/Foundation.framework/Foundation
+        0x192db8000 -         0x193334fff CoreFoundation arm64e  <c5317dc2e73b3163b22a64b312109843> /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+        0x194358000 -         0x19471d35f CFNetwork arm64e  <16db33b3f94d3d8db3d155813474aebd> /System/Library/Frameworks/CFNetwork.framework/CFNetwork
+        0x1956b4000 -         0x1975f641f UIKitCore arm64e  <e976755fe1c7393f9b0b48b6a40e68de> /System/Library/PrivateFrameworks/UIKitCore.framework/UIKitCore
+        0x19ad56000 -         0x19ad9bb3f libdispatch.dylib arm64e  <c19e1caefee03e31844da31bf2c39bd7> /usr/lib/system/libdispatch.dylib
+        0x19ad9c000 -         0x19ae1b6c7 libsystem_c.dylib arm64e  <c577ca59b7033074968de4455ccddc00> /usr/lib/system/libsystem_c.dylib
+        0x1a372a000 -         0x1a37b9ff7 libc++.1.dylib arm64e  <1da08ac81e2735fcad0d76966847ebad> /usr/lib/libc++.1.dylib
+        0x1b9878000 -         0x1b991287b dyld arm64e  <0474b929607f356f8e06bd9cc1ddb4f7> /usr/lib/dyld
+        0x1dfc50000 -         0x1dfc58c7f GraphicsServices arm64e  <6f98303a8a7636dd9b510ad06fe5335e> /System/Library/PrivateFrameworks/GraphicsServices.framework/GraphicsServices
+        0x1e3c89000 -         0x1e3cc2e6f libsystem_kernel.dylib arm64e  <ed1dc11f16dc3670aaa833300ec33037> /usr/lib/system/libsystem_kernel.dylib
+        0x21d12b000 -         0x21d148fff libc++abi.dylib arm64e  <f78a5b0485133afb8505f93d3793e84d> /usr/lib/libc++abi.dylib
+        0x21d210000 -         0x21d21c413 libsystem_pthread.dylib arm64e  <2335096f3c713896afe00b48cb67b535> /usr/lib/system/libsystem_pthread.dylib
+
+EOF

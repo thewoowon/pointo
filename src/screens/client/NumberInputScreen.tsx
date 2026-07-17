@@ -1,27 +1,20 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React from 'react';
 import {
   Animated,
   Image,
+  Modal,
   Pressable,
-  SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
-  Alert,
-  Modal,
-  ScrollView,
-  useWindowDimensions,
 } from 'react-native';
-import {useAuth, useFirestore, useAnalytics, useStoreConfig} from '../../hooks';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import LinearGradient from 'react-native-linear-gradient';
+import LottieView from 'lottie-react-native';
+import {useDeviceType} from '../../hooks';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
-import {
-  AnalyticsEvent,
-  hashPhone,
-  getTierFromLevel,
-  getReturnBucket,
-} from '../../analytics/events';
-import dayjs from 'dayjs';
 import {
   CheckIcon,
   CircleXIcon,
@@ -29,12 +22,9 @@ import {
   LeftBigArrowIcon,
   XIcon,
 } from '../../components/Icons';
-import LinearGradient from 'react-native-linear-gradient';
-import LottieView from 'lottie-react-native';
-// import {BackgroundDeco} from '../../components/background';
-import {useFocusEffect} from '@react-navigation/native';
 import {LoadingOverlay} from '../../components/overlay';
 import DashboardView from './DashboardView';
+import {useNumberInput} from './useNumberInput';
 
 const POINTO_LOGO = require('../../../src/assets/images/pointo_1024.png');
 const APPSTORE_QR = require('../../../src/assets/images/pointo_appstore_qr.png');
@@ -44,8 +34,6 @@ const SUMMER_COLORS = {
   backgroundEnd: '#C5E3F6',
   accent: '#0288D1',
   primary: '#0D2137',
-  waveBlue: '#4FC3F7',
-  sandCream: '#FFF8E7',
 };
 
 const NUMBER_SEQUENCE = [
@@ -54,1110 +42,647 @@ const NUMBER_SEQUENCE = [
   [7, 8, 9],
 ];
 
-const NumberInputScreen = ({navigation}: any) => {
-  const {width: screenWidth} = useWindowDimensions();
-  const isCompact = screenWidth < 768;
-  const {storeCode, storeName, setIsAuthenticated} = useAuth();
-  const storeConfig = useStoreConfig(storeCode);
-  const [number, setNumber] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [viewModalContext, setViewModalContext] = useState({
-    visible: false,
-    phoneNumber: '',
-  });
-  const [agree, setAgree] = useState(false);
-  const [privacyVisible, setPrivacyVisible] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const {
-    addUser,
-    getUser,
-    updateSession,
-    deleteLogsInRange,
-    deleteUserAccount,
-  } = useFirestore(storeCode);
-  const {track, identify} = useAnalytics();
-
-  // 유휴 프로모 오버레이
-  const [idleVisible, setIdleVisible] = useState(false);
-  const hintOpacity = useRef(new Animated.Value(1)).current;
-  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const resetIdleTimer = useCallback(() => {
-    if (idleTimer.current) {
-      clearTimeout(idleTimer.current);
-    }
-    idleTimer.current = setTimeout(() => {
-      setIdleVisible(true);
-    }, storeConfig.idleTimeoutMs);
-  }, [storeConfig.idleTimeoutMs]);
-
-  useEffect(() => {
-    resetIdleTimer();
-    return () => {
-      if (idleTimer.current) {
-        clearTimeout(idleTimer.current);
-      }
-    };
-  }, [resetIdleTimer]);
-
-  // hint pulse (idleVisible일 때만)
-  useEffect(() => {
-    if (!idleVisible) {
-      return;
-    }
-
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(hintOpacity, {
-          toValue: 0.2,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-        Animated.timing(hintOpacity, {
-          toValue: 1,
-          duration: 900,
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    pulse.start();
-
-    return () => {
-      pulse.stop();
-    };
-  }, [idleVisible, hintOpacity]);
-
-  const onNumberPress = (value: number | string) => {
-    resetIdleTimer();
-    if (value === 'c') {
-      setNumber(number.slice(0, -1));
-      return;
-    }
-
-    if (number.length >= 8) {
-      Alert.alert('전화번호는 11자리까지 입력할 수 있습니다.');
-      return;
-    }
-
-    setNumber(number + value);
-  };
-
-  const onDeleteAccountPress = async () => {
-    if (number.length < 8) {
-      Alert.alert(
-        '전화번호를 입력해주세요',
-        '탈퇴할 계정의 전화번호를 먼저 입력해주세요.',
-      );
-      return;
-    }
-    const phoneNumber = `010${number}`;
-    const existingUser = await getUser(phoneNumber);
-    if (!existingUser) {
-      Alert.alert('가입 이력 없음', '해당 번호로 가입된 계정이 없습니다.');
-      return;
-    }
-    Alert.alert(
-      '회원 탈퇴',
-      '탈퇴하면 스탬프, 쿠폰 등 모든 데이터가\n삭제되며 복구할 수 없어요.\n\n정말 탈퇴하시겠어요?',
-      [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '탈퇴하기',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await deleteUserAccount(phoneNumber);
-            if (success) {
-              setNumber('');
-              Alert.alert('탈퇴 완료', '그동안 이용해주셔서 감사합니다.');
-            } else {
-              Alert.alert('오류', '탈퇴 처리 중 문제가 발생했습니다.');
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const onConfirmPress = async () => {
-    if (number.length < 8) {
-      Alert.alert('전화번호를 모두 입력해주세요.');
-      return;
-    }
-
-    const phoneNumber = `010${number}`;
-
-    setIsLoading(true);
-    const response = await getUser(phoneNumber);
-    setIsLoading(false);
-
-    if (!response) {
-      // 신규 유저 — 약관 동의 모달로
-      try {
-        track(AnalyticsEvent.SIGNUP_STARTED, {
-          store_code: storeCode,
-        });
-      } catch (error) {
-        console.error('Error logging event:', error);
-      }
-      setModalVisible(true);
-      return;
-    }
-
-    // 이미 가입된 유저 — 재방문 이벤트 기록
-    try {
-      const user = response as User;
-      identify(phoneNumber);
-      const daysSinceSignup = user.created_at
-        ? dayjs().diff(dayjs(user.created_at), 'day')
-        : 0;
-      const daysSinceLastVisit = user.last_used
-        ? dayjs().diff(dayjs(user.last_used), 'day')
-        : 0;
-      track(AnalyticsEvent.USER_RETURNED, {
-        store_code: storeCode,
-        user_id: hashPhone(phoneNumber),
-        user_tier: getTierFromLevel(user.level ?? 0, storeConfig.levelTiers),
-        user_level: user.level ?? 0,
-        stamps_total: user.stamps ?? 0,
-        days_since_signup: daysSinceSignup,
-        days_since_last_visit: daysSinceLastVisit,
-        return_bucket: getReturnBucket(daysSinceLastVisit),
-      });
-      if (daysSinceLastVisit >= 1) {
-        track(AnalyticsEvent.FIRST_VISIT_OF_DAY, {
-          store_code: storeCode,
-          user_id: hashPhone(phoneNumber),
-          user_tier: getTierFromLevel(user.level ?? 0, storeConfig.levelTiers),
-        });
-      }
-    } catch (error) {
-      console.error('Error logging event:', error);
-    }
-
-    await updateSession(`session_${storeCode}`, {
-      last_used: new Date().toISOString().split('T')[0],
-      phone: phoneNumber,
-      mode: 'onboarding',
-    });
-    // navigation.reset({
-    //   index: 0,
-    //   routes: [{name: 'Dashboard', params: {phoneNumber}}],
-    // });
-    setViewModalContext({
-      visible: true,
-      phoneNumber,
-    });
-    setNumber('');
-  };
-
-  const phoneNumberLabel = () => {
-    if (number.length === 0) {
-      return '';
-    } else if (number.length < 5) {
-      return `-${number}`;
-    } else {
-      return `-${number.slice(0, 4)}-${number.slice(4)}`;
-    }
-  };
-
-  const onAgreePress = async () => {
-    if (!agree) {
-      Alert.alert('이용약관에 동의해주세요.');
-      return;
-    }
-
-    const phoneNumber = `010${number}`;
-    setIsLoading(true);
-    await addUser(phoneNumber);
-    setIsLoading(false);
-
-    try {
-      identify(phoneNumber);
-      track(AnalyticsEvent.SIGNUP_COMPLETED, {
-        store_code: storeCode,
-        user_id: hashPhone(phoneNumber),
-        user_tier: getTierFromLevel(0, storeConfig.levelTiers),
-        user_level: 0,
-        stamps_total: 0,
-        days_since_signup: 0,
-      });
-    } catch (error) {
-      console.error('Error logging event:', error);
-    }
-
-    await updateSession(`session_${storeCode}`, {
-      last_used: new Date().toISOString().split('T')[0],
-      phone: phoneNumber,
-      mode: 'onboarding',
-    });
-    // navigation.reset({
-    //   index: 0,
-    //   routes: [{name: 'Dashboard', params: {phoneNumber}}],
-    // });
-    setViewModalContext({
-      visible: true,
-      phoneNumber,
-    });
-
-    setNumber('');
-
-    setModalVisible(false);
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      updateSession(`session_${storeCode}`, {
-        last_used: new Date().toISOString().split('T')[0],
-        phone: '',
-        mode: 'waiting',
-      });
-    }, [storeCode]),
+// ─── Keypad (공통) ───────────────────────────────────────────
+const Keypad = ({
+  onPress,
+  size,
+}: {
+  onPress: (v: number | string) => void;
+  size: 'compact' | 'large';
+}) => {
+  const btnHeight = size === 'compact' ? 58 : 77;
+  const fontSize = size === 'compact' ? 32 : 42;
+  return (
+    <View style={{width: '100%', gap: size === 'compact' ? 8 : 12}}>
+      {NUMBER_SEQUENCE.map((row, ri) => (
+        <View key={ri} style={s.keyRow}>
+          {row.map(n => (
+            <Pressable
+              key={n}
+              style={({pressed}) => [
+                s.keyBtn,
+                {
+                  height: btnHeight,
+                  backgroundColor: pressed
+                    ? '#B3E5FC'
+                    : 'rgba(255,255,255,0.96)',
+                },
+              ]}
+              onPress={() => onPress(n)}>
+              <Text style={[s.keyText, {fontSize}]}>{n}</Text>
+            </Pressable>
+          ))}
+        </View>
+      ))}
+      <View style={s.keyRow}>
+        <View style={[s.keyBtn, {height: btnHeight}]} />
+        <Pressable
+          style={({pressed}) => [
+            s.keyBtn,
+            {
+              height: btnHeight,
+              backgroundColor: pressed ? '#B3E5FC' : 'rgba(255,255,255,0.96)',
+            },
+          ]}
+          onPress={() => onPress(0)}>
+          <Text style={[s.keyText, {fontSize}]}>0</Text>
+        </Pressable>
+        <Pressable
+          style={({pressed}) => [
+            s.keyBtn,
+            {
+              height: btnHeight,
+              backgroundColor: pressed ? '#B3E5FC' : 'rgba(255,255,255,0.96)',
+            },
+          ]}
+          onPress={() => onPress('c')}>
+          <LeftBigArrowIcon />
+        </Pressable>
+      </View>
+    </View>
   );
+};
+
+// ─── Phone Layout ────────────────────────────────────────────
+const PhoneLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
+  <View style={s.phoneContainer}>
+    <View style={s.phoneInner}>
+      {ctx.storeName ? (
+        <Text style={s.phoneStoreName}>{ctx.storeName}</Text>
+      ) : null}
+      <View style={s.phoneNumberRow}>
+        <View style={s.phoneNumberDisplay}>
+          <Text style={s.phoneNumberText}>010</Text>
+          <Text style={s.phoneNumberText}>{ctx.phoneNumberLabel()}</Text>
+        </View>
+        {ctx.number.length > 0 && (
+          <Pressable onPress={ctx.clearNumber}>
+            <CircleXIcon width={22} height={22} color="#97999D" />
+          </Pressable>
+        )}
+      </View>
+      <View style={s.divider} />
+      <Keypad onPress={ctx.onNumberPress} size="compact" />
+      <View style={s.phoneConfirmWrap}>
+        <Pressable style={s.confirmBtn} onPress={ctx.onConfirmPress}>
+          <LinearGradient
+            colors={['#a1d6efff', '#0288D1']}
+            locations={[0.2, 1]}
+            start={{x: 0, y: 0}}
+            end={{x: 1, y: 1}}
+            style={s.confirmGradient}>
+            <Text style={s.confirmText}>조회하기</Text>
+          </LinearGradient>
+        </Pressable>
+      </View>
+    </View>
+    <View style={s.phoneFooter}>
+      <Pressable onPress={() => ctx.setPrivacyVisible(true)}>
+        <Text style={s.footerLink}>개인정보 처리방침</Text>
+      </Pressable>
+      <Pressable onPress={ctx.onDeleteAccountPress}>
+        <Text style={s.footerLink}>회원 탈퇴</Text>
+      </Pressable>
+      <Pressable
+        style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
+        onPress={ctx.logout}>
+        <ExitIcon width={14} height={14} color="rgba(13,33,55,0.5)" />
+        <Text style={s.footerLink}>로그아웃</Text>
+      </Pressable>
+    </View>
+  </View>
+);
+
+// ─── Tablet Layout ───────────────────────────────────────────
+const TabletLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
+  <View style={s.tabletContainer}>
+    <View style={s.tabletLeft}>
+      <View style={s.tabletWelcome}>
+        {ctx.storeConfig.welcomeLines.map((line, i) => (
+          <Text key={i} style={s.tabletWelcomeText}>
+            {line}
+          </Text>
+        ))}
+        <View style={{marginTop: 10}}>
+          {ctx.storeConfig.guideLines.map((line, i) => (
+            <Text key={i} style={s.tabletGuideText}>
+              {line}
+            </Text>
+          ))}
+        </View>
+        <LottieView
+          source={require('../../../lottie/coffee.json')}
+          autoPlay
+          loop
+          style={{width: 200, height: 200, alignSelf: 'center'}}
+        />
+      </View>
+      <View style={s.tabletFooter}>
+        <Text style={s.tabletCopyright}>
+          © 2025 {ctx.storeConfig.companyName}. All rights reserved.
+        </Text>
+        <View style={s.tabletFooterLinks}>
+          <Pressable onPress={() => ctx.setPrivacyVisible(true)}>
+            <Text style={s.footerLink}>개인정보 처리방침</Text>
+          </Pressable>
+          <Pressable onPress={ctx.onDeleteAccountPress}>
+            <Text style={s.footerLink}>회원 탈퇴</Text>
+          </Pressable>
+          <Pressable
+            style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
+            onPress={ctx.logout}>
+            <ExitIcon width={14} height={14} color="rgba(13,33,55,0.5)" />
+            <Text style={s.footerLink}>로그아웃</Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+    <View style={s.tabletRight}>
+      <View style={s.tabletCard}>
+        <View style={s.tabletCardInner}>
+          {ctx.storeName ? (
+            <Text style={s.tabletStoreName}>{ctx.storeName}</Text>
+          ) : null}
+          <View style={s.tabletNumberRow}>
+            <View style={{flexDirection: 'row', alignItems: 'center'}}>
+              <Text style={s.tabletNumberText}>010</Text>
+              <Text style={s.tabletNumberText}>{ctx.phoneNumberLabel()}</Text>
+            </View>
+            {ctx.number.length > 0 && (
+              <Pressable onPress={ctx.clearNumber}>
+                <CircleXIcon width={24} height={24} color="#97999D" />
+              </Pressable>
+            )}
+          </View>
+          <View style={s.divider} />
+          <Keypad onPress={ctx.onNumberPress} size="large" />
+        </View>
+        <View style={s.tabletConfirmWrap}>
+          <Pressable
+            style={({pressed}) => [
+              s.confirmBtn,
+              {width: pressed ? 409 : 421, maxWidth: 421},
+            ]}
+            onPress={ctx.onConfirmPress}>
+            <LinearGradient
+              colors={['#4FC3F7', '#0288D1']}
+              locations={[0.2, 1]}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={s.confirmGradient}>
+              <Text style={s.confirmText}>조회하기</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  </View>
+);
+
+// ─── Signup Modal (공통) ─────────────────────────────────────
+const SignupModal = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
+  <Modal
+    animationType="slide"
+    transparent
+    visible={ctx.modalVisible}
+    presentationStyle="overFullScreen"
+    supportedOrientations={['portrait', 'landscape']}>
+    <View style={s.modalBackdrop}>
+      <View style={s.modalCard}>
+        <View style={s.modalHeader}>
+          <Text style={s.modalWelcome}>
+            <Text style={s.modalWelcomeAccent}>
+              010{ctx.phoneNumberLabel()}
+            </Text>{' '}
+            님 반갑습니다!
+          </Text>
+          <Pressable style={{padding: 7}} onPress={ctx.closeSignupModal}>
+            <XIcon />
+          </Pressable>
+        </View>
+        <Text style={s.modalTitle}>
+          포인토(Pointo) 가입을 위해 이용약관 동의가 필요해요
+        </Text>
+        <Text style={s.modalSubtitle}>
+          아래 이용약관 확인 후 가입을 완료해 주세요.
+        </Text>
+        <ScrollView style={s.termsScroll}>
+          <View style={{padding: 12}}>
+            <Text>개인정보의 수집. 및 이용 동의서</Text>
+            <Text style={s.termsLight}>
+              - 이용자가 제공한 모든 정보는 다음의 목적을 위해 활용하며, 하기
+              목적 이외의 용도로는 사용되지 않습니다.
+            </Text>
+            <Text style={s.termsSub}>
+              ① 개인정보 수집 항목 및 수집·이용 목적
+            </Text>
+            <Text style={s.termsSmall}>가) 수집 항목 (필수항목)</Text>
+            <Text style={s.termsSmall}> - 전화번호(휴대전화)</Text>
+            <Text style={s.termsSmall}>나) 수집 및 이용 목적</Text>
+            <Text style={s.termsSmall}> - 서비스 제공 및 운영</Text>
+            <Text style={s.termsSmall}> - 사용자 본인 확인</Text>
+            <Text style={s.termsSub}>② 개인정보 보유 및 이용 기간</Text>
+            <Text style={s.termsSmall}>
+              - 수집·이용 동의일로부터 개인정보의 수집·이용 목적을 달성할 때까지
+            </Text>
+            <Text style={s.termsSub}>③ 동의거부관리</Text>
+            <Text style={s.termsSmall}>
+              - 귀하께서는 본 안내에 따른 개인정보 수집, 이용에 대하여 동의를
+              거부하실 권리가 있습니다. 다만, 귀하가 개인정보의 수집·이용에
+              동의를 거부하시는 경우에 서비스 이용 과정에 있어 불이익이 발생할
+              수 있음을 알려드립니다.
+            </Text>
+          </View>
+        </ScrollView>
+        <View style={s.modalBottom}>
+          <Pressable
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6,
+              paddingLeft: 16,
+            }}
+            onPress={() => ctx.setAgree(!ctx.agree)}>
+            <CheckIcon color={ctx.agree ? SUMMER_COLORS.accent : '#CFCFCF'} />
+            <Text style={s.agreeText}>
+              이용약관을 모두 읽었으며 해당 내용에 모두 동의합니다.
+            </Text>
+          </Pressable>
+          <Pressable onPress={() => ctx.setPrivacyVisible(true)}>
+            <Text style={s.privacyLink}>개인정보 처리방침 보기</Text>
+          </Pressable>
+          <Pressable
+            style={[
+              s.confirmBtn,
+              {backgroundColor: ctx.agree ? SUMMER_COLORS.accent : '#CFCFCF'},
+            ]}
+            onPress={ctx.onAgreePress}
+            disabled={!ctx.agree}>
+            <LinearGradient
+              colors={
+                ctx.agree ? ['#FFB884', '#fea265ff'] : ['#EDEDED', '#EDEDED']
+              }
+              locations={[0.2, 1]}
+              start={{x: 0, y: 0}}
+              end={{x: 1, y: 1}}
+              style={s.confirmGradient}>
+              <Text style={s.confirmText}>가입완료</Text>
+            </LinearGradient>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  </Modal>
+);
+
+// ─── Idle Overlay (공통) ─────────────────────────────────────
+const IdleOverlay = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => {
+  if (!ctx.idleVisible) return null;
+  return (
+    <Pressable style={s.idleOverlay} onPress={ctx.dismissIdle}>
+      <LinearGradient
+        colors={['#E8F4FD', '#C5E3F6']}
+        start={{x: 0, y: 0}}
+        end={{x: 1, y: 1}}
+        style={s.idleGradient}>
+        <Image
+          source={POINTO_LOGO}
+          style={{width: 80, height: 80, borderRadius: 20}}
+        />
+        <View style={{alignItems: 'center', gap: 6}}>
+          <Text style={s.idleTitle}>{ctx.storeName ?? '우리 매장'}도</Text>
+          <Text style={s.idleTitle}>포인토 쓰고 있어요</Text>
+        </View>
+        <Text style={s.idleSubtitle}>
+          종이 쿠폰 없이, 번호만으로 적립 끝.{'\n'}앱 하나면 어디서든 스탬프
+          관리.
+        </Text>
+        <Image
+          source={APPSTORE_QR}
+          style={{width: 140, height: 140, borderRadius: 12, marginTop: 8}}
+        />
+        <Text style={s.idleQrHint}>QR을 스캔하면 앱스토어로 이동해요</Text>
+        <Animated.Text style={[s.idleTapHint, {opacity: ctx.hintOpacity}]}>
+          화면을 터치하면 돌아갑니다
+        </Animated.Text>
+      </LinearGradient>
+    </Pressable>
+  );
+};
+
+// ─── Main Screen ─────────────────────────────────────────────
+const NumberInputScreen = () => {
+  const device = useDeviceType();
+  const ctx = useNumberInput();
 
   return (
     <LinearGradient
       colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
-      style={styles.container}>
+      style={{flex: 1}}>
       <StatusBar
         barStyle="dark-content"
         backgroundColor={SUMMER_COLORS.backgroundStart}
         translucent={false}
       />
-      <SafeAreaView style={styles.backgroundStyle}>
-        <LoadingOverlay isLoading={isLoading} />
-        <View style={[styles.flexRowBox]}>
-          <View
-            style={[
-              {
-                display: 'flex',
-                flex: 1,
-                flexDirection: isCompact ? 'column' : 'row',
-                justifyContent: 'center',
-              },
-              {gap: isCompact ? 0 : 60},
-            ]}>
-            {!isCompact && (
-              <View
-                style={[
-                  styles.flexColumnBox,
-                  {
-                    height: '100%',
-                    width: 340,
-                    alignItems: 'flex-start',
-                    justifyContent: 'space-between',
-                    paddingTop: 134,
-                    paddingBottom: 134,
-                  },
-                ]}>
-                <View
-                  style={[
-                    styles.flexColumnBox,
-                    {
-                      alignItems: 'flex-start',
-                      gap: 10,
-                    },
-                  ]}>
-                  <View style={styles.labelBox}>
-                    {storeConfig.welcomeLines.map((line, i) => (
-                      <Text key={i} style={styles.labelTitleText}>{line}</Text>
-                    ))}
-                  </View>
-                  <View style={styles.subLabelBox}>
-                    {storeConfig.guideLines.map((line, i) => (
-                      <Text key={i} style={styles.labelSubText}>{line}</Text>
-                    ))}
-                  </View>
-                  <LottieView
-                    source={require('../../../lottie/coffee.json')}
-                    autoPlay
-                    loop
-                    style={{width: 200, height: 200, alignSelf: 'flex-start'}}
-                  />
-                </View>
-                <View
-                  style={[
-                    styles.labelBox,
-                    {
-                      marginTop: 10,
-                      marginBottom: 10,
-                      gap: 6,
-                    },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.labelSubText,
-                      {fontSize: 16, lineHeight: 24, color: '#0277BD'},
-                    ]}>
-                    © 2025 {storeConfig.companyName}. All rights reserved.
-                  </Text>
-                  {/* <BackgroundDeco /> */}
-                  <View
-                    style={{
-                      alignSelf: 'center',
-                      flexDirection: 'row',
-                      gap: 16,
-                    }}>
-                    <Pressable onPress={() => setPrivacyVisible(true)}>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontFamily: 'Pretendard-Regular',
-                          color: 'rgba(13,33,55,0.5)',
-                        }}>
-                        개인정보 처리방침
-                      </Text>
-                    </Pressable>
-                    <Pressable onPress={onDeleteAccountPress}>
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontFamily: 'Pretendard-Regular',
-                          color: 'rgba(13,33,55,0.5)',
-                        }}>
-                        회원 탈퇴
-                      </Text>
-                    </Pressable>
-                    <Pressable
-                      style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
-                      onPress={() => {
-                        Alert.alert(
-                          '로그아웃',
-                          '고객 모드에서 로그아웃하시겠어요?',
-                          [
-                            {text: '취소', style: 'cancel'},
-                            {
-                              text: '로그아웃',
-                              onPress: () => setIsAuthenticated(false),
-                            },
-                          ],
-                        );
-                      }}>
-                      <ExitIcon width={14} height={14} color="rgba(13,33,55,0.5)" />
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          fontFamily: 'Pretendard-Regular',
-                          color: 'rgba(13,33,55,0.5)',
-                        }}>
-                        로그아웃
-                      </Text>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            )}
-            <View
-              style={[
-                styles.flexColumnBox,
-                {
-                  justifyContent: isCompact ? 'center' : 'flex-end',
-                  height: '100%',
-                  flex: isCompact ? 1 : undefined,
-                },
-              ]}>
-              <View
-                style={[
-                  styles.flexColumnBox,
-                  {
-                    paddingTop: isCompact ? 16 : 24,
-                    paddingLeft: 15,
-                    paddingRight: 15,
-                    borderTopLeftRadius: isCompact ? 0 : 32,
-                    borderTopRightRadius: isCompact ? 0 : 32,
-                    width: isCompact ? '100%' : 533,
-                    height: isCompact ? '100%' : 734,
-                    backgroundColor: '#ffffff',
-                    shadowColor: '#000000',
-                    shadowOffset: {
-                      width: 0,
-                      height: 4.5,
-                    },
-                    shadowOpacity: 0.07,
-                    shadowRadius: 22,
-                    elevation: 6,
-                  },
-                ]}>
-                <View
-                  style={[
-                    styles.flexColumnBox,
-                    {
-                      width: isCompact ? '100%' : 485,
-                      height: 'auto',
-                    },
-                  ]}>
-                  <View
-                    style={[
-                      {
-                        width: isCompact ? '100%' : 376,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'flex-start',
-                        gap: 20,
-                        marginBottom: 32,
-                        paddingLeft: 9,
-                        paddingRight: 9,
-                      },
-                    ]}>
-                    {storeName && (
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          fontFamily: 'Pretendard-SemiBold',
-                          color: '#0288D1',
-                        }}>
-                        {storeName}
-                      </Text>
-                    )}
-                    <View
-                      style={[
-                        styles.headerNumberContainer,
-                        {
-                          width: '100%',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        },
-                      ]}>
-                      <View style={styles.headerNumberContainer}>
-                        <Text style={styles.headerNumberText}>010</Text>
-                        <Text style={styles.headerNumberText}>
-                          {phoneNumberLabel()}
-                        </Text>
-                      </View>
-                      {number.length > 0 && (
-                        <Pressable
-                          onPress={() => {
-                            setNumber('');
-                          }}>
-                          <CircleXIcon width={24} height={24} color="#97999D" />
-                        </Pressable>
-                      )}
-                    </View>
-                    <View style={styles.divisor}></View>
-                  </View>
-                  <View
-                    style={[
-                      {
-                        width: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'flex-start',
-                        gap: 12,
-                      },
-                    ]}>
-                    {NUMBER_SEQUENCE.map((row, rowIndex) => (
-                      <View key={rowIndex} style={styles.numberInputContainer}>
-                        {row.map((number, numberIndex) => (
-                          <Pressable
-                            key={numberIndex}
-                            style={({pressed}) => [
-                              {
-                                backgroundColor: pressed
-                                  ? '#B3E5FC'
-                                  : 'rgba(255, 255, 255, 0.96)',
-                                borderRadius: 10,
-                              },
-                              // 또는 추가 스타일이 있으면 아래처럼
-                              styles.numberInputButton,
-                            ]}
-                            onPress={() => onNumberPress(number)}>
-                            <Text style={styles.numberInputText}>{number}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    ))}
-                    <View style={styles.numberInputContainer}>
-                      <Pressable style={styles.numberInputButton}></Pressable>
-                      <Pressable
-                        style={({pressed}) => [
-                          {
-                            backgroundColor: pressed
-                              ? '#B3E5FC'
-                              : 'rgba(255, 255, 255, 0.96)',
-                            borderRadius: 10,
-                          },
-                          // 또는 추가 스타일이 있으면 아래처럼
-                          styles.numberInputButton,
-                        ]}
-                        onPress={() => onNumberPress(0)}>
-                        <Text style={styles.numberInputText}>0</Text>
-                      </Pressable>
-                      <Pressable
-                        style={({pressed}) => [
-                          {
-                            backgroundColor: pressed
-                              ? '#B3E5FC'
-                              : 'rgba(255, 255, 255, 0.96)',
-                            borderRadius: 10,
-                          },
-                          // 또는 추가 스타일이 있으면 아래처럼
-                          styles.numberInputButton,
-                        ]}
-                        onPress={() => onNumberPress('c')}>
-                        <LeftBigArrowIcon />
-                      </Pressable>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.confirmContainer}>
-                  <Pressable
-                    style={({pressed}) => [
-                      styles.confirmButton,
-                      {
-                        width: isCompact ? '100%' : pressed ? 409 : 421,
-                        maxWidth: isCompact ? undefined : 421,
-                      },
-                    ]}
-                    onPress={onConfirmPress}>
-                    <LinearGradient
-                      colors={['#4FC3F7', '#0288D1']}
-                      locations={[0.2, 1]}
-                      start={{x: 0, y: 0}}
-                      end={{x: 1, y: 1}}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        borderRadius: 20,
-                      }}>
-                      <Text style={styles.confirmButtonText}>조회하기</Text>
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              </View>
-            </View>
-          </View>
-        </View>
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          presentationStyle="overFullScreen" // or "pageSheet" 등 시도
-          supportedOrientations={['portrait', 'landscape']}>
-          <View style={styles.centeredView}>
-            <View style={styles.modalView}>
-              <View
-                style={[
-                  {
-                    width: '100%',
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: 4,
-                  },
-                ]}>
-                <Text
-                  style={[
-                    styles.welcomeText,
-                    {
-                      color: '#191D2B',
-                    },
-                  ]}>
-                  <Text
-                    style={[
-                      styles.welcomeText,
-                      {
-                        color: '#0288D1',
-                        fontFamily: 'SFUIDisplay-Semibold',
-                      },
-                    ]}>
-                    010{phoneNumberLabel()}
-                  </Text>{' '}
-                  님 반갑습니다!
-                </Text>
-                <Pressable
-                  style={{
-                    height: 28,
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'center',
-                    alignItems: 'flex-start',
-                    padding: 7,
-                  }}
-                  onPress={() => {
-                    setAgree(false);
-                    setModalVisible(false);
-                  }}>
-                  <XIcon />
-                </Pressable>
-              </View>
-              <Text style={styles.titleText}>
-                포인토(Pointo) 가입을 위해 이용약관 동의가 필요해요
-              </Text>
-              <Text style={styles.subtitleText}>
-                아래 이용약관 확인 후 가입을 완료해 주세요.
-              </Text>
-              <ScrollView
-                style={{
-                  width: '100%',
-                  borderColor: '#E0E0E9',
-                  borderWidth: 0.5,
-                  borderRadius: 10,
-                  marginBottom: 25,
-                  marginTop: 15,
-                }}>
-                <View style={styles.termsContainer}>
-                  <Text>개인정보의 수집. 및 이용 동의서</Text>
-                  <Text style={styles.termsLightSubtitle}>
-                    - 이용자가 제공한 모든 정보는 다음의 목적을 위해 활용하며,
-                    하기 목적 이외의 용도로는 사용되지 않습니다.
-                  </Text>
-                  <Text style={styles.termsSubtitle}>
-                    ① 개인정보 수집 항목 및 수집·이용 목적
-                  </Text>
-                  <Text style={styles.termsBasicText}>
-                    가) 수집 항목 (필수항목)
-                  </Text>
-                  <Text style={styles.termsSmallText}>
-                    - 전화번호(휴대전화)
-                  </Text>
-                  <Text style={styles.termsBasicText}>
-                    나) 수집 및 이용 목적
-                  </Text>
-                  <Text style={styles.termsSmallText}>
-                    - 서비스 제공 및 운영
-                  </Text>
-                  <Text style={styles.termsSmallText}>- 사용자 본인 확인</Text>
-                  <Text style={styles.termsSubtitle}>
-                    ② 개인정보 보유 및 이용 기간
-                  </Text>
-                  <Text style={styles.termsSmallText}>
-                    - 수집·이용 동의일로부터 개인정보의 수집·이용 목적을 달성할
-                    때까지
-                  </Text>
-                  <Text style={styles.termsSubtitle}>③ 동의거부관리</Text>
-                  <Text style={styles.termsSmallText}>
-                    - 귀하께서는 본 안내에 따른 개인정보 수집, 이용에 대하여
-                    동의를 거부하실 권리가 있습니다. 다만, 귀하가 개인정보의
-                    수집·이용에 동의를 거부하시는 경우에 서비스 이용 과정에 있어
-                    불이익이 발생할 수 있음을 알려드립니다.
-                  </Text>
-                </View>
-              </ScrollView>
-              <View
-                style={{
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: 12,
-                }}>
-                <Pressable
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    flexDirection: 'row',
-                    justifyContent: 'flex-start',
-                    alignItems: 'center',
-                    gap: 6,
-                    paddingLeft: 16,
-                  }}
-                  onPress={() => setAgree(!agree)}>
-                  <CheckIcon color={agree ? SUMMER_COLORS.accent : '#CFCFCF'} />
-                  <Text style={styles.bottomText}>
-                    이용약관을 모두 읽었으며 해당 내용에 모두 동의합니다.
-                  </Text>
-                </Pressable>
-                <Pressable onPress={() => setPrivacyVisible(true)}>
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      fontFamily: 'Pretendard-Regular',
-                      color: '#0288D1',
-                      textDecorationLine: 'underline',
-                      marginTop: 4,
-                      marginBottom: 8,
-                    }}>
-                    개인정보 처리방침 보기
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={({pressed}) => [
-                    styles.confirmButton,
-                    {
-                      width: pressed ? '98%' : '100%',
-                      backgroundColor: agree ? SUMMER_COLORS.accent : '#CFCFCF',
-                      shadowOpacity: agree ? 0.45 : 0,
-                    },
-                  ]}
-                  onPress={onAgreePress}
-                  disabled={!agree}>
-                  <LinearGradient
-                    colors={
-                      agree ? ['#FFB884', '#fea265ff'] : ['#EDEDED', '#EDEDED']
-                    }
-                    locations={[0.2, 1]}
-                    start={{x: 0, y: 0}}
-                    end={{x: 1, y: 1}}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      borderRadius: 20,
-                    }}>
-                    <Text style={styles.confirmButtonText}>가입완료</Text>
-                  </LinearGradient>
-                </Pressable>
-              </View>
-            </View>
-          </View>
-        </Modal>
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={viewModalContext.visible}
-          presentationStyle="overFullScreen" // or "pageSheet" 등 시도
-          supportedOrientations={['portrait', 'landscape']}>
-          <DashboardView
-            phoneNumber={viewModalContext.phoneNumber}
-            onClose={() => {
-              setViewModalContext({
-                visible: false,
-                phoneNumber: '',
-              });
-            }}
-          />
-        </Modal>
+      <SafeAreaView style={{flex: 1}}>
+        <LoadingOverlay isLoading={ctx.isLoading} />
+        {device === 'tablet' ? (
+          <TabletLayout ctx={ctx} />
+        ) : (
+          <PhoneLayout ctx={ctx} />
+        )}
       </SafeAreaView>
-      {/* Coming Soon 아이들 오버레이 — 전체화면 그라디언트 */}
-      {idleVisible && (
-        <Pressable
-          style={styles.idleOverlay}
-          onPress={() => {
-            setIdleVisible(false);
-            resetIdleTimer();
-          }}>
-          <LinearGradient
-            colors={['#E8F4FD', '#C5E3F6']}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}
-            style={styles.idleGradient}>
-            <Image
-              source={POINTO_LOGO}
-              style={{width: 80, height: 80, borderRadius: 20}}
-            />
-            <View style={{alignItems: 'center', gap: 6}}>
-              <Text style={styles.idleTitle}>
-                {storeName ?? '우리 매장'}도
-              </Text>
-              <Text style={styles.idleTitle}>
-                포인토 쓰고 있어요
-              </Text>
-            </View>
-            <Text style={styles.idleSubtitle}>
-              종이 쿠폰 없이, 번호만으로 적립 끝.{'\n'}앱 하나면 어디서든 스탬프 관리.
-            </Text>
-            <Image
-              source={APPSTORE_QR}
-              style={{width: 140, height: 140, borderRadius: 12, marginTop: 8}}
-            />
-            <Text style={{
-              fontSize: 13,
-              fontFamily: 'Pretendard-Regular',
-              color: 'rgba(13,33,55,0.5)',
-              marginTop: 4,
-            }}>
-              QR을 스캔하면 앱스토어로 이동해요
-            </Text>
-            <Animated.Text style={[styles.idleTapHint, {opacity: hintOpacity}]}>
-              화면을 터치하면 돌아갑니다
-            </Animated.Text>
-          </LinearGradient>
-        </Pressable>
-      )}
+      <SignupModal ctx={ctx} />
+      <Modal
+        animationType="slide"
+        transparent
+        visible={ctx.viewModalContext.visible}
+        presentationStyle="overFullScreen"
+        supportedOrientations={['portrait', 'landscape']}>
+        <DashboardView
+          phoneNumber={ctx.viewModalContext.phoneNumber}
+          onClose={ctx.closeViewModal}
+        />
+      </Modal>
+      <IdleOverlay ctx={ctx} />
       <PrivacyPolicyModal
-        visible={privacyVisible}
-        onClose={() => setPrivacyVisible(false)}
-        companyName={storeConfig.companyName}
-        contactEmail={storeConfig.contactEmail}
+        visible={ctx.privacyVisible}
+        onClose={() => ctx.setPrivacyVisible(false)}
+        companyName={ctx.storeConfig.companyName}
+        contactEmail={ctx.storeConfig.contactEmail}
       />
     </LinearGradient>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    // backgroundColor: '#FFFAE3',
-  },
-  backgroundStyle: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-  },
-  flexCenter: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  flexRowBox: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  flexColumnBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  labelBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  holidayBadge: {
-    backgroundColor: 'rgba(2, 136, 209, 0.12)',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(2, 136, 209, 0.4)',
-    marginBottom: 10,
-    gap: 4,
-  },
-  holidayBadgeText: {
-    fontSize: 16,
-    fontFamily: 'Pretendard-SemiBold',
-    color: SUMMER_COLORS.accent,
-    letterSpacing: -0.5,
-  },
-  holidayBadgeSubText: {
-    fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
-    color: SUMMER_COLORS.primary,
-  },
-  subLabelBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  labelTitleText: {
-    fontSize: 36,
-    fontFamily: 'Pretendard-Medium',
-    lineHeight: 48,
-    letterSpacing: -1,
-    color: SUMMER_COLORS.primary,
-  },
-  labelSubText: {
-    fontSize: 24,
-    fontFamily: 'Pretendard-Light',
-    lineHeight: 32,
-    letterSpacing: -1,
-    color: 'rgba(13, 33, 55, 0.65)',
-  },
-  numberInputContainer: {
+// ─── Styles ──────────────────────────────────────────────────
+const s = StyleSheet.create({
+  // Keypad
+  keyRow: {
     width: '100%',
     flexDirection: 'row',
     justifyContent: 'center',
     gap: 16,
   },
-  numberInputButton: {
-    display: 'flex',
+  keyBtn: {
     flex: 1,
     maxWidth: 151,
-    height: 77,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 10,
   },
-  numberInputText: {
-    fontSize: 42,
-    color: '#3D2416',
-    fontFamily: 'SFUIDisplay-Regular',
+  keyText: {color: '#3D2416', fontFamily: 'SFUIDisplay-Regular'},
+
+  // Phone
+  phoneContainer: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    justifyContent: 'center',
   },
-  headerNumberContainer: {
-    display: 'flex',
+  phoneInner: {width: '100%', alignItems: 'center'},
+  phoneStoreName: {
+    fontSize: 15,
+    fontFamily: 'Pretendard-SemiBold',
+    color: '#0288D1',
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    paddingHorizontal: 9,
+  },
+  phoneNumberRow: {
+    width: '100%',
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 9,
+    marginBottom: 20,
   },
-  headerNumberText: {
+  phoneNumberDisplay: {flexDirection: 'row', alignItems: 'center'},
+  phoneNumberText: {
+    fontSize: 36,
+    color: '#0D2137',
+    fontFamily: 'SFUIDisplay-Medium',
+    lineHeight: 40,
+    letterSpacing: -1,
+  },
+  phoneConfirmWrap: {width: '100%', alignItems: 'center', marginTop: 24},
+  phoneFooter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    paddingVertical: 16,
+  },
+
+  // Tablet
+  tabletContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 60,
+    paddingHorizontal: 20,
+  },
+  tabletLeft: {
+    width: 340,
+    justifyContent: 'space-between',
+    paddingTop: 134,
+    paddingBottom: 134,
+  },
+  tabletWelcome: {gap: 10},
+  tabletWelcomeText: {
+    fontSize: 36,
+    fontFamily: 'Pretendard-Medium',
+    lineHeight: 48,
+    letterSpacing: -1,
+    color: '#0D2137',
+  },
+  tabletGuideText: {
+    fontSize: 24,
+    fontFamily: 'Pretendard-Light',
+    lineHeight: 32,
+    letterSpacing: -1,
+    color: 'rgba(13,33,55,0.65)',
+  },
+  tabletFooter: {gap: 6},
+  tabletCopyright: {
+    fontSize: 16,
+    lineHeight: 24,
+    fontFamily: 'Pretendard-Light',
+    color: '#0277BD',
+    textAlign: 'center',
+  },
+  tabletFooterLinks: {flexDirection: 'row', alignSelf: 'center', gap: 16},
+  tabletRight: {justifyContent: 'flex-end', height: '100%'},
+  tabletCard: {
+    width: 533,
+    height: 734,
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingTop: 24,
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 4.5},
+    shadowOpacity: 0.07,
+    shadowRadius: 22,
+    elevation: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabletCardInner: {width: '100%', paddingHorizontal: 24},
+  tabletStoreName: {
+    fontSize: 15,
+    fontFamily: 'Pretendard-SemiBold',
+    color: '#0288D1',
+    marginBottom: 20,
+    paddingHorizontal: 9,
+  },
+  tabletNumberRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 9,
+  },
+  tabletNumberText: {
     fontSize: 44,
-    color: SUMMER_COLORS.primary,
+    color: '#0D2137',
     fontFamily: 'SFUIDisplay-Medium',
     lineHeight: 48,
     letterSpacing: -1,
   },
-  santaCard: {
-    width: '100%',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 14,
-    backgroundColor: 'rgba(2, 136, 209, 0.1)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(2, 136, 209, 0.35)',
-  },
-  santaIconWrapper: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: 'rgba(79, 195, 247, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  santaIcon: {
-    fontSize: 30,
-    color: SUMMER_COLORS.accent,
-  },
-  santaTextWrapper: {
-    flexShrink: 1,
-    gap: 2,
-  },
-  santaTitle: {
-    fontSize: 17,
-    fontFamily: 'SFUIDisplay-Semibold',
-    color: '#3D2416',
-  },
-  santaSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13, 33, 55, 0.65)',
-    lineHeight: 20,
-  },
-  confirmContainer: {
-    width: '100%',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 55.5,
-  },
-  confirmButton: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
+  tabletConfirmWrap: {width: '100%', alignItems: 'center', marginTop: 55.5},
+
+  // Confirm button (shared)
+  confirmBtn: {
     width: '100%',
     maxWidth: 344,
     height: 64,
-    backgroundColor: '#81D4FA',
     borderRadius: 24,
-    // shadow
     shadowColor: '#0277BD',
-    shadowOffset: {
-      width: 0,
-      height: 4.5,
-    },
+    shadowOffset: {width: 0, height: 4.5},
     shadowOpacity: 0.5,
     shadowRadius: 12,
     elevation: 6,
   },
-  confirmButtonText: {
-    fontSize: 16,
-    color: 'white',
-    fontFamily: 'Pretendard-Regular',
+  confirmGradient: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 24,
   },
-  divisor: {
+  confirmText: {fontSize: 16, color: '#fff', fontFamily: 'Pretendard-Regular'},
+
+  // Divider
+  divider: {
     width: '100%',
     height: 0.5,
     backgroundColor: '#B3E5FC',
+    marginBottom: 12,
   },
-  centeredView: {
+
+  // Footer link
+  footerLink: {
+    fontSize: 13,
+    fontFamily: 'Pretendard-Regular',
+    color: 'rgba(13,33,55,0.5)',
+  },
+
+  // Modal
+  modalBackdrop: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  modalView: {
+  modalCard: {
     height: 450,
     width: '90%',
     maxWidth: 634,
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    backgroundColor: 'rgba(255,255,255,0.98)',
     borderColor: SUMMER_COLORS.accent,
     borderWidth: 1,
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
   },
-  termsContainer: {
-    flex: 1,
-    padding: 12,
+  modalHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  templateContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    padding: 5,
-    borderWidth: 0.5,
-    borderColor: '#8E979E',
-    borderRadius: 5,
-    marginBottom: 20,
-  },
-  templateText: {
-    fontSize: 10,
-    fontFamily: 'Pretendard-Light',
-  },
-  termsLightSubtitle: {
-    fontSize: 10,
-    fontFamily: 'Pretendard-Light',
-    marginTop: 10,
-    paddingLeft: 10,
-  },
-  termsSubtitle: {
-    fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
-    marginTop: 10,
-    paddingLeft: 10,
-  },
-  termsBasicText: {
-    fontSize: 10,
-    fontFamily: 'Pretendard-Light',
-    marginTop: 5,
-    paddingLeft: 20,
-  },
-  termsSmallText: {
-    fontSize: 10,
-    fontFamily: 'Pretendard-Light',
-    marginTop: 5,
-    paddingLeft: 30,
-  },
-  welcomeText: {
+  modalWelcome: {
     fontSize: 20,
     lineHeight: 28,
     fontFamily: 'Pretendard-Medium',
-    color: '#0E4132',
+    color: '#191D2B',
   },
-  titleText: {
+  modalWelcomeAccent: {color: '#0288D1', fontFamily: 'SFUIDisplay-Semibold'},
+  modalTitle: {
     width: '100%',
     fontSize: 28,
     lineHeight: 38,
     fontFamily: 'Pretendard-Medium',
     color: '#0E4132',
   },
-  subtitleText: {
+  modalSubtitle: {
     width: '100%',
     fontSize: 14,
     lineHeight: 24,
     fontFamily: 'Pretendard-Regular',
     color: '#3E5F51',
   },
-  bottomText: {
+  termsScroll: {
+    width: '100%',
+    borderColor: '#E0E0E9',
+    borderWidth: 0.5,
+    borderRadius: 10,
+    marginBottom: 25,
+    marginTop: 15,
+  },
+  termsLight: {
+    fontSize: 10,
+    fontFamily: 'Pretendard-Light',
+    marginTop: 10,
+    paddingLeft: 10,
+  },
+  termsSub: {
+    fontSize: 11,
+    fontFamily: 'Pretendard-Regular',
+    marginTop: 10,
+    paddingLeft: 10,
+  },
+  termsSmall: {
+    fontSize: 10,
+    fontFamily: 'Pretendard-Light',
+    marginTop: 5,
+    paddingLeft: 20,
+  },
+  modalBottom: {width: '100%', alignItems: 'center', gap: 12},
+  agreeText: {
     fontSize: 14,
     lineHeight: 22,
     fontFamily: 'Pretendard-Regular',
     color: '#0E4132',
   },
+  privacyLink: {
+    fontSize: 13,
+    fontFamily: 'Pretendard-Regular',
+    color: '#0288D1',
+    textDecorationLine: 'underline',
+    marginTop: 4,
+    marginBottom: 8,
+  },
+
+  // Idle overlay
   idleOverlay: {
     position: 'absolute',
     top: 0,
@@ -1166,7 +691,6 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(232, 244, 253, 0.45)',
   },
   idleGradient: {
     flex: 1,
@@ -1178,7 +702,7 @@ const styles = StyleSheet.create({
   idleTitle: {
     fontSize: 36,
     fontFamily: 'Pretendard-SemiBold',
-    color: SUMMER_COLORS.primary,
+    color: '#0D2137',
     textAlign: 'center',
     letterSpacing: -1,
     lineHeight: 50,
@@ -1186,14 +710,20 @@ const styles = StyleSheet.create({
   idleSubtitle: {
     fontSize: 20,
     fontFamily: 'Pretendard-Light',
-    color: 'rgba(13, 33, 55, 0.6)',
+    color: 'rgba(13,33,55,0.6)',
     textAlign: 'center',
     lineHeight: 32,
+  },
+  idleQrHint: {
+    fontSize: 13,
+    fontFamily: 'Pretendard-Regular',
+    color: 'rgba(13,33,55,0.5)',
+    marginTop: 4,
   },
   idleTapHint: {
     fontSize: 18,
     fontFamily: 'Pretendard-Light',
-    color: 'rgba(13, 33, 55, 1)',
+    color: 'rgba(13,33,55,1)',
     marginTop: 8,
   },
 });

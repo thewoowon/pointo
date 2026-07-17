@@ -2,16 +2,17 @@ import React, {useCallback, useState} from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import dayjs from 'dayjs';
-import {useAuth, useFirestore, useStoreConfig} from '../../hooks';
+import {useAuth, useFirestore, useStoreConfig, useDeviceType} from '../../hooks';
 import {useFocusEffect} from '@react-navigation/native';
+import {LeftArrowIcon} from '../../components/Icons';
 import {
   computePortfolioKpis,
   fmtFloat,
@@ -49,9 +50,13 @@ const HOUR_BLOCKS: {label: string; from: number; to: number}[] = [
   {label: '21시~', from: 21, to: 24},
 ];
 
+// 단일 브랜드 액센트 (차트/활성 상태에만 절제해서 사용)
+const ACCENT = '#D4845A';
+
 const StatisticsScreen = ({navigation}: any) => {
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
+  const isPhone = useDeviceType() === 'phone';
   const {
     getStores,
     getUserCount,
@@ -59,6 +64,10 @@ const StatisticsScreen = ({navigation}: any) => {
     getAllUsers,
     getAllLogs,
   } = useFirestore(storeCode);
+
+  const isPoint = storeConfig.mode === 'point';
+  const rewardLabel = isPoint ? '포인트' : '스탬프';
+  const rewardUnit = isPoint ? storeConfig.pointUnit : '개';
 
   const [period, setPeriod] = useState<Period>('today');
   const [storeName, setStoreName] = useState<string>('');
@@ -107,8 +116,15 @@ const StatisticsScreen = ({navigation}: any) => {
         const todayLogs = logs.filter(
           l => dayjs(l.timestamp).format('YYYY-MM-DD') === today,
         );
-        setTodaySaved(todayLogs.filter(l => l.action === 'stamp_saved').length);
-        setTodayUsed(todayLogs.filter(l => l.action === 'stamp_used').length);
+        const todaySavedLogs = todayLogs.filter(l => l.action === 'stamp_saved');
+        const todayUsedLogs = todayLogs.filter(l => l.action === 'stamp_used');
+        if (isPoint) {
+          setTodaySaved(todaySavedLogs.reduce((s, l) => s + (Number(l.stamp) || 0), 0));
+          setTodayUsed(todayUsedLogs.reduce((s, l) => s + (Number(l.stamp) || 0), 0));
+        } else {
+          setTodaySaved(todaySavedLogs.length);
+          setTodayUsed(todayUsedLogs.length);
+        }
         const uniquePhones = [...new Set(todayLogs.map(l => l.phone_number))];
         setTodayVisitors(uniquePhones.length);
         setTodayVisitorList(uniquePhones);
@@ -143,10 +159,16 @@ const StatisticsScreen = ({navigation}: any) => {
           const dayLogs = logs.filter(
             l => dayjs(l.timestamp).format('YYYY-MM-DD') === key,
           );
+          const savedLogs = dayLogs.filter(l => l.action === 'stamp_saved');
+          const usedLogs = dayLogs.filter(l => l.action === 'stamp_used');
           return {
             date: d.format('M/D'),
-            saved: dayLogs.filter(l => l.action === 'stamp_saved').length,
-            used: dayLogs.filter(l => l.action === 'stamp_used').length,
+            saved: isPoint
+              ? savedLogs.reduce((s, l) => s + (Number(l.stamp) || 0), 0)
+              : savedLogs.length,
+            used: isPoint
+              ? usedLogs.reduce((s, l) => s + (Number(l.stamp) || 0), 0)
+              : usedLogs.length,
           };
         });
         setPeriodStats(stats);
@@ -213,24 +235,23 @@ const StatisticsScreen = ({navigation}: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFAF4" />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         {/* 헤더 */}
         <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
+            <LeftArrowIcon width={20} height={20} />
             <Text style={styles.backText}>뒤로</Text>
           </Pressable>
           <Text style={styles.headerTitle}>대시보드</Text>
-          <Pressable
-            style={styles.refreshBtn}
-            onPress={() => loadData(period)}>
+          <Pressable style={styles.refreshBtn} onPress={() => loadData(period)}>
             <Text style={styles.refreshText}>새로고침</Text>
           </Pressable>
         </View>
 
         {isLoading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#D4845A" />
+            <ActivityIndicator size="large" color={ACCENT} />
           </View>
         ) : (
           <ScrollView
@@ -238,9 +259,9 @@ const StatisticsScreen = ({navigation}: any) => {
             showsVerticalScrollIndicator={false}>
             {/* 가게 정보 */}
             <View style={styles.storeInfoRow}>
-              <View>
+              <View style={{flex: 1}}>
                 <Text style={styles.storeName}>{storeName}</Text>
-                <Text style={styles.storeCode}>코드: {storeCode}</Text>
+                <Text style={styles.storeCode}>코드 {storeCode}</Text>
               </View>
               <View style={styles.memberBadge}>
                 <Text style={styles.memberBadgeNumber}>{memberCount}</Text>
@@ -251,11 +272,11 @@ const StatisticsScreen = ({navigation}: any) => {
             {/* ─── 종합 성과 (포트폴리오 섹션) ─── */}
             <View style={styles.kpiSection}>
               <View style={styles.kpiHeader}>
-                <View>
-                  <Text style={styles.kpiTitle}>📊 종합 성과</Text>
+                <View style={{flex: 1, paddingRight: 12}}>
+                  <Text style={styles.kpiTitle}>종합 성과</Text>
                   <Text style={styles.kpiSubtitle}>
                     {kpiLastLoaded
-                      ? `마지막 집계: ${kpiLastLoaded}`
+                      ? `마지막 집계 ${kpiLastLoaded}`
                       : '버튼을 눌러 전체 데이터를 집계합니다'}
                   </Text>
                 </View>
@@ -285,13 +306,11 @@ const StatisticsScreen = ({navigation}: any) => {
                       label="누적 가입자"
                       value={fmtInt(kpis.totalUsers)}
                       unit="명"
-                      accent="#D4845A"
                     />
                     <KpiCard
-                      label="누적 스탬프"
+                      label={`누적 ${rewardLabel}`}
                       value={fmtInt(kpis.totalStampsEarned)}
-                      unit="개"
-                      accent="#6B9E78"
+                      unit={rewardUnit}
                     />
                   </View>
 
@@ -302,21 +321,18 @@ const StatisticsScreen = ({navigation}: any) => {
                       label="DAU"
                       value={fmtInt(kpis.dau)}
                       unit="명"
-                      accent="#3D2416"
                       subtitle="최근 1일"
                     />
                     <KpiCard
                       label="WAU"
                       value={fmtInt(kpis.wau)}
                       unit="명"
-                      accent="#3D2416"
                       subtitle="최근 7일"
                     />
                     <KpiCard
                       label="MAU"
                       value={fmtInt(kpis.mau)}
                       unit="명"
-                      accent="#3D2416"
                       subtitle="최근 30일"
                     />
                   </View>
@@ -325,39 +341,38 @@ const StatisticsScreen = ({navigation}: any) => {
                       label="평균 방문 빈도"
                       value={fmtFloat(kpis.avgVisitsPerUser, 1)}
                       unit="회/인"
-                      accent="#C89A2E"
                     />
                     <KpiCard
                       label="재방문율 (D7)"
                       value={fmtPct(kpis.retention7d)}
                       unit=""
-                      accent="#C89A2E"
                       subtitle={`n=${fmtInt(kpis.retention7dSampleSize)}`}
                     />
                   </View>
 
                   {/* 리워드 */}
-                  <Text style={styles.kpiGroupLabel}>리워드</Text>
-                  <View style={styles.kpiCardRow}>
-                    <KpiCard
-                      label="쿠폰 발행"
-                      value={fmtInt(kpis.totalCouponsIssued)}
-                      unit="장"
-                      accent="#7B8ED4"
-                    />
-                    <KpiCard
-                      label="쿠폰 사용"
-                      value={fmtInt(kpis.totalCouponsRedeemed)}
-                      unit="장"
-                      accent="#7B8ED4"
-                    />
-                    <KpiCard
-                      label="사용률"
-                      value={fmtPct(kpis.couponRedemptionRate)}
-                      unit=""
-                      accent="#7B8ED4"
-                    />
-                  </View>
+                  {!isPoint && (
+                    <>
+                      <Text style={styles.kpiGroupLabel}>리워드</Text>
+                      <View style={styles.kpiCardRow}>
+                        <KpiCard
+                          label="쿠폰 발행"
+                          value={fmtInt(kpis.totalCouponsIssued)}
+                          unit="장"
+                        />
+                        <KpiCard
+                          label="쿠폰 사용"
+                          value={fmtInt(kpis.totalCouponsRedeemed)}
+                          unit="장"
+                        />
+                        <KpiCard
+                          label="사용률"
+                          value={fmtPct(kpis.couponRedemptionRate)}
+                          unit=""
+                        />
+                      </View>
+                    </>
+                  )}
 
                   {/* 로열티 */}
                   <Text style={styles.kpiGroupLabel}>로열티</Text>
@@ -366,21 +381,18 @@ const StatisticsScreen = ({navigation}: any) => {
                       label="충성 고객 (Lv.4↑)"
                       value={fmtPct(kpis.loyalRatio)}
                       unit=""
-                      accent="#9B59B6"
                       subtitle={`${fmtInt(kpis.loyalCount)}명`}
                     />
                     <KpiCard
                       label="활성 유저"
                       value={fmtPct(kpis.activeRatio)}
                       unit=""
-                      accent="#6B9E78"
                       subtitle={`${fmtInt(kpis.activeCount)}명`}
                     />
                     <KpiCard
                       label="이탈 유저 (30d+)"
                       value={fmtPct(kpis.churnedRatio)}
                       unit=""
-                      accent="#B85C5C"
                       subtitle={`${fmtInt(kpis.churnedCount)}명`}
                     />
                   </View>
@@ -411,27 +423,24 @@ const StatisticsScreen = ({navigation}: any) => {
 
             {/* 오늘 현황 카드 */}
             <Text style={styles.sectionTitle}>오늘 현황</Text>
-            <View style={styles.cardRow}>
+            <View style={[styles.cardRow, isPhone && {flexWrap: 'wrap'}]}>
               <StatCard
-                emoji="👥"
                 label="방문 고객"
                 value={todayVisitors}
                 unit="명"
-                color="#D4845A"
+                minWidth={isPhone ? '45%' : undefined}
               />
               <StatCard
-                emoji="✅"
-                label="스탬프 적립"
+                label={`${rewardLabel} 적립`}
                 value={todaySaved}
-                unit="개"
-                color="#6B9E78"
+                unit={rewardUnit}
+                minWidth={isPhone ? '45%' : undefined}
               />
               <StatCard
-                emoji="🎁"
-                label="쿠폰 사용"
+                label={isPoint ? '포인트 사용' : '쿠폰 사용'}
                 value={todayUsed}
-                unit="개"
-                color="#7B8ED4"
+                unit={rewardUnit}
+                minWidth={isPhone ? '45%' : undefined}
               />
             </View>
 
@@ -440,7 +449,7 @@ const StatisticsScreen = ({navigation}: any) => {
               오늘 시간대별 방문
               {peakHour.count > 0 && (
                 <Text style={styles.peakLabel}>
-                  {'  '}피크: {peakHour.label}
+                  {'  '}피크 {peakHour.label}
                 </Text>
               )}
             </Text>
@@ -462,8 +471,8 @@ const StatisticsScreen = ({navigation}: any) => {
                             height: barHeight,
                             width: 36,
                             backgroundColor: isPeak
-                              ? '#D4845A'
-                              : 'rgba(212, 132, 90, 0.25)',
+                              ? ACCENT
+                              : 'rgba(212, 132, 90, 0.22)',
                           },
                         ]}
                       />
@@ -485,7 +494,7 @@ const StatisticsScreen = ({navigation}: any) => {
                 : period === '30days'
                 ? '최근 30일 (주별)'
                 : '이번달 (주별)'}{' '}
-              스탬프 적립
+              {rewardLabel} 적립
             </Text>
             <View style={styles.chartCard}>
               <View style={styles.barChart}>
@@ -506,8 +515,8 @@ const StatisticsScreen = ({navigation}: any) => {
                           {
                             height: barHeight,
                             backgroundColor: isLast
-                              ? '#D4845A'
-                              : 'rgba(212, 132, 90, 0.3)',
+                              ? ACCENT
+                              : 'rgba(212, 132, 90, 0.25)',
                           },
                         ]}
                       />
@@ -515,7 +524,7 @@ const StatisticsScreen = ({navigation}: any) => {
                         style={[
                           styles.barLabel,
                           isLast && {
-                            color: '#D4845A',
+                            color: ACCENT,
                             fontFamily: 'Pretendard-SemiBold',
                           },
                         ]}>
@@ -532,17 +541,17 @@ const StatisticsScreen = ({navigation}: any) => {
               <SummaryItem
                 label={period === 'today' ? '오늘 적립' : '기간 적립'}
                 value={totalSaved}
-                unit="개"
+                unit={rewardUnit}
               />
               <SummaryItem
                 label={period === 'today' ? '오늘 사용' : '기간 사용'}
                 value={totalUsed}
-                unit="개"
+                unit={rewardUnit}
               />
               <SummaryItem
                 label="순증"
                 value={totalSaved - totalUsed}
-                unit="개"
+                unit={rewardUnit}
               />
             </View>
 
@@ -582,21 +591,24 @@ const StatisticsScreen = ({navigation}: any) => {
 // ─── 서브 컴포넌트 ────────────────────────────────────────────
 
 const StatCard = ({
-  emoji,
   label,
   value,
   unit,
-  color,
+  minWidth,
 }: {
-  emoji: string;
   label: string;
   value: number;
   unit: string;
-  color: string;
+  minWidth?: `${number}%`;
 }) => (
-  <View style={[styles.statCard, {borderTopColor: color}]}>
-    <Text style={styles.statEmoji}>{emoji}</Text>
-    <Text style={[styles.statValue, {color}]}>
+  <View
+    style={[
+      styles.statCard,
+      minWidth
+        ? {minWidth: minWidth as any, flex: undefined, flexBasis: minWidth as any}
+        : undefined,
+    ]}>
+    <Text style={styles.statValue}>
       {value}
       <Text style={styles.statUnit}> {unit}</Text>
     </Text>
@@ -608,18 +620,16 @@ const KpiCard = ({
   label,
   value,
   unit,
-  accent,
   subtitle,
 }: {
   label: string;
   value: string;
   unit: string;
-  accent: string;
   subtitle?: string;
 }) => (
-  <View style={[styles.kpiCard, {borderLeftColor: accent}]}>
+  <View style={styles.kpiCard}>
     <Text style={styles.kpiCardLabel}>{label}</Text>
-    <Text style={[styles.kpiCardValue, {color: accent}]}>
+    <Text style={styles.kpiCardValue}>
       {value}
       {unit ? <Text style={styles.kpiCardUnit}> {unit}</Text> : null}
     </Text>
@@ -645,45 +655,55 @@ const SummaryItem = ({
 
 // ─── 스타일 ──────────────────────────────────────────────────
 
+const TEXT_PRIMARY = '#191D2B';
+const TEXT_SECONDARY = '#73777B';
+const TEXT_MUTED = '#9DA1A6';
+const SURFACE = '#FFFFFF';
+const HAIRLINE = '#EEEEEE';
+const TRACK = '#F2F3F5';
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F7F3EF',
+    backgroundColor: '#F6F6F8',
   },
   safeArea: {
     flex: 1,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
     paddingVertical: 14,
+    backgroundColor: SURFACE,
     borderBottomWidth: 1,
-    borderColor: '#EDE5DC',
-    backgroundColor: '#FFFFFF',
+    borderBottomColor: HAIRLINE,
   },
-  backBtn: {
-    position: 'absolute',
-    left: 16,
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    width: 80,
   },
   backText: {
-    fontSize: 14,
+    fontSize: 16,
     fontFamily: 'Pretendard-Regular',
-    color: '#3D2416',
+    color: '#3D4C57',
   },
   headerTitle: {
     fontSize: 18,
     fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
+    color: TEXT_PRIMARY,
   },
   refreshBtn: {
-    position: 'absolute',
-    right: 16,
+    width: 80,
+    alignItems: 'flex-end',
   },
   refreshText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: '#D4845A',
+    fontFamily: 'Pretendard-Medium',
+    color: ACCENT,
   },
   loadingContainer: {
     flex: 1,
@@ -699,57 +719,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
   },
   storeName: {
     fontSize: 22,
     fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
+    color: TEXT_PRIMARY,
   },
   storeCode: {
     fontSize: 13,
     fontFamily: 'SFUIDisplay-Regular',
-    color: 'rgba(61, 36, 22, 0.45)',
+    color: TEXT_MUTED,
     marginTop: 4,
     letterSpacing: 1,
   },
   memberBadge: {
     alignItems: 'center',
-    backgroundColor: 'rgba(212, 132, 90, 0.08)',
+    backgroundColor: '#F6F6F8',
     borderRadius: 12,
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
     paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.2)',
   },
   memberBadgeNumber: {
     fontSize: 28,
     fontFamily: 'Pretendard-SemiBold',
-    color: '#D4845A',
+    color: TEXT_PRIMARY,
   },
   memberBadgeLabel: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.55)',
+    color: TEXT_SECONDARY,
   },
   tabRow: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: TRACK,
     borderRadius: 12,
     padding: 4,
     gap: 4,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 1},
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
   },
   tab: {
     flex: 1,
@@ -758,27 +768,32 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   tabActive: {
-    backgroundColor: '#D4845A',
+    backgroundColor: SURFACE,
+    shadowColor: '#000',
+    shadowOffset: {width: 0, height: 1},
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
   },
   tabText: {
     fontSize: 14,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.45)',
+    color: TEXT_MUTED,
   },
   tabTextActive: {
     fontFamily: 'Pretendard-SemiBold',
-    color: '#FFFFFF',
+    color: TEXT_PRIMARY,
   },
   peakLabel: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: '#D4845A',
+    color: ACCENT,
   },
   sectionTitle: {
     fontSize: 14,
     fontFamily: 'Pretendard-SemiBold',
-    color: 'rgba(61, 36, 22, 0.5)',
-    letterSpacing: 0.5,
+    color: TEXT_SECONDARY,
+    letterSpacing: -0.2,
     marginTop: 4,
   },
   cardRow: {
@@ -787,44 +802,36 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 14,
-    padding: 16,
-    borderTopWidth: 3,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
     alignItems: 'center',
-    gap: 4,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  statEmoji: {
-    fontSize: 22,
-    marginBottom: 4,
+    gap: 6,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
   },
   statValue: {
     fontSize: 28,
     fontFamily: 'Pretendard-SemiBold',
+    color: TEXT_PRIMARY,
   },
   statUnit: {
     fontSize: 14,
     fontFamily: 'Pretendard-Regular',
+    color: TEXT_SECONDARY,
   },
   statLabel: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.5)',
+    color: TEXT_SECONDARY,
   },
   chartCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
   },
   barChart: {
     flexDirection: 'row',
@@ -841,7 +848,7 @@ const styles = StyleSheet.create({
   barValue: {
     fontSize: 11,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.6)',
+    color: TEXT_SECONDARY,
     height: 14,
   },
   bar: {
@@ -852,7 +859,7 @@ const styles = StyleSheet.create({
   barLabel: {
     fontSize: 11,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.45)',
+    color: TEXT_MUTED,
   },
   summaryRow: {
     flexDirection: 'row',
@@ -860,97 +867,85 @@ const styles = StyleSheet.create({
   },
   summaryItem: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 14,
     padding: 16,
     alignItems: 'center',
     gap: 2,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
   },
   summaryValue: {
     fontSize: 24,
     fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
+    color: TEXT_PRIMARY,
   },
   summaryUnit: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.5)',
+    color: TEXT_SECONDARY,
   },
   summaryLabel: {
     fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.45)',
+    color: TEXT_MUTED,
     marginTop: 2,
   },
   visitorCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 16,
     paddingVertical: 4,
     paddingHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: HAIRLINE,
   },
   visitorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(61, 36, 22, 0.06)',
+    borderBottomColor: '#F4F4F6',
     gap: 16,
   },
   visitorIndex: {
     fontSize: 13,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.35)',
+    color: TEXT_MUTED,
     width: 20,
     textAlign: 'right',
   },
   visitorPhone: {
     fontSize: 15,
     fontFamily: 'SFUIDisplay-Regular',
-    color: '#3D2416',
+    color: TEXT_PRIMARY,
     letterSpacing: 1,
   },
   kpiSection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: SURFACE,
     borderRadius: 16,
-    padding: 18,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
-    elevation: 3,
+    padding: 20,
     borderWidth: 1,
-    borderColor: 'rgba(212, 132, 90, 0.12)',
+    borderColor: HAIRLINE,
   },
   kpiHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
   },
   kpiTitle: {
     fontSize: 17,
     fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
+    color: TEXT_PRIMARY,
+    letterSpacing: -0.3,
   },
   kpiSubtitle: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.5)',
-    marginTop: 3,
+    color: TEXT_MUTED,
+    marginTop: 4,
   },
   kpiLoadBtn: {
-    backgroundColor: '#D4845A',
+    backgroundColor: ACCENT,
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
@@ -968,10 +963,10 @@ const styles = StyleSheet.create({
   kpiGroupLabel: {
     fontSize: 12,
     fontFamily: 'Pretendard-SemiBold',
-    color: 'rgba(61, 36, 22, 0.55)',
+    color: TEXT_SECONDARY,
     marginTop: 16,
     marginBottom: 8,
-    letterSpacing: 0.5,
+    letterSpacing: -0.2,
   },
   kpiCardRow: {
     flexDirection: 'row',
@@ -980,30 +975,30 @@ const styles = StyleSheet.create({
   },
   kpiCard: {
     flex: 1,
-    backgroundColor: '#FAF6F1',
+    backgroundColor: '#F6F6F8',
     borderRadius: 12,
     padding: 12,
-    borderLeftWidth: 3,
-    gap: 2,
+    gap: 3,
   },
   kpiCardLabel: {
     fontSize: 11,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.6)',
+    color: TEXT_SECONDARY,
   },
   kpiCardValue: {
     fontSize: 20,
     fontFamily: 'Pretendard-SemiBold',
+    color: TEXT_PRIMARY,
   },
   kpiCardUnit: {
     fontSize: 11,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.5)',
+    color: TEXT_SECONDARY,
   },
   kpiCardSubtitle: {
     fontSize: 10,
     fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.4)',
+    color: TEXT_MUTED,
   },
 });
 

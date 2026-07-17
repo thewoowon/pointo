@@ -1,6 +1,5 @@
 import React from 'react';
 import {
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
@@ -8,10 +7,11 @@ import {
   Pressable,
   useWindowDimensions,
 } from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {ProfileIcon, StatisticIcon} from '../../components/Icons';
 // import {BackgroundDeco} from '../../components/background';
 
-const ModeSelectionScreen = ({navigation, route}: any) => {
+const ModeSelectionScreen = ({navigation}: any) => {
   const {width: screenWidth} = useWindowDimensions();
   const isCompact = screenWidth < 768;
   const handleSignIn = (mode: 'supervisor' | 'client') => {
@@ -43,7 +43,7 @@ const ModeSelectionScreen = ({navigation, route}: any) => {
               <Pressable
                 style={[styles.modeContainer, isCompact && {flex: undefined, width: '100%', paddingVertical: 40}]}
                 onPress={() => {
-                  handleSignIn('supervisor');
+                  navigation.navigate('EmailAuth');
                 }}>
                 <StatisticIcon />
                 <Text style={styles.buttonText}>관리자 모드</Text>
