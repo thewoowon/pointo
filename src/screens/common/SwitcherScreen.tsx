@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,8 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
-import {useAuth, useFirestore} from '../../hooks';
+import {useAuth, useFirestore, useTheme} from '../../hooks';
+import type {Theme} from '../../theme';
 import {
   signOutOwner,
   getCurrentOwner,
@@ -23,6 +24,8 @@ import {
 import {ShortRightArrowIcon} from '../../components/Icons';
 
 const SwitcherScreen = ({navigation}: any) => {
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const {
     ownerUid,
     ownerEmail,
@@ -149,7 +152,7 @@ const SwitcherScreen = ({navigation}: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.normal.bg1} translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <View style={{flex: 1}}>
@@ -165,7 +168,7 @@ const SwitcherScreen = ({navigation}: any) => {
 
         {isLoading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color="#D4845A" />
+            <ActivityIndicator size="large" color={theme.color.surface.brand.primary} />
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -253,7 +256,7 @@ const SwitcherScreen = ({navigation}: any) => {
                 value={phone}
                 onChangeText={setPhone}
                 placeholder="01012345678"
-                placeholderTextColor="#B5B8BC"
+                placeholderTextColor={theme.color.texticon.onNormal.lowemp}
                 keyboardType="phone-pad"
               />
               <Pressable
@@ -275,10 +278,11 @@ const SwitcherScreen = ({navigation}: any) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: theme.color.surface.normal.container10,
   },
   safeArea: {
     flex: 1,
@@ -288,19 +292,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: theme.palette.gray[200],
   },
   headerTitle: {
     fontSize: 20,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: theme.font.semibold,
+    color: theme.color.texticon.onNormal.highestemp,
   },
   headerEmail: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Regular',
-    color: '#9DA1A6',
+    fontFamily: theme.font.regular,
+    color: theme.color.texticon.onNormal.lowemp,
     marginTop: 2,
   },
   logoutBtn: {
@@ -309,8 +313,8 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Medium',
-    color: '#73777B',
+    fontFamily: theme.font.medium,
+    color: theme.color.texticon.onNormal.midemp,
   },
   loading: {
     flex: 1,
@@ -322,17 +326,17 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   verifyBanner: {
-    backgroundColor: '#FFF6EF',
+    backgroundColor: theme.palette.blue[50],
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#F2D9C6',
+    borderColor: theme.palette.blue[100],
     padding: 14,
     gap: 8,
   },
   verifyText: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Medium',
-    color: '#A56A41',
+    fontFamily: theme.font.medium,
+    color: theme.palette.blue[700],
   },
   verifyActions: {
     flexDirection: 'row',
@@ -340,14 +344,14 @@ const styles = StyleSheet.create({
   },
   verifyLink: {
     fontSize: 13,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#D4845A',
+    fontFamily: theme.font.semibold,
+    color: theme.color.surface.brand.primary,
   },
   emptyBox: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: theme.palette.gray[200],
     padding: 24,
     alignItems: 'center',
     gap: 10,
@@ -355,13 +359,13 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: theme.font.semibold,
+    color: theme.color.texticon.onNormal.highestemp,
   },
   emptySubtitle: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: '#73777B',
+    fontFamily: theme.font.regular,
+    color: theme.color.texticon.onNormal.midemp,
     textAlign: 'center',
     lineHeight: 21,
     marginBottom: 8,
@@ -375,33 +379,33 @@ const styles = StyleSheet.create({
   },
   slotText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#73777B',
+    fontFamily: theme.font.semibold,
+    color: theme.color.texticon.onNormal.midemp,
   },
   claimLink: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Medium',
-    color: '#D4845A',
+    fontFamily: theme.font.medium,
+    color: theme.color.surface.brand.primary,
   },
   storeCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#EEEEEE',
+    borderColor: theme.palette.gray[200],
     paddingVertical: 20,
     paddingHorizontal: 20,
   },
   storeName: {
     fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: theme.font.semibold,
+    color: theme.color.texticon.onNormal.highestemp,
   },
   storeCode: {
     fontSize: 13,
     fontFamily: 'SFUIDisplay-Regular',
-    color: '#9DA1A6',
+    color: theme.color.texticon.onNormal.lowemp,
     marginTop: 4,
     letterSpacing: 1,
   },
@@ -409,45 +413,45 @@ const styles = StyleSheet.create({
     height: 54,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E7E8EA',
+    borderColor: theme.palette.gray[200],
     borderStyle: 'dashed',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     marginTop: 4,
   },
   addBtnText: {
     fontSize: 15,
-    fontFamily: 'Pretendard-Medium',
-    color: '#73777B',
+    fontFamily: theme.font.medium,
+    color: theme.color.texticon.onNormal.midemp,
   },
   primaryBtn: {
     height: 52,
     width: '100%',
-    backgroundColor: '#D4845A',
+    backgroundColor: theme.color.surface.brand.primary,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   primaryBtnText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: theme.font.semibold,
+    color: theme.color.etc.absolute.white,
   },
   secondaryBtn: {
     height: 52,
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#E7E8EA',
+    borderColor: theme.palette.gray[200],
     justifyContent: 'center',
     alignItems: 'center',
   },
   secondaryBtnText: {
     fontSize: 15,
-    fontFamily: 'Pretendard-Medium',
-    color: '#3D4C57',
+    fontFamily: theme.font.medium,
+    color: theme.color.texticon.onNormal.highemp,
   },
   modalBackdrop: {
     flex: 1,
@@ -458,30 +462,30 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 20,
     padding: 24,
     gap: 14,
   },
   modalTitle: {
     fontSize: 20,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: theme.font.semibold,
+    color: theme.color.texticon.onNormal.highestemp,
   },
   modalSubtitle: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: '#73777B',
+    fontFamily: theme.font.regular,
+    color: theme.color.texticon.onNormal.midemp,
     lineHeight: 21,
   },
   modalInput: {
     height: 54,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: theme.color.surface.normal.container10,
     borderRadius: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
-    color: '#191D2B',
+    fontFamily: theme.font.regular,
+    color: theme.color.texticon.onNormal.highestemp,
   },
 });
 

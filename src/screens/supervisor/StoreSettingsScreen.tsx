@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useStoreConfig} from '../../hooks';
+import {semanticColors as c, primitives as pal, fontFamily as f} from '../../theme';
 import {LeftArrowIcon} from '../../components/Icons';
 
 const Section = ({title, children}: {title: string; children: React.ReactNode}) => (
@@ -216,7 +217,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar barStyle="dark-content" backgroundColor={c.surface.normal.bg1} translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -404,14 +405,14 @@ const StoreSettingsScreen = ({navigation}: any) => {
                       value={newPresetName}
                       onChangeText={setNewPresetName}
                       placeholder="프리셋 이름"
-                      placeholderTextColor="#BBBBBB"
+                      placeholderTextColor={c.texticon.onNormal.lowemp}
                     />
                     <TextInput
                       style={[styles.fieldInput, {width: 100, textAlign: 'right'}]}
                       value={newPresetPoints}
                       onChangeText={setNewPresetPoints}
                       placeholder={`0${pointUnit}`}
-                      placeholderTextColor="#BBBBBB"
+                      placeholderTextColor={c.texticon.onNormal.lowemp}
                       keyboardType="numeric"
                     />
                   </View>
@@ -477,7 +478,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: c.surface.normal.container10,
   },
   safeArea: {
     flex: 1,
@@ -488,9 +489,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.surface.normal.bg1,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
+    borderBottomColor: pal.gray[200],
   },
   backButton: {
     flexDirection: 'row',
@@ -500,16 +501,16 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
-    color: '#3D4C57',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highemp,
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: f.semibold,
+    color: c.texticon.onNormal.highestemp,
   },
   saveButton: {
-    backgroundColor: '#D4845A',
+    backgroundColor: c.surface.brand.primary,
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 20,
@@ -518,8 +519,8 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     fontSize: 15,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: f.semibold,
+    color: c.etc.absolute.white,
   },
   scrollView: {
     flex: 1,
@@ -529,15 +530,15 @@ const styles = StyleSheet.create({
     gap: 20,
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: c.surface.normal.bg1,
     borderRadius: 16,
     padding: 20,
     gap: 16,
   },
   sectionTitle: {
     fontSize: 17,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: f.semibold,
+    color: c.texticon.onNormal.highestemp,
     letterSpacing: -0.3,
     marginBottom: 4,
   },
@@ -546,22 +547,22 @@ const styles = StyleSheet.create({
   },
   fieldLabel: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Medium',
-    color: '#73777B',
+    fontFamily: f.medium,
+    color: c.texticon.onNormal.midemp,
     letterSpacing: -0.2,
   },
   fieldInput: {
-    backgroundColor: '#F6F6F8',
+    backgroundColor: c.surface.normal.container10,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
-    color: '#191D2B',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highestemp,
   },
   segmentContainer: {
     flexDirection: 'row',
-    backgroundColor: '#EEEFF1',
+    backgroundColor: pal.gray[200],
     borderRadius: 10,
     padding: 3,
   },
@@ -572,8 +573,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   segmentActive: {
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
+    backgroundColor: c.surface.normal.bg1,
+    shadowColor: c.etc.absolute.black,
     shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.08,
     shadowRadius: 2,
@@ -581,24 +582,24 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: '#999',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
   },
   segmentTextActive: {
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
+    fontFamily: f.semibold,
+    color: c.texticon.onNormal.highestemp,
   },
   segmentHint: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
-    color: '#999',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
     marginTop: 6,
     lineHeight: 18,
   },
   presetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F6F6F8',
+    backgroundColor: c.surface.normal.container10,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -611,13 +612,13 @@ const styles = StyleSheet.create({
   },
   presetName: {
     fontSize: 15,
-    fontFamily: 'Pretendard-Medium',
-    color: '#191D2B',
+    fontFamily: f.medium,
+    color: c.texticon.onNormal.highestemp,
   },
   presetPoints: {
     fontSize: 15,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#D4845A',
+    fontFamily: f.semibold,
+    color: c.surface.brand.primary,
   },
   presetDeleteButton: {
     paddingVertical: 4,
@@ -625,8 +626,8 @@ const styles = StyleSheet.create({
   },
   presetDeleteText: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Medium',
-    color: '#E74C3C',
+    fontFamily: f.medium,
+    color: c.texticon.onNormal.warning,
   },
   presetAddForm: {
     gap: 10,
@@ -636,15 +637,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   presetAddButton: {
-    backgroundColor: '#D4845A',
+    backgroundColor: c.surface.brand.primary,
     borderRadius: 10,
     paddingVertical: 12,
     alignItems: 'center',
   },
   presetAddButtonText: {
     fontSize: 15,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: f.semibold,
+    color: c.etc.absolute.white,
   },
 });
 

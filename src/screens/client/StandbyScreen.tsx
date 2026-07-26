@@ -8,11 +8,12 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {doc, getFirestore, onSnapshot} from '@react-native-firebase/firestore';
-import {useAuth} from '../../hooks';
+import {useAuth, useTheme} from '../../hooks';
 import {useFocusEffect} from '@react-navigation/native';
 
 const StandbyScreen = ({navigation, route}: any) => {
   const {storeCode} = useAuth();
+  const theme = useTheme();
 
   useFocusEffect(
     useCallback(() => {
@@ -49,7 +50,7 @@ const StandbyScreen = ({navigation, route}: any) => {
     <View style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="#6a51ae"
+        backgroundColor={theme.color.surface.normal.bg1}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>

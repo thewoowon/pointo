@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   StatusBar,
   StyleSheet,
@@ -12,13 +12,17 @@ import {
   Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore, useAnalytics} from '../../hooks';
+import {useAuth, useFirestore, useAnalytics, useTheme} from '../../hooks';
 import {AnalyticsEvent} from '../../analytics/events';
+import type {Theme} from '../../theme';
 // import {BackgroundDeco} from '../../components/background';
 
 const SignInScreen = ({navigation, route}: any) => {
   const mode = route.params?.mode;
   const title = mode === 'supervisor' ? '관리자 로그인' : '고객 로그인';
+
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const {setIsAuthenticated, setMode, initStoreCode, setStoreName} = useAuth();
   const {getStores, findStoreByPhone} = useFirestore();
@@ -101,7 +105,7 @@ const SignInScreen = ({navigation, route}: any) => {
     <View style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="#6a51ae"
+        backgroundColor={theme.color.surface.normal.bg1}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>
@@ -112,7 +116,7 @@ const SignInScreen = ({navigation, route}: any) => {
               display: 'flex',
               flexDirection: 'row',
               position: 'absolute',
-              left: 16,
+              left: theme.spacing[4],
             }}>
             <Pressable
               onPress={() => {
@@ -128,7 +132,7 @@ const SignInScreen = ({navigation, route}: any) => {
           style={{flex: 1}}>
           {/* renderContent만 ScrollView로 감싸기 */}
           <ScrollView
-            contentContainerStyle={{flexGrow: 1, paddingBottom: 20}}
+            contentContainerStyle={{flexGrow: 1, paddingBottom: theme.spacing[5]}}
             keyboardShouldPersistTaps="handled">
             <View style={styles.innerContainer}>
               <View style={styles.flexBox}>
@@ -137,7 +141,7 @@ const SignInScreen = ({navigation, route}: any) => {
                   style={styles.input}
                   onChangeText={handleChange}
                   placeholder="스토어 코드를 입력해주세요"
-                  placeholderTextColor={'#6D6D6D'}
+                  placeholderTextColor={theme.color.texticon.onNormal.midemp}
                 />
                 <Pressable style={styles.confirmButton} onPress={handleSignIn}>
                   <Text style={styles.confirmButtonText}>로그인</Text>
@@ -159,7 +163,7 @@ const SignInScreen = ({navigation, route}: any) => {
                       onChangeText={setPhone}
                       value={phone}
                       placeholder="01012345678"
-                      placeholderTextColor={'#6D6D6D'}
+                      placeholderTextColor={theme.color.texticon.onNormal.midemp}
                       keyboardType="phone-pad"
                     />
                     <Pressable
@@ -185,127 +189,117 @@ const SignInScreen = ({navigation, route}: any) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  innerContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  backgroundStyle: {
-    flex: 1,
-  },
-  flexBox: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 20,
-  },
-  modeContainer: {
-    width: '100%',
-    maxWidth: 391,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: 12,
-    backgroundColor: '#3D7BF7',
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#e5e5e5',
-  },
-  modeText: {
-    color: '#fff',
-    fontSize: 16,
-    fontFamily: 'Pretendard-SemiBold',
-  },
-  header: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 11,
-    paddingBottom: 11,
-    maxHeight: 50,
-    borderBottomWidth: 1,
-    borderColor: '#F2F4F6',
-  },
-  headerText: {
-    color: '#181818',
-    fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-  },
-  goBackText: {
-    color: '#181818',
-    fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-  },
-  label: {
-    fontSize: 28,
-    color: '#181818',
-    fontFamily: 'Pretendard-SemiBold',
-    lineHeight: 34,
-  },
-  input: {
-    width: '100%',
-    maxWidth: 391,
-    height: 60,
-    borderColor: 'gray',
-    borderWidth: 1,
-    borderRadius: 5,
-    textAlign: 'center',
-    fontSize: 20,
-    backgroundColor: 'white',
-  },
-  confirmButton: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 391,
-    height: 55,
-    backgroundColor: '#FE8300',
-    borderRadius: 20,
-    // shadow
-    shadowColor: '#FE6D00',
-    shadowOffset: {
-      width: 0,
-      height: 4.5,
+const createStyles = (t: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
     },
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    color: 'white',
-    fontFamily: 'Pretendard-Regular',
-  },
-  findCodeText: {
-    fontSize: 14,
-    color: '#6D6D6D',
-    fontFamily: 'Pretendard-Regular',
-    textDecorationLine: 'underline',
-  },
-  findCodeBox: {
-    width: '100%',
-    maxWidth: 391,
-    gap: 12,
-    alignItems: 'center',
-  },
-  findCodeLabel: {
-    fontSize: 16,
-    color: '#181818',
-    fontFamily: 'Pretendard-Medium',
-  },
-  findButton: {
-    backgroundColor: '#333',
-    shadowColor: '#333',
-  },
-});
+    innerContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: t.spacing[5],
+    },
+    backgroundStyle: {
+      flex: 1,
+    },
+    flexBox: {
+      width: '100%',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: t.spacing[5],
+    },
+    header: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingTop: t.spacing[3],
+      paddingBottom: t.spacing[3],
+      maxHeight: 50,
+      // 디자인 시스템엔 border 토큰이 없음(=보더 미사용). 헤더 구분선은
+      // 가장 옅은 surface 토큰으로 임시 대체 — 리디자인 패스에서 재검토.
+      borderBottomWidth: 1,
+      borderColor: t.color.surface.normal.container10,
+    },
+    headerText: {
+      color: t.color.texticon.onNormal.highestemp,
+      fontSize: 18,
+      fontFamily: t.font.semibold,
+    },
+    goBackText: {
+      color: t.color.texticon.onNormal.highestemp,
+      fontSize: 14,
+      fontFamily: t.font.regular,
+    },
+    label: {
+      fontSize: 28,
+      color: t.color.texticon.onNormal.highestemp,
+      fontFamily: t.font.semibold,
+      lineHeight: 34,
+    },
+    input: {
+      width: '100%',
+      maxWidth: 391,
+      height: 60,
+      // border 토큰 부재 → 중립 팔레트로 입력 외곽선 처리 (리디자인 때 재검토)
+      borderColor: t.palette.gray[300],
+      borderWidth: 1,
+      borderRadius: t.radius.sm,
+      textAlign: 'center',
+      fontSize: 20,
+      color: t.color.texticon.onNormal.highestemp,
+      backgroundColor: t.color.surface.normal.bg1,
+    },
+    confirmButton: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '100%',
+      maxWidth: 391,
+      height: 55,
+      backgroundColor: t.color.surface.brand.primary,
+      borderRadius: t.radius.xl,
+      // shadow
+      shadowColor: t.color.surface.brand.primary,
+      shadowOffset: {
+        width: 0,
+        height: 4.5,
+      },
+      shadowOpacity: 0.5,
+      shadowRadius: 12,
+      elevation: 6,
+    },
+    confirmButtonText: {
+      fontSize: 16,
+      color: t.color.texticon.onBrand.onPrimary,
+      fontFamily: t.font.regular,
+    },
+    findCodeText: {
+      fontSize: 14,
+      color: t.color.texticon.onNormal.midemp,
+      fontFamily: t.font.regular,
+      textDecorationLine: 'underline',
+    },
+    findCodeBox: {
+      width: '100%',
+      maxWidth: 391,
+      gap: t.spacing[3],
+      alignItems: 'center',
+    },
+    findCodeLabel: {
+      fontSize: 16,
+      color: t.color.texticon.onNormal.highestemp,
+      fontFamily: t.font.medium,
+    },
+    findButton: {
+      // 보조(코드 찾기) 버튼 — 중립 다크. 시맨틱 토큰 없어 팔레트 직접 사용.
+      backgroundColor: t.palette.gray[800],
+      shadowColor: t.palette.gray[800],
+    },
+  });
 
 export default SignInScreen;

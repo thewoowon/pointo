@@ -14,6 +14,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import LottieView from 'lottie-react-native';
 import {useDeviceType} from '../../hooks';
+import {semanticColors as c, primitives as p, fontFamily as f} from '../../theme';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 import {
   CheckIcon,
@@ -30,10 +31,10 @@ const POINTO_LOGO = require('../../../src/assets/images/pointo_1024.png');
 const APPSTORE_QR = require('../../../src/assets/images/pointo_appstore_qr.png');
 
 const SUMMER_COLORS = {
-  backgroundStart: '#E8F4FD',
-  backgroundEnd: '#C5E3F6',
-  accent: '#0288D1',
-  primary: '#0D2137',
+  backgroundStart: p.blue[50],
+  backgroundEnd: p.blue[100],
+  accent: c.surface.brand.primary,
+  primary: c.texticon.onNormal.highestemp,
 };
 
 const NUMBER_SEQUENCE = [
@@ -64,7 +65,7 @@ const Keypad = ({
                 {
                   height: btnHeight,
                   backgroundColor: pressed
-                    ? '#B3E5FC'
+                    ? p.blue[100]
                     : 'rgba(255,255,255,0.96)',
                 },
               ]}
@@ -81,7 +82,7 @@ const Keypad = ({
             s.keyBtn,
             {
               height: btnHeight,
-              backgroundColor: pressed ? '#B3E5FC' : 'rgba(255,255,255,0.96)',
+              backgroundColor: pressed ? p.blue[100] : 'rgba(255,255,255,0.96)',
             },
           ]}
           onPress={() => onPress(0)}>
@@ -92,7 +93,7 @@ const Keypad = ({
             s.keyBtn,
             {
               height: btnHeight,
-              backgroundColor: pressed ? '#B3E5FC' : 'rgba(255,255,255,0.96)',
+              backgroundColor: pressed ? p.blue[100] : 'rgba(255,255,255,0.96)',
             },
           ]}
           onPress={() => onPress('c')}>
@@ -117,7 +118,7 @@ const PhoneLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
         </View>
         {ctx.number.length > 0 && (
           <Pressable onPress={ctx.clearNumber}>
-            <CircleXIcon width={22} height={22} color="#97999D" />
+            <CircleXIcon width={22} height={22} color={c.texticon.onNormal.midemp} />
           </Pressable>
         )}
       </View>
@@ -126,7 +127,7 @@ const PhoneLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
       <View style={s.phoneConfirmWrap}>
         <Pressable style={s.confirmBtn} onPress={ctx.onConfirmPress}>
           <LinearGradient
-            colors={['#a1d6efff', '#0288D1']}
+            colors={[p.blue[200], c.surface.brand.primary]}
             locations={[0.2, 1]}
             start={{x: 0, y: 0}}
             end={{x: 1, y: 1}}
@@ -146,7 +147,7 @@ const PhoneLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
       <Pressable
         style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
         onPress={ctx.logout}>
-        <ExitIcon width={14} height={14} color="rgba(13,33,55,0.5)" />
+        <ExitIcon width={14} height={14} color={c.texticon.onNormal.midemp} />
         <Text style={s.footerLink}>로그아웃</Text>
       </Pressable>
     </View>
@@ -191,7 +192,7 @@ const TabletLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
           <Pressable
             style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
             onPress={ctx.logout}>
-            <ExitIcon width={14} height={14} color="rgba(13,33,55,0.5)" />
+            <ExitIcon width={14} height={14} color={c.texticon.onNormal.midemp} />
             <Text style={s.footerLink}>로그아웃</Text>
           </Pressable>
         </View>
@@ -210,7 +211,7 @@ const TabletLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
             </View>
             {ctx.number.length > 0 && (
               <Pressable onPress={ctx.clearNumber}>
-                <CircleXIcon width={24} height={24} color="#97999D" />
+                <CircleXIcon width={24} height={24} color={c.texticon.onNormal.midemp} />
               </Pressable>
             )}
           </View>
@@ -225,7 +226,7 @@ const TabletLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
             ]}
             onPress={ctx.onConfirmPress}>
             <LinearGradient
-              colors={['#4FC3F7', '#0288D1']}
+              colors={[p.blue[300], c.surface.brand.primary]}
               locations={[0.2, 1]}
               start={{x: 0, y: 0}}
               end={{x: 1, y: 1}}
@@ -303,7 +304,7 @@ const SignupModal = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
               paddingLeft: 16,
             }}
             onPress={() => ctx.setAgree(!ctx.agree)}>
-            <CheckIcon color={ctx.agree ? SUMMER_COLORS.accent : '#CFCFCF'} />
+            <CheckIcon color={ctx.agree ? SUMMER_COLORS.accent : p.gray[200]} />
             <Text style={s.agreeText}>
               이용약관을 모두 읽었으며 해당 내용에 모두 동의합니다.
             </Text>
@@ -314,13 +315,13 @@ const SignupModal = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
           <Pressable
             style={[
               s.confirmBtn,
-              {backgroundColor: ctx.agree ? SUMMER_COLORS.accent : '#CFCFCF'},
+              {backgroundColor: ctx.agree ? SUMMER_COLORS.accent : p.gray[200]},
             ]}
             onPress={ctx.onAgreePress}
             disabled={!ctx.agree}>
             <LinearGradient
               colors={
-                ctx.agree ? ['#FFB884', '#fea265ff'] : ['#EDEDED', '#EDEDED']
+                ctx.agree ? [c.surface.brand.primary, p.blue[600]] : [p.gray[200], p.gray[200]]
               }
               locations={[0.2, 1]}
               start={{x: 0, y: 0}}
@@ -341,7 +342,7 @@ const IdleOverlay = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => {
   return (
     <Pressable style={s.idleOverlay} onPress={ctx.dismissIdle}>
       <LinearGradient
-        colors={['#E8F4FD', '#C5E3F6']}
+        colors={[p.blue[50], p.blue[100]]}
         start={{x: 0, y: 0}}
         end={{x: 1, y: 1}}
         style={s.idleGradient}>
@@ -431,7 +432,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 10,
   },
-  keyText: {color: '#3D2416', fontFamily: 'SFUIDisplay-Regular'},
+  keyText: {color: c.texticon.onNormal.highestemp, fontFamily: 'SFUIDisplay-Regular'},
 
   // Phone
   phoneContainer: {
@@ -443,8 +444,8 @@ const s = StyleSheet.create({
   phoneInner: {width: '100%', alignItems: 'center'},
   phoneStoreName: {
     fontSize: 15,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#0288D1',
+    fontFamily: f.semibold,
+    color: c.surface.brand.primary,
     alignSelf: 'flex-start',
     marginBottom: 12,
     paddingHorizontal: 9,
@@ -460,7 +461,7 @@ const s = StyleSheet.create({
   phoneNumberDisplay: {flexDirection: 'row', alignItems: 'center'},
   phoneNumberText: {
     fontSize: 36,
-    color: '#0D2137',
+    color: c.texticon.onNormal.highestemp,
     fontFamily: 'SFUIDisplay-Medium',
     lineHeight: 40,
     letterSpacing: -1,
@@ -490,24 +491,24 @@ const s = StyleSheet.create({
   tabletWelcome: {gap: 10},
   tabletWelcomeText: {
     fontSize: 36,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 48,
     letterSpacing: -1,
-    color: '#0D2137',
+    color: c.texticon.onNormal.highestemp,
   },
   tabletGuideText: {
     fontSize: 24,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: f.light,
     lineHeight: 32,
     letterSpacing: -1,
-    color: 'rgba(13,33,55,0.65)',
+    color: c.texticon.onNormal.highemp,
   },
   tabletFooter: {gap: 6},
   tabletCopyright: {
     fontSize: 16,
     lineHeight: 24,
-    fontFamily: 'Pretendard-Light',
-    color: '#0277BD',
+    fontFamily: f.light,
+    color: p.blue[700],
     textAlign: 'center',
   },
   tabletFooterLinks: {flexDirection: 'row', alignSelf: 'center', gap: 16},
@@ -515,12 +516,12 @@ const s = StyleSheet.create({
   tabletCard: {
     width: 533,
     height: 734,
-    backgroundColor: '#fff',
+    backgroundColor: c.surface.normal.bg1,
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     paddingTop: 24,
     paddingHorizontal: 15,
-    shadowColor: '#000',
+    shadowColor: c.etc.absolute.black,
     shadowOffset: {width: 0, height: 4.5},
     shadowOpacity: 0.07,
     shadowRadius: 22,
@@ -531,8 +532,8 @@ const s = StyleSheet.create({
   tabletCardInner: {width: '100%', paddingHorizontal: 24},
   tabletStoreName: {
     fontSize: 15,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#0288D1',
+    fontFamily: f.semibold,
+    color: c.surface.brand.primary,
     marginBottom: 20,
     paddingHorizontal: 9,
   },
@@ -546,7 +547,7 @@ const s = StyleSheet.create({
   },
   tabletNumberText: {
     fontSize: 44,
-    color: '#0D2137',
+    color: c.texticon.onNormal.highestemp,
     fontFamily: 'SFUIDisplay-Medium',
     lineHeight: 48,
     letterSpacing: -1,
@@ -559,7 +560,7 @@ const s = StyleSheet.create({
     maxWidth: 344,
     height: 64,
     borderRadius: 24,
-    shadowColor: '#0277BD',
+    shadowColor: p.blue[700],
     shadowOffset: {width: 0, height: 4.5},
     shadowOpacity: 0.5,
     shadowRadius: 12,
@@ -572,21 +573,21 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 24,
   },
-  confirmText: {fontSize: 16, color: '#fff', fontFamily: 'Pretendard-Regular'},
+  confirmText: {fontSize: 16, color: c.etc.absolute.white, fontFamily: f.regular},
 
   // Divider
   divider: {
     width: '100%',
     height: 0.5,
-    backgroundColor: '#B3E5FC',
+    backgroundColor: p.blue[100],
     marginBottom: 12,
   },
 
   // Footer link
   footerLink: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13,33,55,0.5)',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
   },
 
   // Modal
@@ -606,7 +607,7 @@ const s = StyleSheet.create({
     borderRadius: 24,
     padding: 24,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: c.etc.absolute.black,
     shadowOffset: {width: 0, height: 2},
     shadowOpacity: 0.25,
     shadowRadius: 4,
@@ -622,27 +623,27 @@ const s = StyleSheet.create({
   modalWelcome: {
     fontSize: 20,
     lineHeight: 28,
-    fontFamily: 'Pretendard-Medium',
-    color: '#191D2B',
+    fontFamily: f.medium,
+    color: c.texticon.onNormal.highestemp,
   },
-  modalWelcomeAccent: {color: '#0288D1', fontFamily: 'SFUIDisplay-Semibold'},
+  modalWelcomeAccent: {color: c.surface.brand.primary, fontFamily: 'SFUIDisplay-Semibold'},
   modalTitle: {
     width: '100%',
     fontSize: 28,
     lineHeight: 38,
-    fontFamily: 'Pretendard-Medium',
-    color: '#0E4132',
+    fontFamily: f.medium,
+    color: c.texticon.onNormal.highestemp,
   },
   modalSubtitle: {
     width: '100%',
     fontSize: 14,
     lineHeight: 24,
-    fontFamily: 'Pretendard-Regular',
-    color: '#3E5F51',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highemp,
   },
   termsScroll: {
     width: '100%',
-    borderColor: '#E0E0E9',
+    borderColor: p.gray[200],
     borderWidth: 0.5,
     borderRadius: 10,
     marginBottom: 25,
@@ -650,19 +651,19 @@ const s = StyleSheet.create({
   },
   termsLight: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: f.light,
     marginTop: 10,
     paddingLeft: 10,
   },
   termsSub: {
     fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     marginTop: 10,
     paddingLeft: 10,
   },
   termsSmall: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: f.light,
     marginTop: 5,
     paddingLeft: 20,
   },
@@ -670,13 +671,13 @@ const s = StyleSheet.create({
   agreeText: {
     fontSize: 14,
     lineHeight: 22,
-    fontFamily: 'Pretendard-Regular',
-    color: '#0E4132',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highestemp,
   },
   privacyLink: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Regular',
-    color: '#0288D1',
+    fontFamily: f.regular,
+    color: c.surface.brand.primary,
     textDecorationLine: 'underline',
     marginTop: 4,
     marginBottom: 8,
@@ -701,29 +702,29 @@ const s = StyleSheet.create({
   },
   idleTitle: {
     fontSize: 36,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#0D2137',
+    fontFamily: f.semibold,
+    color: c.texticon.onNormal.highestemp,
     textAlign: 'center',
     letterSpacing: -1,
     lineHeight: 50,
   },
   idleSubtitle: {
     fontSize: 20,
-    fontFamily: 'Pretendard-Light',
-    color: 'rgba(13,33,55,0.6)',
+    fontFamily: f.light,
+    color: c.texticon.onNormal.highemp,
     textAlign: 'center',
     lineHeight: 32,
   },
   idleQrHint: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13,33,55,0.5)',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
     marginTop: 4,
   },
   idleTapHint: {
     fontSize: 18,
-    fontFamily: 'Pretendard-Light',
-    color: 'rgba(13,33,55,1)',
+    fontFamily: f.light,
+    color: c.texticon.onNormal.highestemp,
     marginTop: 8,
   },
 });

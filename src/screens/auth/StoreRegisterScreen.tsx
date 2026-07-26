@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -11,11 +11,15 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useFirestore} from '../../hooks';
+import {useFirestore, useTheme} from '../../hooks';
+import type {Theme} from '../../theme';
 
 const StoreRegisterScreen = ({navigation, route}: any) => {
   const ownerUid: string | undefined = route?.params?.ownerUid;
   const {registerStore, findStoreByPhone, linkStoreToOwner} = useFirestore();
+
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [storeName, setStoreName] = useState('');
   const [ownerPhone, setOwnerPhone] = useState('');
@@ -143,7 +147,7 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{flex: 1}}>
           <ScrollView
-            contentContainerStyle={{flexGrow: 1, paddingBottom: 40}}
+            contentContainerStyle={{flexGrow: 1, paddingBottom: theme.spacing[10]}}
             keyboardShouldPersistTaps="handled">
             <View style={styles.innerContainer}>
               <View style={styles.formSection}>
@@ -160,7 +164,7 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
                   value={storeName}
                   onChangeText={setStoreName}
                   placeholder="예) 우리동네 볼링장"
-                  placeholderTextColor="#AAAAAA"
+                  placeholderTextColor={theme.color.texticon.onNormal.lowemp}
                   maxLength={30}
                 />
               </View>
@@ -172,7 +176,7 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
                   value={ownerPhone}
                   onChangeText={setOwnerPhone}
                   placeholder="010-0000-0000"
-                  placeholderTextColor="#AAAAAA"
+                  placeholderTextColor={theme.color.texticon.onNormal.lowemp}
                   keyboardType="phone-pad"
                   maxLength={13}
                 />
@@ -197,155 +201,158 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFAF4',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderColor: '#F2F4F6',
-  },
-  backButtonWrapper: {
-    position: 'absolute',
-    left: 16,
-  },
-  headerText: {
-    fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#181818',
-  },
-  goBackText: {
-    fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: '#181818',
-  },
-  innerContainer: {
-    flex: 1,
-    paddingHorizontal: 32,
-    paddingTop: 40,
-    gap: 24,
-  },
-  formSection: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  pageTitle: {
-    fontSize: 28,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
-    lineHeight: 36,
-  },
-  pageSubtitle: {
-    fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.6)',
-    lineHeight: 24,
-  },
-  fieldGroup: {
-    gap: 8,
-  },
-  fieldLabel: {
-    fontSize: 16,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
-  },
-  input: {
-    height: 56,
-    borderColor: '#E8D5C0',
-    borderWidth: 1.5,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 18,
-    fontFamily: 'Pretendard-Regular',
-    color: '#3D2416',
-    backgroundColor: '#FFFFFF',
-  },
-  confirmButton: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 60,
-    backgroundColor: '#D4845A',
-    borderRadius: 16,
-    marginTop: 8,
-    shadowColor: '#D4845A',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 6,
-    paddingHorizontal: 20,
-  },
-  confirmButtonText: {
-    fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#FFFFFF',
-  },
-  // 완료 화면
-  successContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 40,
-    gap: 16,
-  },
-  successEmoji: {
-    fontSize: 72,
-  },
-  successTitle: {
-    fontSize: 36,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#3D2416',
-  },
-  successSubtitle: {
-    fontSize: 18,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.65)',
-    textAlign: 'center',
-    lineHeight: 28,
-  },
-  codeBox: {
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: '#E8D5C0',
-    paddingVertical: 28,
-    paddingHorizontal: 40,
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 8,
-    shadowColor: '#D4845A',
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.1,
-    shadowRadius: 16,
-    elevation: 4,
-  },
-  codeLabel: {
-    fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.5)',
-    letterSpacing: 1,
-  },
-  codeText: {
-    fontSize: 44,
-    fontFamily: 'SFUIDisplay-Medium',
-    color: '#3D2416',
-    letterSpacing: 6,
-  },
-  noticeText: {
-    fontSize: 15,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(61, 36, 22, 0.5)',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-});
+// 보더 토큰이 디자인 시스템에 없어(=보더 미사용 방침), 구분선·입력 외곽선은
+// 중립 팔레트로 임시 처리. 리디자인 패스에서 보더 정책 확정 시 교체.
+const createStyles = (t: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.color.surface.normal.container10,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: t.spacing[3.5],
+      borderBottomWidth: 1,
+      borderColor: t.palette.gray[200],
+    },
+    backButtonWrapper: {
+      position: 'absolute',
+      left: t.spacing[4],
+    },
+    headerText: {
+      fontSize: 18,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onNormal.highestemp,
+    },
+    goBackText: {
+      fontSize: 14,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.highestemp,
+    },
+    innerContainer: {
+      flex: 1,
+      paddingHorizontal: t.spacing[8],
+      paddingTop: t.spacing[10],
+      gap: t.spacing[6],
+    },
+    formSection: {
+      gap: t.spacing[2],
+      marginBottom: t.spacing[2],
+    },
+    pageTitle: {
+      fontSize: 28,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onNormal.highestemp,
+      lineHeight: 36,
+    },
+    pageSubtitle: {
+      fontSize: 16,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.midemp,
+      lineHeight: 24,
+    },
+    fieldGroup: {
+      gap: t.spacing[2],
+    },
+    fieldLabel: {
+      fontSize: 16,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onNormal.highestemp,
+    },
+    input: {
+      height: 56,
+      borderColor: t.palette.gray[200],
+      borderWidth: 1.5,
+      borderRadius: t.radius.md,
+      paddingHorizontal: t.spacing[4],
+      fontSize: 18,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.highestemp,
+      backgroundColor: t.color.surface.normal.bg1,
+    },
+    confirmButton: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: 60,
+      backgroundColor: t.color.surface.brand.primary,
+      borderRadius: t.radius.lg,
+      marginTop: t.spacing[2],
+      shadowColor: t.color.surface.brand.primary,
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.4,
+      shadowRadius: 10,
+      elevation: 6,
+      paddingHorizontal: t.spacing[5],
+    },
+    confirmButtonText: {
+      fontSize: 18,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onBrand.onPrimary,
+    },
+    // 완료 화면
+    successContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: t.spacing[10],
+      gap: t.spacing[4],
+    },
+    successEmoji: {
+      fontSize: 72,
+    },
+    successTitle: {
+      fontSize: 36,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onNormal.highestemp,
+    },
+    successSubtitle: {
+      fontSize: 18,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.midemp,
+      textAlign: 'center',
+      lineHeight: 28,
+    },
+    codeBox: {
+      alignItems: 'center',
+      backgroundColor: t.color.surface.normal.bg1,
+      borderRadius: t.radius.xl,
+      borderWidth: 1.5,
+      borderColor: t.palette.gray[200],
+      paddingVertical: t.spacing[6],
+      paddingHorizontal: t.spacing[10],
+      gap: t.spacing[2],
+      marginTop: t.spacing[2],
+      marginBottom: t.spacing[2],
+      shadowColor: t.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.1,
+      shadowRadius: 16,
+      elevation: 4,
+    },
+    codeLabel: {
+      fontSize: 14,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.midemp,
+      letterSpacing: 1,
+    },
+    codeText: {
+      fontSize: 44,
+      fontFamily: 'SFUIDisplay-Medium',
+      color: t.color.texticon.onNormal.highestemp,
+      letterSpacing: 6,
+    },
+    noticeText: {
+      fontSize: 15,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.midemp,
+      textAlign: 'center',
+      lineHeight: 24,
+    },
+  });
 
 export default StoreRegisterScreen;

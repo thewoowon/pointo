@@ -11,6 +11,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import dayjs from 'dayjs';
 import {useAuth, useFirestore, useStoreConfig, useDeviceType} from '../../hooks';
+import {semanticColors as c, primitives as pal, fontFamily as f} from '../../theme';
 import {useFocusEffect} from '@react-navigation/native';
 import {LeftArrowIcon} from '../../components/Icons';
 import {
@@ -51,7 +52,7 @@ const HOUR_BLOCKS: {label: string; from: number; to: number}[] = [
 ];
 
 // 단일 브랜드 액센트 (차트/활성 상태에만 절제해서 사용)
-const ACCENT = '#D4845A';
+const ACCENT = c.surface.brand.primary;
 
 const StatisticsScreen = ({navigation}: any) => {
   const {storeCode} = useAuth();
@@ -235,7 +236,7 @@ const StatisticsScreen = ({navigation}: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar barStyle="dark-content" backgroundColor={c.surface.normal.bg1} translucent={false} />
       <SafeAreaView style={styles.safeArea}>
         {/* 헤더 */}
         <View style={styles.header}>
@@ -288,7 +289,7 @@ const StatisticsScreen = ({navigation}: any) => {
                   onPress={loadKpis}
                   disabled={isLoadingKpis}>
                   {isLoadingKpis ? (
-                    <ActivityIndicator size="small" color="#fff" />
+                    <ActivityIndicator size="small" color={c.etc.absolute.white} />
                   ) : (
                     <Text style={styles.kpiLoadBtnText}>
                       {kpis ? '다시 집계' : '집계 시작'}
@@ -472,7 +473,7 @@ const StatisticsScreen = ({navigation}: any) => {
                             width: 36,
                             backgroundColor: isPeak
                               ? ACCENT
-                              : 'rgba(212, 132, 90, 0.22)',
+                              : pal.blue[100],
                           },
                         ]}
                       />
@@ -516,7 +517,7 @@ const StatisticsScreen = ({navigation}: any) => {
                             height: barHeight,
                             backgroundColor: isLast
                               ? ACCENT
-                              : 'rgba(212, 132, 90, 0.25)',
+                              : pal.blue[100],
                           },
                         ]}
                       />
@@ -525,7 +526,7 @@ const StatisticsScreen = ({navigation}: any) => {
                           styles.barLabel,
                           isLast && {
                             color: ACCENT,
-                            fontFamily: 'Pretendard-SemiBold',
+                            fontFamily: f.semibold,
                           },
                         ]}>
                         {stat.date}
@@ -655,17 +656,17 @@ const SummaryItem = ({
 
 // ─── 스타일 ──────────────────────────────────────────────────
 
-const TEXT_PRIMARY = '#191D2B';
-const TEXT_SECONDARY = '#73777B';
-const TEXT_MUTED = '#9DA1A6';
-const SURFACE = '#FFFFFF';
-const HAIRLINE = '#EEEEEE';
-const TRACK = '#F2F3F5';
+const TEXT_PRIMARY = c.texticon.onNormal.highestemp;
+const TEXT_SECONDARY = c.texticon.onNormal.midemp;
+const TEXT_MUTED = c.texticon.onNormal.lowemp;
+const SURFACE = c.surface.normal.bg1;
+const HAIRLINE = pal.gray[200];
+const TRACK = c.surface.normal.container10;
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: c.surface.normal.container10,
   },
   safeArea: {
     flex: 1,
@@ -688,12 +689,12 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
-    color: '#3D4C57',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highemp,
   },
   headerTitle: {
     fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   refreshBtn: {
@@ -702,7 +703,7 @@ const styles = StyleSheet.create({
   },
   refreshText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     color: ACCENT,
   },
   loadingContainer: {
@@ -727,7 +728,7 @@ const styles = StyleSheet.create({
   },
   storeName: {
     fontSize: 22,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   storeCode: {
@@ -739,19 +740,19 @@ const styles = StyleSheet.create({
   },
   memberBadge: {
     alignItems: 'center',
-    backgroundColor: '#F6F6F8',
+    backgroundColor: c.surface.normal.container10,
     borderRadius: 12,
     paddingHorizontal: 18,
     paddingVertical: 10,
   },
   memberBadgeNumber: {
     fontSize: 28,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   memberBadgeLabel: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
   tabRow: {
@@ -769,7 +770,7 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     backgroundColor: SURFACE,
-    shadowColor: '#000',
+    shadowColor: c.etc.absolute.black,
     shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.08,
     shadowRadius: 2,
@@ -777,21 +778,21 @@ const styles = StyleSheet.create({
   },
   tabText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_MUTED,
   },
   tabTextActive: {
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   peakLabel: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: ACCENT,
   },
   sectionTitle: {
     fontSize: 14,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_SECONDARY,
     letterSpacing: -0.2,
     marginTop: 4,
@@ -813,17 +814,17 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 28,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   statUnit: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
   statLabel: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
   chartCard: {
@@ -847,7 +848,7 @@ const styles = StyleSheet.create({
   },
   barValue: {
     fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
     height: 14,
   },
@@ -858,7 +859,7 @@ const styles = StyleSheet.create({
   },
   barLabel: {
     fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_MUTED,
   },
   summaryRow: {
@@ -877,17 +878,17 @@ const styles = StyleSheet.create({
   },
   summaryValue: {
     fontSize: 24,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   summaryUnit: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
   summaryLabel: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_MUTED,
     marginTop: 2,
   },
@@ -904,12 +905,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 11,
     borderBottomWidth: 1,
-    borderBottomColor: '#F4F4F6',
+    borderBottomColor: c.surface.normal.container10,
     gap: 16,
   },
   visitorIndex: {
     fontSize: 13,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_MUTED,
     width: 20,
     textAlign: 'right',
@@ -934,13 +935,13 @@ const styles = StyleSheet.create({
   },
   kpiTitle: {
     fontSize: 17,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
     letterSpacing: -0.3,
   },
   kpiSubtitle: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_MUTED,
     marginTop: 4,
   },
@@ -956,13 +957,13 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   kpiLoadBtnText: {
-    color: '#FFFFFF',
+    color: c.etc.absolute.white,
     fontSize: 13,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
   },
   kpiGroupLabel: {
     fontSize: 12,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_SECONDARY,
     marginTop: 16,
     marginBottom: 8,
@@ -975,29 +976,29 @@ const styles = StyleSheet.create({
   },
   kpiCard: {
     flex: 1,
-    backgroundColor: '#F6F6F8',
+    backgroundColor: c.surface.normal.container10,
     borderRadius: 12,
     padding: 12,
     gap: 3,
   },
   kpiCardLabel: {
     fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
   kpiCardValue: {
     fontSize: 20,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: TEXT_PRIMARY,
   },
   kpiCardUnit: {
     fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
   kpiCardSubtitle: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: TEXT_MUTED,
   },
 });

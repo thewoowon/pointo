@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useStoreConfig, useDeviceType} from '../../hooks';
+import {semanticColors as c, primitives as p, fontFamily as f} from '../../theme';
 import {getFirestore, doc, onSnapshot} from '@react-native-firebase/firestore';
 import {LeftArrowIcon} from '../../components/Icons';
 import {normalizeUser, getEarliestExpiry, filterExpiredCoupons} from '../../utils/coupons';
@@ -16,11 +17,11 @@ import {AnimatedBall} from '../../components/decorations';
 import LinearGradient from 'react-native-linear-gradient';
 
 const SUMMER_COLORS = {
-  backgroundStart: '#E8F4FD',
-  backgroundEnd: '#C5E3F6',
-  accent: '#0288D1',
-  primary: '#0D2137',
-  softSky: '#B3E5FC',
+  backgroundStart: p.blue[50],
+  backgroundEnd: p.blue[100],
+  accent: c.surface.brand.primary,
+  primary: c.texticon.onNormal.highestemp,
+  softSky: p.blue[100],
 };
 
 const BALL_POSITIONS: {
@@ -29,19 +30,19 @@ const BALL_POSITIONS: {
   size: number;
   zIndex: number;
 }[] = [
-  {position: {bottom: -11, left: -55}, color: '#FFEB3B', size: 128, zIndex: 1},
-  {position: {bottom: -90, left: 30}, color: '#4FC3F7', size: 128, zIndex: 6},
-  {position: {bottom: -30, left: 130}, color: '#FF7043', size: 128, zIndex: 5},
-  {position: {bottom: -40, right: 60}, color: '#E8F5E9', size: 128, zIndex: 3},
-  {position: {bottom: -20, right: -30}, color: '#FFEB3B', size: 128, zIndex: 4},
-  {position: {bottom: 75, left: -35}, color: '#81D4FA', size: 128, zIndex: 6},
-  {position: {bottom: 10, left: 50}, color: '#FF7043', size: 128, zIndex: 13},
-  {position: {bottom: 55, left: 160}, color: '#B2EBF2', size: 128, zIndex: 2},
-  {position: {bottom: 60, right: 28}, color: '#FFEB3B', size: 128, zIndex: 7},
-  {position: {bottom: 145, left: -30}, color: '#4FC3F7', size: 128, zIndex: 4},
-  {position: {bottom: 120, left: 78}, color: '#E8F5E9', size: 128, zIndex: 5},
-  {position: {bottom: 145, right: 47}, color: '#FF7043', size: 128, zIndex: 1},
-  {position: {bottom: 120, right: -43}, color: '#81D4FA', size: 128, zIndex: 6},
+  {position: {bottom: -11, left: -55}, color: p.yellow[400], size: 128, zIndex: 1},
+  {position: {bottom: -90, left: 30}, color: p.blue[300], size: 128, zIndex: 6},
+  {position: {bottom: -30, left: 130}, color: p.orange[400], size: 128, zIndex: 5},
+  {position: {bottom: -40, right: 60}, color: p.green[100], size: 128, zIndex: 3},
+  {position: {bottom: -20, right: -30}, color: p.yellow[400], size: 128, zIndex: 4},
+  {position: {bottom: 75, left: -35}, color: p.blue[200], size: 128, zIndex: 6},
+  {position: {bottom: 10, left: 50}, color: p.orange[400], size: 128, zIndex: 13},
+  {position: {bottom: 55, left: 160}, color: p.blue[100], size: 128, zIndex: 2},
+  {position: {bottom: 60, right: 28}, color: p.yellow[400], size: 128, zIndex: 7},
+  {position: {bottom: 145, left: -30}, color: p.blue[300], size: 128, zIndex: 4},
+  {position: {bottom: 120, left: 78}, color: p.green[100], size: 128, zIndex: 5},
+  {position: {bottom: 145, right: 47}, color: p.orange[400], size: 128, zIndex: 1},
+  {position: {bottom: 120, right: -43}, color: p.blue[200], size: 128, zIndex: 6},
 ];
 
 const DashboardScreen = ({navigation, route}: any) => {
@@ -328,8 +329,8 @@ const DashboardScreen = ({navigation, route}: any) => {
         style={[
           {
             borderRadius: 35,
-            backgroundColor: '#ffffff',
-            shadowColor: '#000000',
+            backgroundColor: c.surface.normal.bg1,
+            shadowColor: c.etc.absolute.black,
             shadowOffset: {width: 0, height: 4.5},
             shadowOpacity: 0.07,
             shadowRadius: 22,
@@ -356,7 +357,7 @@ const DashboardScreen = ({navigation, route}: any) => {
               justifyContent: 'flex-start',
               alignItems: 'center',
             }}>
-            <Text style={[s.labelSubText, {color: '#0D2137', fontSize: isPhone ? 16 : 20}]}>
+            <Text style={[s.labelSubText, {color: c.texticon.onNormal.highestemp, fontSize: isPhone ? 16 : 20}]}>
               {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
             </Text>
           </View>
@@ -428,13 +429,13 @@ const DashboardScreen = ({navigation, route}: any) => {
             <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
               <Pressable style={{flexDirection: 'row', alignItems: 'center', gap: 7}} onPress={goBack}>
                 <LeftArrowIcon color={SUMMER_COLORS.primary} />
-                <Text style={{fontSize: 16, fontFamily: 'Pretendard-Regular', color: SUMMER_COLORS.primary}}>
+                <Text style={{fontSize: 16, fontFamily: f.regular, color: SUMMER_COLORS.primary}}>
                   뒤로가기
                 </Text>
               </Pressable>
               {timeLeft < 15 && (
-                <Text style={{fontSize: 14, fontFamily: 'Pretendard-Regular', color: 'rgba(13,33,55,0.5)'}}>
-                  <Text style={{fontFamily: 'Pretendard-SemiBold'}}>{timeLeft}</Text>초
+                <Text style={{fontSize: 14, fontFamily: f.regular, color: c.texticon.onNormal.midemp}}>
+                  <Text style={{fontFamily: f.semibold}}>{timeLeft}</Text>초
                 </Text>
               )}
             </View>
@@ -449,20 +450,20 @@ const DashboardScreen = ({navigation, route}: any) => {
 
             {/* User Info */}
             <View style={{gap: 4}}>
-              <Text style={{fontSize: 16, fontFamily: 'Pretendard-Regular', color: 'rgba(13,33,55,0.65)', letterSpacing: -0.5}}>
+              <Text style={{fontSize: 16, fontFamily: f.regular, color: c.texticon.onNormal.highemp, letterSpacing: -0.5}}>
                 <Text style={{color: SUMMER_COLORS.accent, fontFamily: 'SFUIDisplay-Semibold'}}>
                   {phoneNumberLabel()}
                 </Text>
                 {' 님 반갑습니다.'}
               </Text>
-              <Text style={{fontSize: 24, fontFamily: 'Pretendard-Medium', color: SUMMER_COLORS.primary, letterSpacing: -1, lineHeight: 34}}>
+              <Text style={{fontSize: 24, fontFamily: f.medium, color: SUMMER_COLORS.primary, letterSpacing: -1, lineHeight: 34}}>
                 오늘도 좋은 하루 되세요 {'><'}
               </Text>
             </View>
 
             {/* Change summary */}
             {hasChange && (
-              <View style={{backgroundColor: 'rgba(2,136,209,0.08)', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: 'rgba(2,136,209,0.2)'}}>
+              <View style={{backgroundColor: p.blue[50], borderRadius: 12, paddingHorizontal: 16, paddingVertical: 14, borderWidth: 1, borderColor: p.blue[100]}}>
                 {renderChangeInfo()}
               </View>
             )}
@@ -477,8 +478,8 @@ const DashboardScreen = ({navigation, route}: any) => {
 
             {/* Timer */}
             <View style={{alignItems: 'center', paddingVertical: 8}}>
-              <Text style={{fontSize: 14, fontFamily: 'Pretendard-Regular', color: 'rgba(13,33,55,0.45)'}}>
-                <Text style={{fontFamily: 'Pretendard-SemiBold'}}>{timeLeft}</Text>초 후 화면이 종료됩니다
+              <Text style={{fontSize: 14, fontFamily: f.regular, color: c.texticon.onNormal.midemp}}>
+                <Text style={{fontFamily: f.semibold}}>{timeLeft}</Text>초 후 화면이 종료됩니다
               </Text>
             </View>
           </ScrollView>
@@ -533,7 +534,7 @@ const DashboardScreen = ({navigation, route}: any) => {
                     <Text
                       style={[
                         s.labelSubText,
-                        {width: 24, fontFamily: 'Pretendard-SemiBold'},
+                        {width: 24, fontFamily: f.semibold},
                       ]}>
                       {timeLeft}
                     </Text>{' '}
@@ -568,7 +569,7 @@ const DashboardScreen = ({navigation, route}: any) => {
                   <Text
                     style={{
                       fontSize: 20,
-                      fontFamily: 'Pretendard-Regular',
+                      fontFamily: f.regular,
                       color: SUMMER_COLORS.softSky,
                       lineHeight: 28,
                       letterSpacing: -1,
@@ -598,7 +599,7 @@ const DashboardScreen = ({navigation, route}: any) => {
                       <Text
                         style={[
                           s.labelSubText,
-                          {width: 24, fontFamily: 'Pretendard-SemiBold'},
+                          {width: 24, fontFamily: f.semibold},
                         ]}>
                         {timeLeft}
                       </Text>{' '}
@@ -654,48 +655,48 @@ const s = StyleSheet.create({
     gap: 5,
   },
   holidayBadge: {
-    backgroundColor: 'rgba(2, 136, 209, 0.12)',
+    backgroundColor: p.blue[50],
     paddingVertical: 10,
     paddingHorizontal: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(2, 136, 209, 0.4)',
+    borderColor: p.blue[200],
     marginBottom: 10,
     gap: 4,
   },
   holidayBadgeText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     color: SUMMER_COLORS.accent,
     letterSpacing: -0.5,
   },
   holidayBadgeSubText: {
     fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: SUMMER_COLORS.softSky,
   },
   labelTitleText: {
     fontSize: 32,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 45,
     letterSpacing: -1,
   },
   labelSubText: {
     fontSize: 20,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     lineHeight: 28,
     letterSpacing: -1,
   },
   stampLeftText: {
     fontSize: 76,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 86,
     letterSpacing: -1,
-    color: '#0288D1',
+    color: c.surface.brand.primary,
   },
   stampRightText: {
     fontSize: 28,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 38,
     letterSpacing: -1,
   },
@@ -711,7 +712,7 @@ const s = StyleSheet.create({
   beverageBox: {
     width: '100%',
     height: 98,
-    backgroundColor: '#0288D1',
+    backgroundColor: c.surface.brand.primary,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 16,
@@ -723,15 +724,15 @@ const s = StyleSheet.create({
   beverageTitleText: {
     fontSize: 24,
     lineHeight: 32,
-    fontFamily: 'Pretendard-Medium',
-    color: '#ffffff',
+    fontFamily: f.medium,
+    color: c.etc.absolute.white,
     letterSpacing: -1,
   },
   beverageBodyText: {
     fontSize: 16,
     lineHeight: 26,
-    fontFamily: 'Pretendard-Regular',
-    color: '#ffffff',
+    fontFamily: f.regular,
+    color: c.etc.absolute.white,
     letterSpacing: -1,
   },
 });

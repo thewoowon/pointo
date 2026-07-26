@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -7,10 +7,17 @@ import {
   Text,
   View,
   Alert,
-  useWindowDimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore, useAnalytics, useStoreConfig} from '../../hooks';
+import {
+  useAuth,
+  useFirestore,
+  useAnalytics,
+  useStoreConfig,
+  useLayoutMode,
+  useTheme,
+} from '../../hooks';
+import type {Theme} from '../../theme';
 import {
   doc,
   getFirestore,
@@ -59,8 +66,9 @@ const DetailView = ({
   onClose: () => void;
   updateLogs: () => void;
 }) => {
-  const {width: screenWidth} = useWindowDimensions();
-  const isCompact = screenWidth < 768;
+  const {isCompact} = useLayoutMode();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const {track} = useAnalytics();
@@ -550,7 +558,7 @@ const DetailView = ({
     <View style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="#6a51ae"
+        backgroundColor={theme.color.surface.normal.bg1}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>
@@ -559,9 +567,9 @@ const DetailView = ({
             style={[
               styles.flexRowBox,
               {
-                backgroundColor: '#ffffff',
+                backgroundColor: theme.color.surface.normal.bg1,
                 // shadow
-                shadowColor: '#000',
+                shadowColor: theme.color.etc.absolute.black,
                 shadowOffset: {
                   width: 0,
                   height: 6,
@@ -583,8 +591,8 @@ const DetailView = ({
               <Text
                 style={{
                   fontSize: isCompact ? 14 : 20,
-                  fontFamily: 'Pretendard-Regular',
-                  color: '#4E5056',
+                  fontFamily: theme.font.regular,
+                  color: theme.color.texticon.onNormal.highemp,
                   lineHeight: isCompact ? 20 : 28,
                 }}>
                 닫기
@@ -624,7 +632,7 @@ const DetailView = ({
                     style={[
                       styles.labelSubText,
                       {
-                        color: '#FE7901',
+                        color: theme.color.texticon.onNormal.primary,
                         fontFamily: 'SFUIDisplay-Semibold',
                       },
                       isCompact && {fontSize: 14, lineHeight: 20},
@@ -635,7 +643,7 @@ const DetailView = ({
                 <View
                   style={{
                     flexDirection: 'row',
-                    backgroundColor: '#F0F0F0',
+                    backgroundColor: theme.color.surface.normal.container10,
                     borderRadius: isCompact ? 10 : 14,
                     padding: isCompact ? 3 : 4,
                     alignSelf: 'stretch',
@@ -648,8 +656,8 @@ const DetailView = ({
                       paddingVertical: isCompact ? 7 : 10,
                       borderRadius: isCompact ? 8 : 11,
                       backgroundColor:
-                        mode === 'earn' ? '#FFFFFF' : 'transparent',
-                      shadowColor: mode === 'earn' ? '#000' : 'transparent',
+                        mode === 'earn' ? theme.color.surface.normal.bg1 : 'transparent',
+                      shadowColor: mode === 'earn' ? theme.color.etc.absolute.black : 'transparent',
                       shadowOffset: {width: 0, height: 1},
                       shadowOpacity: mode === 'earn' ? 0.1 : 0,
                       shadowRadius: 3,
@@ -661,9 +669,9 @@ const DetailView = ({
                         fontSize: isCompact ? 14 : 18,
                         fontFamily:
                           mode === 'earn'
-                            ? 'Pretendard-Bold'
-                            : 'Pretendard-Medium',
-                        color: mode === 'earn' ? '#191D2B' : '#999',
+                            ? theme.font.bold
+                            : theme.font.medium,
+                        color: mode === 'earn' ? theme.color.texticon.onNormal.highestemp : theme.color.texticon.onNormal.midemp,
                         letterSpacing: -0.2,
                       }}>
                       적립
@@ -676,8 +684,8 @@ const DetailView = ({
                       paddingVertical: isCompact ? 7 : 10,
                       borderRadius: isCompact ? 8 : 11,
                       backgroundColor:
-                        mode === 'use' ? '#FFFFFF' : 'transparent',
-                      shadowColor: mode === 'use' ? '#000' : 'transparent',
+                        mode === 'use' ? theme.color.surface.normal.bg1 : 'transparent',
+                      shadowColor: mode === 'use' ? theme.color.etc.absolute.black : 'transparent',
                       shadowOffset: {width: 0, height: 1},
                       shadowOpacity: mode === 'use' ? 0.1 : 0,
                       shadowRadius: 3,
@@ -689,9 +697,9 @@ const DetailView = ({
                         fontSize: isCompact ? 14 : 18,
                         fontFamily:
                           mode === 'use'
-                            ? 'Pretendard-Bold'
-                            : 'Pretendard-Medium',
-                        color: mode === 'use' ? '#191D2B' : '#999',
+                            ? theme.font.bold
+                            : theme.font.medium,
+                        color: mode === 'use' ? theme.color.texticon.onNormal.highestemp : theme.color.texticon.onNormal.midemp,
                         letterSpacing: -0.2,
                       }}>
                       사용
@@ -739,7 +747,7 @@ const DetailView = ({
                           {remaining > 1 && (
                             <View style={styles.countBadge}>
                               <LinearGradient
-                                colors={['#FE8300', '#FC4A00']}
+                                colors={[theme.color.surface.brand.primary, theme.palette.blue[600]]}
                                 locations={[0.4, 1]}
                                 start={{x: 0, y: 1}}
                                 end={{x: 1, y: 1}}
@@ -783,10 +791,10 @@ const DetailView = ({
                             style={({pressed}) => ({
                               backgroundColor:
                                 number === String(preset.points)
-                                  ? '#FE7901'
+                                  ? theme.color.texticon.onNormal.primary
                                   : pressed
-                                  ? '#E8E8E8'
-                                  : '#F5F5F5',
+                                  ? theme.palette.gray[200]
+                                  : theme.color.surface.normal.container10,
                               paddingHorizontal: 20,
                               paddingVertical: 14,
                               borderRadius: 14,
@@ -796,11 +804,11 @@ const DetailView = ({
                             <Text
                               style={{
                                 fontSize: 16,
-                                fontFamily: 'Pretendard-SemiBold',
+                                fontFamily: theme.font.semibold,
                                 color:
                                   number === String(preset.points)
-                                    ? '#FFFFFF'
-                                    : '#191D2B',
+                                    ? theme.color.surface.normal.bg1
+                                    : theme.color.texticon.onNormal.highestemp,
                                 letterSpacing: -0.2,
                               }}>
                               {preset.name}
@@ -808,11 +816,11 @@ const DetailView = ({
                             <Text
                               style={{
                                 fontSize: 14,
-                                fontFamily: 'Pretendard-Regular',
+                                fontFamily: theme.font.regular,
                                 color:
                                   number === String(preset.points)
                                     ? 'rgba(255,255,255,0.8)'
-                                    : '#999',
+                                    : theme.color.texticon.onNormal.midemp,
                                 marginTop: 2,
                               }}>
                               {preset.points.toLocaleString()}
@@ -834,7 +842,7 @@ const DetailView = ({
                     width: '100%',
                     maxWidth: isCompact ? 340 : 420,
                     height: 'auto',
-                    backgroundColor: '#ffffff',
+                    backgroundColor: theme.color.surface.normal.bg1,
                   },
                 ]}>
                 <View
@@ -860,7 +868,7 @@ const DetailView = ({
                     <Text
                       style={{
                         fontFamily: 'Prentendard-Semibold',
-                        color: '#4E5056',
+                        color: theme.color.texticon.onNormal.highemp,
                         fontSize: isCompact ? 13 : 16,
                         lineHeight: isCompact ? 20 : 26,
                         letterSpacing: -0.2,
@@ -872,7 +880,7 @@ const DetailView = ({
                         fontSize: isCompact ? 18 : 24,
                         lineHeight: isCompact ? 26 : 32,
                         fontFamily: 'Prentendard-Semibold',
-                        color: '#FE7901',
+                        color: theme.color.texticon.onNormal.primary,
                       }}>
                       {isPointMode
                         ? `${user.stamps.toLocaleString()}${
@@ -913,7 +921,7 @@ const DetailView = ({
                           totalSelected(userContext.selectedCoupon) > 0 && (
                             <Text
                               style={{
-                                color: '#FF8400',
+                                color: theme.color.texticon.onNormal.success,
                               }}>
                               {storeConfig.couponTypes
                                 .filter(
@@ -936,7 +944,7 @@ const DetailView = ({
                             {
                               fontSize: isCompact ? 28 : 38,
                               lineHeight: isCompact ? 36 : 48,
-                              color: number.length > 0 ? '#191D2B' : '#E3E3E3',
+                              color: number.length > 0 ? theme.color.texticon.onNormal.highestemp : theme.palette.gray[200],
                             },
                           ]}>
                           {number || '0'}
@@ -945,7 +953,7 @@ const DetailView = ({
                           style={[
                             styles.headerNumberText,
                             {
-                              fontFamily: 'Pretendard-Semibold',
+                              fontFamily: theme.font.semibold,
                             },
                           ]}>
                           {isPointMode
@@ -980,7 +988,7 @@ const DetailView = ({
                             key={numberIndex}
                             style={({pressed}) => [
                               {
-                                backgroundColor: pressed ? '#EEEEEE' : '#fff',
+                                backgroundColor: pressed ? theme.color.surface.normal.container10 : theme.color.surface.normal.bg1,
                                 borderRadius: 10,
                               },
                               styles.numberInputButton,
@@ -997,7 +1005,7 @@ const DetailView = ({
                       <Pressable
                         style={({pressed}) => [
                           {
-                            backgroundColor: pressed ? '#EEEEEE' : '#fff',
+                            backgroundColor: pressed ? theme.color.surface.normal.container10 : theme.color.surface.normal.bg1,
                             borderRadius: 10,
                           },
                           styles.numberInputButton,
@@ -1009,7 +1017,7 @@ const DetailView = ({
                       <Pressable
                         style={({pressed}) => [
                           {
-                            backgroundColor: pressed ? '#EEEEEE' : '#fff',
+                            backgroundColor: pressed ? theme.color.surface.normal.container10 : theme.color.surface.normal.bg1,
                             borderRadius: 10,
                           },
                           styles.numberInputButton,
@@ -1029,8 +1037,8 @@ const DetailView = ({
                               styles.confirmButton,
                               {
                                 width: pressed ? 142 : 150,
-                                backgroundColor: '#EDEDED',
-                                shadowColor: '#EDEDED',
+                                backgroundColor: theme.palette.gray[200],
+                                shadowColor: theme.palette.gray[200],
                                 gap: 6,
                               },
                             ]}
@@ -1040,7 +1048,7 @@ const DetailView = ({
                               style={[
                                 styles.confirmButtonText,
                                 {
-                                  color: '#373737',
+                                  color: theme.color.texticon.onNormal.highestemp,
                                 },
                               ]}>
                               입력 초기화
@@ -1058,15 +1066,15 @@ const DetailView = ({
                                 : pressed
                                 ? 142
                                 : 150,
-                              backgroundColor: '#0090FE',
-                              shadowColor: '#0090FE',
+                              backgroundColor: theme.color.surface.brand.primary,
+                              shadowColor: theme.color.surface.brand.primary,
                             },
                           ]}
                           onPress={
                             isPointMode ? handleUsingPoint : handleUsing
                           }>
                           <LinearGradient
-                            colors={['#0090FE', '#003FFC']}
+                            colors={[theme.color.surface.brand.primary, theme.palette.blue[700]]}
                             locations={[0.3, 1]}
                             start={{x: 0, y: 0}}
                             end={{x: 1, y: 1}}
@@ -1093,15 +1101,15 @@ const DetailView = ({
                           styles.confirmButton,
                           {
                             width: pressed ? '98%' : '100%',
-                            backgroundColor: '#FE6A00',
-                            shadowColor: '#FE6A00',
+                            backgroundColor: theme.palette.green[500],
+                            shadowColor: theme.palette.green[500],
                           },
                         ]}
                         onPress={
                           isPointMode ? handleApprovePoint : handleApprove
                         }>
                         <LinearGradient
-                          colors={['#FE6A00', '#FC0000']}
+                          colors={[theme.palette.green[500], theme.palette.green[700]]}
                           locations={[0.3, 1]}
                           start={{x: 0, y: 0}}
                           end={{x: 1, y: 1}}
@@ -1169,7 +1177,8 @@ const DetailView = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -1216,13 +1225,13 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
     height: 50,
-    backgroundColor: '#3D7BF7',
+    backgroundColor: theme.color.surface.brand.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 10,
   },
   buttonText: {
-    color: 'white',
+    color: theme.color.etc.absolute.white,
   },
   centeredView: {
     flex: 1,
@@ -1233,11 +1242,11 @@ const styles = StyleSheet.create({
   modalView: {
     height: 'auto',
     width: 'auto',
-    backgroundColor: 'white',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 10,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.color.etc.absolute.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1247,7 +1256,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   buttonClose: {
-    backgroundColor: '#2196F3',
+    backgroundColor: theme.color.surface.brand.primary,
     height: 50,
     width: 120,
     borderRadius: 10,
@@ -1255,20 +1264,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   counterText: {
-    color: 'white',
+    color: theme.color.etc.absolute.white,
     fontSize: 24,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     lineHeight: 24,
     textAlign: 'center',
   },
   counterInnerText: {
     fontSize: 18,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     lineHeight: 20,
     textAlign: 'center',
   },
   textStyle: {
-    color: 'white',
+    color: theme.color.etc.absolute.white,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -1291,13 +1300,13 @@ const styles = StyleSheet.create({
   },
   labelTitleText: {
     fontSize: 32,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: theme.font.medium,
     lineHeight: 45,
     letterSpacing: -0.2,
   },
   labelSubText: {
     fontSize: 20,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     lineHeight: 28,
     letterSpacing: -0.1,
   },
@@ -1316,7 +1325,7 @@ const styles = StyleSheet.create({
   },
   numberInputText: {
     fontSize: 38,
-    color: '#4B4D55',
+    color: theme.color.texticon.onNormal.highemp,
     fontFamily: 'SFUIDisplay-Semibold',
   },
   headerNumberContainer: {
@@ -1328,14 +1337,14 @@ const styles = StyleSheet.create({
   },
   headerNumberText: {
     fontSize: 32,
-    color: '#191D2B',
+    color: theme.color.texticon.onNormal.highestemp,
     fontFamily: 'SFUIDisplay-Semibold',
     lineHeight: 45,
   },
   divisor: {
     width: '100%',
     height: 0.5,
-    backgroundColor: '#E0E0E9',
+    backgroundColor: theme.palette.gray[200],
   },
   confirmContainer: {
     width: '100%',
@@ -1352,10 +1361,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     height: 56,
-    backgroundColor: '#FE8300',
+    backgroundColor: theme.color.surface.brand.primary,
     borderRadius: 24,
     // shadow
-    shadowColor: '#FE6D00',
+    shadowColor: theme.color.surface.brand.primary,
     shadowOffset: {
       width: 0,
       height: 4.5,
@@ -1368,8 +1377,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     lineHeight: 28,
     letterSpacing: -0.1,
-    color: 'white',
-    fontFamily: 'Pretendard-Regular',
+    color: theme.color.etc.absolute.white,
+    fontFamily: theme.font.regular,
   },
   flexBox: {
     display: 'flex',
@@ -1389,7 +1398,7 @@ const styles = StyleSheet.create({
   beverageBox: {
     width: '100%',
     maxWidth: 340,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: theme.color.surface.normal.container10,
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 16,
@@ -1401,22 +1410,22 @@ const styles = StyleSheet.create({
   beverageTitleText: {
     fontSize: 20,
     lineHeight: 28,
-    fontFamily: 'Pretendard-Medium',
-    color: '#3A3A3A',
+    fontFamily: theme.font.medium,
+    color: theme.color.texticon.onNormal.highestemp,
     letterSpacing: -0.1,
   },
   beverageBodyText: {
     fontSize: 16,
     lineHeight: 26,
-    fontFamily: 'Pretendard-Regular',
-    color: '#3A3A3A',
+    fontFamily: theme.font.regular,
+    color: theme.color.texticon.onNormal.highestemp,
     letterSpacing: -0.2,
   },
   beverageButtonText: {
     fontSize: 16,
     lineHeight: 26,
-    fontFamily: 'Pretendard-Medium',
-    color: '#3A3A3A',
+    fontFamily: theme.font.medium,
+    color: theme.color.texticon.onNormal.highestemp,
     letterSpacing: -0.2,
     textDecorationLine: 'underline',
   },
@@ -1431,9 +1440,9 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     padding: 2,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 14,
-    shadowColor: '#FE6D00',
+    shadowColor: theme.color.surface.brand.primary,
     shadowOffset: {
       width: 0,
       height: 4.5,
@@ -1443,7 +1452,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   badgeText: {
-    color: 'white',
+    color: theme.color.etc.absolute.white,
     fontSize: 16,
     lineHeight: 24,
     letterSpacing: -0.1,

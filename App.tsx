@@ -5,7 +5,7 @@ import {NavigationContainer} from '@react-navigation/native';
 
 import Toast, {BaseToast, ToastConfig} from 'react-native-toast-message';
 
-import {AuthProvider} from './src/contexts';
+import {AuthProvider, ThemeProvider} from './src/contexts';
 import RootNavigator from './src/navigation/RootNavigator';
 import MyCustomToast from './src/components/MyCustomToast';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
@@ -61,7 +61,9 @@ function App(): React.JSX.Element {
 export default function RootApp() {
   return (
     <AuthProvider>
-      <App />
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
     </AuthProvider>
   );
 }

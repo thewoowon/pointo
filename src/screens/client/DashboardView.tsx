@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useDeviceType} from '../../hooks';
+import {semanticColors as c, primitives as p, fontFamily as f} from '../../theme';
 import {LeftArrowIcon} from '../../components/Icons';
 import {AnimatedBall, SnowflakeEffect} from '../../components/decorations';
 import {StampNearOverlay, CouponEarnedOverlay} from '../../components/overlay';
@@ -16,12 +17,12 @@ import LinearGradient from 'react-native-linear-gradient';
 import {useDashboard} from './useDashboard';
 
 const SUMMER_COLORS = {
-  backgroundStart: '#E8F4FD',
-  backgroundEnd: '#C5E3F6',
-  accent: '#0288D1',
-  primary: '#0D2137',
-  waveBlue: '#4FC3F7',
-  sandCream: '#FFF8E7',
+  backgroundStart: p.blue[50],
+  backgroundEnd: p.blue[100],
+  accent: c.surface.brand.primary,
+  primary: c.texticon.onNormal.highestemp,
+  waveBlue: p.blue[300],
+  sandCream: p.amber[50],
 };
 
 const BALL_POSITIONS: {
@@ -30,27 +31,27 @@ const BALL_POSITIONS: {
   size: number;
   zIndex: number;
 }[] = [
-  {position: {bottom: -11, left: -55}, color: '#FFEB3B', size: 171, zIndex: 1},
-  {position: {bottom: -128, left: 45}, color: '#4FC3F7', size: 171, zIndex: 6},
-  {position: {bottom: -42, left: 177}, color: '#FF7043', size: 171, zIndex: 5},
-  {position: {bottom: -59, right: 78}, color: '#E8F5E9', size: 171, zIndex: 3},
-  {position: {bottom: -34, right: -36}, color: '#FFEB3B', size: 171, zIndex: 4},
-  {position: {bottom: 98, left: -48}, color: '#81D4FA', size: 171, zIndex: 6},
-  {position: {bottom: 13, left: 67}, color: '#FF7043', size: 171, zIndex: 13},
-  {position: {bottom: 70, left: 210}, color: '#B2EBF2', size: 171, zIndex: 2},
-  {position: {bottom: 78, right: 36}, color: '#FFEB3B', size: 171, zIndex: 7},
-  {position: {bottom: 191, left: -42}, color: '#4FC3F7', size: 171, zIndex: 4},
-  {position: {bottom: 160, left: 103}, color: '#E8F5E9', size: 171, zIndex: 5},
-  {position: {bottom: 192, right: 62}, color: '#FF7043', size: 171, zIndex: 1},
-  {position: {bottom: 160, right: -57}, color: '#81D4FA', size: 171, zIndex: 6},
-  {position: {bottom: 287, left: -53}, color: '#FFEB3B', size: 171, zIndex: 3},
-  {position: {bottom: 262, left: 61}, color: '#4FC3F7', size: 171, zIndex: 2},
-  {position: {bottom: 279, left: 167}, color: '#FF7043', size: 171, zIndex: 3},
-  {position: {bottom: 334, left: 278}, color: '#B2EBF2', size: 171, zIndex: 13},
-  {position: {bottom: 300, right: -38}, color: '#E8F5E9', size: 171, zIndex: 5},
-  {position: {top: 144, left: -5}, color: '#FFEB3B', size: 171, zIndex: 5},
-  {position: {top: 172, left: 135}, color: '#81D4FA', size: 171, zIndex: 1},
-  {position: {top: 204, right: -31}, color: '#4FC3F7', size: 171, zIndex: 5},
+  {position: {bottom: -11, left: -55}, color: p.yellow[400], size: 171, zIndex: 1},
+  {position: {bottom: -128, left: 45}, color: p.blue[300], size: 171, zIndex: 6},
+  {position: {bottom: -42, left: 177}, color: p.orange[400], size: 171, zIndex: 5},
+  {position: {bottom: -59, right: 78}, color: p.green[100], size: 171, zIndex: 3},
+  {position: {bottom: -34, right: -36}, color: p.yellow[400], size: 171, zIndex: 4},
+  {position: {bottom: 98, left: -48}, color: p.blue[200], size: 171, zIndex: 6},
+  {position: {bottom: 13, left: 67}, color: p.orange[400], size: 171, zIndex: 13},
+  {position: {bottom: 70, left: 210}, color: p.blue[100], size: 171, zIndex: 2},
+  {position: {bottom: 78, right: 36}, color: p.yellow[400], size: 171, zIndex: 7},
+  {position: {bottom: 191, left: -42}, color: p.blue[300], size: 171, zIndex: 4},
+  {position: {bottom: 160, left: 103}, color: p.green[100], size: 171, zIndex: 5},
+  {position: {bottom: 192, right: 62}, color: p.orange[400], size: 171, zIndex: 1},
+  {position: {bottom: 160, right: -57}, color: p.blue[200], size: 171, zIndex: 6},
+  {position: {bottom: 287, left: -53}, color: p.yellow[400], size: 171, zIndex: 3},
+  {position: {bottom: 262, left: 61}, color: p.blue[300], size: 171, zIndex: 2},
+  {position: {bottom: 279, left: 167}, color: p.orange[400], size: 171, zIndex: 3},
+  {position: {bottom: 334, left: 278}, color: p.blue[100], size: 171, zIndex: 13},
+  {position: {bottom: 300, right: -38}, color: p.green[100], size: 171, zIndex: 5},
+  {position: {top: 144, left: -5}, color: p.yellow[400], size: 171, zIndex: 5},
+  {position: {top: 172, left: 135}, color: p.blue[200], size: 171, zIndex: 1},
+  {position: {top: 204, right: -31}, color: p.blue[300], size: 171, zIndex: 5},
 ];
 
 type DashboardViewProps = {
@@ -86,8 +87,8 @@ const StampCard = ({
           borderTopRightRadius: 32,
           width: compact ? '100%' : 533,
           height: compact ? cardHeight : cardHeight,
-          backgroundColor: '#ffffff',
-          shadowColor: '#000000',
+          backgroundColor: c.surface.normal.bg1,
+          shadowColor: c.etc.absolute.black,
           shadowOffset: {width: 0, height: 4.5},
           shadowOpacity: 0.07,
           shadowRadius: 22,
@@ -206,7 +207,7 @@ const ChangeBanner = ({
         <Text
           style={[
             phoneSt.changeBannerText,
-            {color: SUMMER_COLORS.accent, fontFamily: 'Pretendard-SemiBold'},
+            {color: SUMMER_COLORS.accent, fontFamily: f.semibold},
           ]}>
           {isPointMode
             ? `${changeSummary.amount.toLocaleString()}${changeSummary.unit}`
@@ -234,7 +235,7 @@ const PhoneLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
         {d.timeLeft < 15 && (
           <Text style={phoneSt.timerText}>
             <Text
-              style={[phoneSt.timerText, {fontFamily: 'Pretendard-SemiBold'}]}>
+              style={[phoneSt.timerText, {fontFamily: f.semibold}]}>
               {d.timeLeft}
             </Text>
             초
@@ -321,7 +322,7 @@ const PhoneLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
           <Text
             style={[
               phoneSt.timerBannerText,
-              {fontFamily: 'Pretendard-SemiBold'},
+              {fontFamily: f.semibold},
             ]}>
             {d.timeLeft}
           </Text>
@@ -413,7 +414,7 @@ const TabletLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
                 <Text
                   style={[
                     styles.labelSubText,
-                    {width: 24, fontFamily: 'Pretendard-SemiBold'},
+                    {width: 24, fontFamily: f.semibold},
                   ]}>
                   {d.timeLeft}
                 </Text>{' '}
@@ -440,7 +441,7 @@ const TabletLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
               <Text
                 style={{
                   fontSize: 20,
-                  fontFamily: 'Pretendard-Regular',
+                  fontFamily: f.regular,
                   color: SUMMER_COLORS.primary,
                   lineHeight: 28,
                   letterSpacing: -1,
@@ -465,7 +466,7 @@ const TabletLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
                   <Text style={{fontSize: 16}}>{d.levelInfo.emoji}</Text>
                   <Text
                     style={{
-                      fontFamily: 'Pretendard-SemiBold',
+                      fontFamily: f.semibold,
                       fontSize: 14,
                       color: d.levelInfo.color,
                       letterSpacing: -0.3,
@@ -474,7 +475,7 @@ const TabletLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
                   </Text>
                   <Text
                     style={{
-                      fontFamily: 'Pretendard-Regular',
+                      fontFamily: f.regular,
                       fontSize: 12,
                       color: d.levelInfo.color,
                       opacity: 0.7,
@@ -502,7 +503,7 @@ const TabletLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
                   <Text
                     style={[
                       styles.labelSubText,
-                      {width: 24, fontFamily: 'Pretendard-SemiBold'},
+                      {width: 24, fontFamily: f.semibold},
                     ]}>
                     {d.timeLeft}
                   </Text>{' '}
@@ -667,28 +668,28 @@ const styles = StyleSheet.create({
   },
   labelTitleText: {
     fontSize: 32,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 45,
     letterSpacing: -1,
     color: SUMMER_COLORS.primary,
   },
   labelSubText: {
     fontSize: 20,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     lineHeight: 28,
     letterSpacing: -1,
-    color: 'rgba(13, 33, 55, 0.65)',
+    color: c.texticon.onNormal.highemp,
   },
   stampLeftText: {
     fontSize: 76,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 86,
     letterSpacing: -1,
     color: SUMMER_COLORS.accent,
   },
   stampRightText: {
     fontSize: 28,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 38,
     letterSpacing: -1,
   },
@@ -704,7 +705,7 @@ const styles = StyleSheet.create({
   beverageBox: {
     width: '100%',
     height: 98,
-    backgroundColor: 'rgba(2, 136, 209, 0.1)',
+    backgroundColor: p.blue[50],
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 16,
@@ -716,15 +717,15 @@ const styles = StyleSheet.create({
   beverageTitleText: {
     fontSize: 20,
     lineHeight: 28,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     color: SUMMER_COLORS.primary,
     letterSpacing: -1,
   },
   beverageBodyText: {
     fontSize: 16,
     lineHeight: 26,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13, 33, 55, 0.65)',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highemp,
     letterSpacing: -1,
   },
 });
@@ -746,14 +747,14 @@ const phoneSt = StyleSheet.create({
   },
   backText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: SUMMER_COLORS.primary,
     letterSpacing: -0.5,
   },
   timerText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13, 33, 55, 0.5)',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
   },
   userInfo: {
     gap: 6,
@@ -769,40 +770,40 @@ const phoneSt = StyleSheet.create({
     marginBottom: 2,
   },
   levelName: {
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: f.semibold,
     fontSize: 12,
     letterSpacing: -0.3,
   },
   levelNum: {
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     fontSize: 10,
     opacity: 0.7,
   },
   welcomeText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     lineHeight: 24,
     letterSpacing: -0.5,
-    color: 'rgba(13, 33, 55, 0.65)',
+    color: c.texticon.onNormal.highemp,
   },
   visitText: {
     fontSize: 24,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     lineHeight: 34,
     letterSpacing: -1,
     color: SUMMER_COLORS.primary,
   },
   changeBanner: {
-    backgroundColor: 'rgba(2, 136, 209, 0.08)',
+    backgroundColor: p.blue[50],
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderWidth: 1,
-    borderColor: 'rgba(2, 136, 209, 0.2)',
+    borderColor: p.blue[100],
   },
   changeBannerText: {
     fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: f.regular,
     color: SUMMER_COLORS.primary,
     lineHeight: 24,
     letterSpacing: -0.5,
@@ -811,7 +812,7 @@ const phoneSt = StyleSheet.create({
     gap: 10,
   },
   infoCard: {
-    backgroundColor: 'rgba(2, 136, 209, 0.1)',
+    backgroundColor: p.blue[50],
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 14,
@@ -820,15 +821,15 @@ const phoneSt = StyleSheet.create({
   infoTitle: {
     fontSize: 16,
     lineHeight: 24,
-    fontFamily: 'Pretendard-Medium',
+    fontFamily: f.medium,
     color: SUMMER_COLORS.primary,
     letterSpacing: -0.5,
   },
   infoBody: {
     fontSize: 13,
     lineHeight: 20,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13, 33, 55, 0.65)',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highemp,
     letterSpacing: -0.5,
   },
   timerBanner: {
@@ -837,8 +838,8 @@ const phoneSt = StyleSheet.create({
   },
   timerBannerText: {
     fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: 'rgba(13, 33, 55, 0.45)',
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
   },
 });
 

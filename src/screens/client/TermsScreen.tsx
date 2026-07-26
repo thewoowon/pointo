@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {
   Pressable,
   StatusBar,
@@ -7,11 +7,14 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore} from '../../hooks';
+import {useAuth, useFirestore, useTheme} from '../../hooks';
+import type {Theme} from '../../theme';
 
 const TermsScreen = ({navigation, route}: any) => {
   const phoneNumber = route.params?.phoneNumber;
   const {storeCode} = useAuth();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const {addUser, updateSession} = useFirestore(storeCode);
   const onConfirmPress = async () => {
     await addUser(phoneNumber);
@@ -26,7 +29,7 @@ const TermsScreen = ({navigation, route}: any) => {
     <View style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="#6a51ae"
+        backgroundColor={theme.color.surface.normal.bg1}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>
@@ -81,7 +84,8 @@ const TermsScreen = ({navigation, route}: any) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
   },
@@ -104,13 +108,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: 5,
     borderWidth: 0.5,
-    borderColor: '#8E979E',
+    borderColor: theme.palette.gray[200],
     borderRadius: 5,
     marginBottom: 20,
   },
   templateText: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: theme.font.light,
   },
   termsContainer: {
     flex: 1,
@@ -118,32 +122,32 @@ const styles = StyleSheet.create({
   },
   termsLightSubtitle: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: theme.font.light,
     marginTop: 10,
     paddingLeft: 10,
   },
   termsSubtitle: {
     fontSize: 11,
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     marginTop: 10,
     paddingLeft: 10,
   },
   termsBasicText: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: theme.font.light,
     marginTop: 5,
     paddingLeft: 20,
   },
   termsSmallText: {
     fontSize: 10,
-    fontFamily: 'Pretendard-Light',
+    fontFamily: theme.font.light,
     marginTop: 5,
     paddingLeft: 30,
   },
   numberInputText: {
     fontSize: 16,
-    color: 'white',
-    fontFamily: 'Pretendard-Regular',
+    color: theme.color.texticon.onBrand.onPrimary,
+    fontFamily: theme.font.regular,
   },
   headerNumberContainer: {
     width: '100%',
@@ -159,12 +163,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     height: 40,
-    backgroundColor: 'black',
+    backgroundColor: theme.color.surface.brand.primary,
     borderRadius: 5,
   },
   bigTitle: {
     fontSize: 24,
-    fontFamily: 'Pretendard-SemiBold',
+    fontFamily: theme.font.semibold,
   },
   titleContainer: {
     width: '100%',

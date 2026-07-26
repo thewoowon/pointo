@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useMemo, useState} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,7 +12,8 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore} from '../../hooks';
+import {useAuth, useFirestore, useTheme} from '../../hooks';
+import type {Theme} from '../../theme';
 import {
   signInWithEmail,
   signUpWithEmail,
@@ -25,6 +26,9 @@ type AuthMode = 'login' | 'signup';
 const EmailAuthScreen = ({navigation}: any) => {
   const {setOwnerUid, setOwnerEmail} = useAuth();
   const {ensureOwnerProfile} = useFirestore();
+
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
@@ -95,7 +99,11 @@ const EmailAuthScreen = ({navigation}: any) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent={false} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={theme.color.surface.normal.bg1}
+        translucent={false}
+      />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -126,7 +134,7 @@ const EmailAuthScreen = ({navigation}: any) => {
                 value={email}
                 onChangeText={setEmail}
                 placeholder="example@email.com"
-                placeholderTextColor="#B5B8BC"
+                placeholderTextColor={theme.color.texticon.onNormal.lowemp}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -140,7 +148,7 @@ const EmailAuthScreen = ({navigation}: any) => {
                 value={password}
                 onChangeText={setPassword}
                 placeholder="6자 이상"
-                placeholderTextColor="#B5B8BC"
+                placeholderTextColor={theme.color.texticon.onNormal.lowemp}
                 secureTextEntry
                 autoCapitalize="none"
               />
@@ -196,141 +204,144 @@ const EmailAuthScreen = ({navigation}: any) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F6F6F8',
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 14,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#EEEEEE',
-  },
-  backButton: {
-    position: 'absolute',
-    left: 16,
-  },
-  backText: {
-    fontSize: 14,
-    fontFamily: 'Pretendard-Regular',
-    color: '#3D4C57',
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 40,
-    gap: 18,
-  },
-  intro: {
-    gap: 8,
-    marginBottom: 8,
-  },
-  pageTitle: {
-    fontSize: 26,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#191D2B',
-    lineHeight: 34,
-  },
-  pageSubtitle: {
-    fontSize: 15,
-    fontFamily: 'Pretendard-Regular',
-    color: '#73777B',
-    lineHeight: 22,
-  },
-  field: {
-    gap: 8,
-  },
-  fieldLabel: {
-    fontSize: 14,
-    fontFamily: 'Pretendard-Medium',
-    color: '#73777B',
-  },
-  input: {
-    height: 54,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E7E8EA',
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: 'Pretendard-Regular',
-    color: '#191D2B',
-  },
-  forgotBtn: {
-    alignSelf: 'flex-end',
-    marginTop: -6,
-  },
-  forgotText: {
-    fontSize: 13,
-    fontFamily: 'Pretendard-Regular',
-    color: '#9DA1A6',
-    textDecorationLine: 'underline',
-  },
-  primaryBtn: {
-    height: 56,
-    backgroundColor: '#D4845A',
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  primaryBtnText: {
-    fontSize: 17,
-    fontFamily: 'Pretendard-SemiBold',
-    color: '#FFFFFF',
-  },
-  switchModeBtn: {
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  switchModeText: {
-    fontSize: 14,
-    fontFamily: 'Pretendard-Medium',
-    color: '#73777B',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginVertical: 4,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#E7E8EA',
-  },
-  dividerText: {
-    fontSize: 12,
-    fontFamily: 'Pretendard-Regular',
-    color: '#B5B8BC',
-  },
-  secondaryBtn: {
-    height: 54,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#E7E8EA',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    fontSize: 15,
-    fontFamily: 'Pretendard-Medium',
-    color: '#3D4C57',
-  },
-});
+// 보더 토큰이 디자인 시스템에 없어(=보더 미사용 방침), 구분선·입력 외곽선은
+// 중립 팔레트로 임시 처리. 리디자인 패스에서 보더 정책 확정 시 교체.
+const createStyles = (t: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: t.color.surface.normal.container10,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingVertical: t.spacing[3.5],
+      backgroundColor: t.color.surface.normal.bg1,
+      borderBottomWidth: 1,
+      borderBottomColor: t.palette.gray[200],
+    },
+    backButton: {
+      position: 'absolute',
+      left: t.spacing[4],
+    },
+    backText: {
+      fontSize: 14,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.highemp,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onNormal.highestemp,
+    },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: t.spacing[6],
+      paddingTop: t.spacing[8],
+      paddingBottom: t.spacing[10],
+      gap: t.spacing[4],
+    },
+    intro: {
+      gap: t.spacing[2],
+      marginBottom: t.spacing[2],
+    },
+    pageTitle: {
+      fontSize: 26,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onNormal.highestemp,
+      lineHeight: 34,
+    },
+    pageSubtitle: {
+      fontSize: 15,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.midemp,
+      lineHeight: 22,
+    },
+    field: {
+      gap: t.spacing[2],
+    },
+    fieldLabel: {
+      fontSize: 14,
+      fontFamily: t.font.medium,
+      color: t.color.texticon.onNormal.midemp,
+    },
+    input: {
+      height: 54,
+      backgroundColor: t.color.surface.normal.bg1,
+      borderRadius: t.radius.md,
+      borderWidth: 1,
+      borderColor: t.palette.gray[200],
+      paddingHorizontal: t.spacing[4],
+      fontSize: 16,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.highestemp,
+    },
+    forgotBtn: {
+      alignSelf: 'flex-end',
+      marginTop: -t.spacing[1.5],
+    },
+    forgotText: {
+      fontSize: 13,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.lowemp,
+      textDecorationLine: 'underline',
+    },
+    primaryBtn: {
+      height: 56,
+      backgroundColor: t.color.surface.brand.primary,
+      borderRadius: t.radius.lg,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: t.spacing[1],
+    },
+    primaryBtnText: {
+      fontSize: 17,
+      fontFamily: t.font.semibold,
+      color: t.color.texticon.onBrand.onPrimary,
+    },
+    switchModeBtn: {
+      alignItems: 'center',
+      paddingVertical: t.spacing[1],
+    },
+    switchModeText: {
+      fontSize: 14,
+      fontFamily: t.font.medium,
+      color: t.color.texticon.onNormal.midemp,
+    },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: t.spacing[3],
+      marginVertical: t.spacing[1],
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: t.palette.gray[200],
+    },
+    dividerText: {
+      fontSize: 12,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.lowemp,
+    },
+    secondaryBtn: {
+      height: 54,
+      backgroundColor: t.color.surface.normal.bg1,
+      borderRadius: t.radius.lg,
+      borderWidth: 1,
+      borderColor: t.palette.gray[200],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    secondaryBtnText: {
+      fontSize: 15,
+      fontFamily: t.font.medium,
+      color: t.color.texticon.onNormal.highemp,
+    },
+  });
 
 export default EmailAuthScreen;

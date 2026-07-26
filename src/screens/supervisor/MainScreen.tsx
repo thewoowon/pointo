@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   Alert,
   Modal,
@@ -9,10 +9,16 @@ import {
   Text,
   TextInput,
   View,
-  useWindowDimensions,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore, useAnalytics} from '../../hooks';
+import {
+  useAuth,
+  useFirestore,
+  useAnalytics,
+  useLayoutMode,
+  useTheme,
+} from '../../hooks';
+import type {Theme} from '../../theme';
 import {AnalyticsEvent} from '../../analytics/events';
 import {doc, getFirestore, onSnapshot} from '@react-native-firebase/firestore';
 import {useFocusEffect} from '@react-navigation/native';
@@ -31,6 +37,7 @@ import {
 import dayjs from 'dayjs';
 // import {BackgroundDeco} from '../../components/background';
 import DetailView from './DetailView';
+import {useMasterDetail} from '../../components';
 import {LoadingOverlay} from '../../components/overlay';
 
 const FILTER_LIST: {
@@ -51,9 +58,12 @@ const FILTER_MAP: {
 };
 
 const MainScreen = ({navigation, route}: any) => {
-  const {width: screenWidth} = useWindowDimensions();
-  const isCompact = screenWidth < 768;
+  const {isCompact} = useLayoutMode();
+  const theme = useTheme();
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [showDetail, setShowDetail] = useState(false);
+  // Master-detail panel visibility (centralized — see SplitLayout primitive).
+  const {showList, showDetailPanel} = useMasterDetail(showDetail);
   const {storeCode, storeName, setIsAuthenticated, initStoreCode} = useAuth();
   const {enterNumber, getLogs, getLogsAfter, getLogsByPhoneNumber} =
     useFirestore(storeCode);
@@ -243,7 +253,7 @@ const MainScreen = ({navigation, route}: any) => {
     <View style={styles.container}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor="#6a51ae"
+        backgroundColor={theme.color.surface.normal.bg1}
         translucent={false}
       />
       <SafeAreaView style={styles.backgroundStyle}>
@@ -254,13 +264,13 @@ const MainScreen = ({navigation, route}: any) => {
               styles.flexRowBox,
               {
                 justifyContent: 'space-between',
-                backgroundColor: '#3D4C57',
+                backgroundColor: theme.color.texticon.onNormal.highemp,
                 paddingVertical: isCompact ? 10 : 18,
                 paddingHorizontal: isCompact ? 12 : 24,
               },
             ]}>
             {storeName ? (
-              <Text style={{color: '#FFFFFF', fontSize: isCompact ? 13 : 16, fontFamily: 'Pretendard-SemiBold'}}>{storeName}</Text>
+              <Text style={{color: theme.color.surface.normal.bg1, fontSize: isCompact ? 13 : 16, fontFamily: theme.font.semibold}}>{storeName}</Text>
             ) : <View />}
             <View style={[styles.flexRowBox, {gap: isCompact ? 6 : 8}]}>
               <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={() => navigation.navigate('StoreSettings')}>
@@ -284,11 +294,11 @@ const MainScreen = ({navigation, route}: any) => {
                 flex: 1,
               },
             ]}>
-            {(!isCompact || !showDetail) && <View
+            {showList && <View
               style={[
                 styles.innerContainer,
                 {
-                  backgroundColor: 'white',
+                  backgroundColor: theme.color.surface.normal.bg1,
                   paddingHorizontal: 24,
                   paddingTop: 32,
                 },
@@ -390,7 +400,7 @@ const MainScreen = ({navigation, route}: any) => {
                           style={[
                             styles.flexRowBox,
                             {
-                              backgroundColor: '#F3F3F3',
+                              backgroundColor: theme.color.surface.normal.container10,
                               width: isCompact ? 56 : 70,
                               height: isCompact ? 28 : 32,
                               borderRadius: 6,
@@ -403,8 +413,8 @@ const MainScreen = ({navigation, route}: any) => {
                               fontSize: isCompact ? 12 : 16,
                               lineHeight: isCompact ? 18 : 26,
                               letterSpacing: -1,
-                              fontFamily: 'Pretendard-Medium',
-                              color: '#595959',
+                              fontFamily: theme.font.medium,
+                              color: theme.color.texticon.onNormal.highemp,
                             }}>
                             오늘
                           </Text>
@@ -422,7 +432,7 @@ const MainScreen = ({navigation, route}: any) => {
                         </Pressable>
                         <Text
                           style={{
-                            fontFamily: 'Pretendard-Medium',
+                            fontFamily: theme.font.medium,
                             fontSize: isCompact ? 13 : 16,
                             lineHeight: isCompact ? 20 : 26,
                             letterSpacing: -1,
@@ -450,7 +460,7 @@ const MainScreen = ({navigation, route}: any) => {
                       style={[
                         styles.searchInputText,
                         {
-                          color: '#CACACA',
+                          color: theme.palette.gray[200],
                         },
                       ]}>
                       고객번호로 내역검색
@@ -473,7 +483,7 @@ const MainScreen = ({navigation, route}: any) => {
                       justifyContent: 'space-between',
                       height: 30,
                       borderBottomWidth: 1,
-                      borderBottomColor: '#E5E5E5',
+                      borderBottomColor: theme.palette.gray[200],
                       gap: 16,
                       marginBottom: 16,
                     },
@@ -485,46 +495,46 @@ const MainScreen = ({navigation, route}: any) => {
                     ]}>
                     <Text
                       style={{
-                        fontFamily: 'Pretendard-Medium',
+                        fontFamily: theme.font.medium,
                         fontSize: 14,
                         lineHeight: 24,
                         letterSpacing: -1,
                         width: 62,
-                        color: '#9F9FA6',
+                        color: theme.color.texticon.onNormal.midemp,
                       }}>
                       적립정보
                     </Text>
                     <Text
                       style={{
-                        fontFamily: 'Pretendard-Medium',
+                        fontFamily: theme.font.medium,
                         fontSize: 14,
                         lineHeight: 24,
                         letterSpacing: -1,
                         width: 100,
-                        color: '#9F9FA6',
+                        color: theme.color.texticon.onNormal.midemp,
                       }}>
                       회원정보
                     </Text>
                     <Text
                       style={{
-                        fontFamily: 'Pretendard-Medium',
+                        fontFamily: theme.font.medium,
                         fontSize: 14,
                         lineHeight: 24,
                         letterSpacing: -1,
                         flex: 1,
-                        color: '#9F9FA6',
+                        color: theme.color.texticon.onNormal.midemp,
                       }}>
                       비고
                     </Text>
                   </View>
                   <Text
                     style={{
-                      fontFamily: 'Pretendard-Medium',
+                      fontFamily: theme.font.medium,
                       fontSize: 14,
                       lineHeight: 24,
                       letterSpacing: -1,
                       width: 120,
-                      color: '#9F9FA6',
+                      color: theme.color.texticon.onNormal.midemp,
                     }}>
                     일시
                   </Text>
@@ -543,7 +553,7 @@ const MainScreen = ({navigation, route}: any) => {
                           <Pressable
                             key={index}
                             style={{
-                              backgroundColor: '#FAFAFA',
+                              backgroundColor: theme.color.surface.normal.container10,
                               borderRadius: 10,
                               padding: 12,
                               gap: 6,
@@ -560,17 +570,17 @@ const MainScreen = ({navigation, route}: any) => {
                                     height: 26,
                                     backgroundColor:
                                       statistic.action === 'stamp_saved'
-                                        ? '#FFEBD7'
-                                        : '#E8F1FF',
+                                        ? theme.palette.green[100]
+                                        : theme.palette.blue[50],
                                   }}>
                                   <Text
                                     style={{
                                       fontSize: 12,
-                                      fontFamily: 'Pretendard-Medium',
+                                      fontFamily: theme.font.medium,
                                       color:
                                         statistic.action === 'stamp_saved'
-                                          ? '#FF8400'
-                                          : '#3F8CFF',
+                                          ? theme.color.texticon.onNormal.success
+                                          : theme.color.texticon.onNormal.primary,
                                     }}>
                                     {statistic.action === 'stamp_saved'
                                       ? '적립'
@@ -580,9 +590,9 @@ const MainScreen = ({navigation, route}: any) => {
                                 </View>
                                 <Text
                                   style={{
-                                    color: '#1B2128',
+                                    color: theme.color.texticon.onNormal.highestemp,
                                     fontSize: 13,
-                                    fontFamily: 'Pretendard-Medium',
+                                    fontFamily: theme.font.medium,
                                     letterSpacing: -0.5,
                                   }}>
                                   {statistic.phone_number.replace(
@@ -593,7 +603,7 @@ const MainScreen = ({navigation, route}: any) => {
                               </View>
                               <Text
                                 style={{
-                                  color: '#878B8F',
+                                  color: theme.color.texticon.onNormal.midemp,
                                   fontSize: 11,
                                   letterSpacing: -0.5,
                                 }}>
@@ -603,9 +613,9 @@ const MainScreen = ({navigation, route}: any) => {
                             {statistic.note ? (
                               <Text
                                 style={{
-                                  color: '#666',
+                                  color: theme.color.texticon.onNormal.midemp,
                                   fontSize: 12,
-                                  fontFamily: 'Pretendard-Light',
+                                  fontFamily: theme.font.light,
                                   letterSpacing: -0.3,
                                 }}
                                 numberOfLines={1}>
@@ -639,19 +649,19 @@ const MainScreen = ({navigation, route}: any) => {
                                   height: 32,
                                   backgroundColor:
                                     statistic.action === 'stamp_saved'
-                                      ? '#FFEBD7'
-                                      : '#E8F1FF',
+                                      ? theme.palette.green[100]
+                                      : theme.palette.blue[50],
                                 }}>
                                 <Text
                                   style={{
                                     fontSize: 14,
                                     lineHeight: 24,
                                     letterSpacing: -1,
-                                    fontFamily: 'Pretendard-Medium',
+                                    fontFamily: theme.font.medium,
                                     color:
                                       statistic.action === 'stamp_saved'
-                                        ? '#FF8400'
-                                        : '#3F8CFF',
+                                        ? theme.color.texticon.onNormal.success
+                                        : theme.color.texticon.onNormal.primary,
                                   }}>
                                   {statistic.action === 'stamp_saved'
                                     ? '적립'
@@ -662,11 +672,11 @@ const MainScreen = ({navigation, route}: any) => {
                               <Text
                                 style={{
                                   width: 100,
-                                  color: '#1B2128',
+                                  color: theme.color.texticon.onNormal.highestemp,
                                   fontSize: 14,
                                   lineHeight: 24,
                                   letterSpacing: -1,
-                                  fontFamily: 'Pretendard-Medium',
+                                  fontFamily: theme.font.medium,
                                 }}>
                                 {statistic.phone_number.replace(
                                   /(\d{3})(\d{4})(\d{4})/,
@@ -675,11 +685,11 @@ const MainScreen = ({navigation, route}: any) => {
                               </Text>
                               <Text
                                 style={{
-                                  color: 'black',
+                                  color: theme.color.texticon.onNormal.highestemp,
                                   fontSize: 14,
                                   lineHeight: 24,
                                   letterSpacing: -1,
-                                  fontFamily: 'Pretendard-Light',
+                                  fontFamily: theme.font.light,
                                 }}>
                                 {statistic.note}
                               </Text>
@@ -687,7 +697,7 @@ const MainScreen = ({navigation, route}: any) => {
                             <Text
                               style={{
                                 width: 120,
-                                color: '#878B8F',
+                                color: theme.color.texticon.onNormal.midemp,
                                 fontSize: 14,
                                 lineHeight: 24,
                                 letterSpacing: -1,
@@ -716,14 +726,14 @@ const MainScreen = ({navigation, route}: any) => {
                 </ScrollView>
               </View>
             </View>}
-            {(!isCompact || showDetail) && <View
+            {showDetailPanel && <View
               style={[
                 styles.flexColumnBox,
                 {
                   flex: 1,
                   maxWidth: isCompact ? undefined : 536,
                   height: '100%',
-                  backgroundColor: '#F6F6F6',
+                  backgroundColor: theme.color.surface.normal.container10,
                   paddingHorizontal: 24,
                   paddingVertical: 32,
                 },
@@ -733,7 +743,7 @@ const MainScreen = ({navigation, route}: any) => {
                   style={[styles.flexRowBox, {gap: 6, marginBottom: 16}]}
                   onPress={() => setShowDetail(false)}>
                   <LeftArrowIcon width={16} height={16} />
-                  <Text style={{fontFamily: 'Pretendard-Medium', fontSize: 15, color: '#3D4C57'}}>목록으로</Text>
+                  <Text style={{fontFamily: theme.font.medium, fontSize: 15, color: theme.color.texticon.onNormal.highemp}}>목록으로</Text>
                 </Pressable>
               )}
               {selectedContext.selectedLog ? (
@@ -753,8 +763,8 @@ const MainScreen = ({navigation, route}: any) => {
                       ]}>
                       <Text
                         style={{
-                          color: '#262626',
-                          fontFamily: 'Pretendard-Regular',
+                          color: theme.color.texticon.onNormal.highestemp,
+                          fontFamily: theme.font.regular,
                           fontSize: 16,
                           lineHeight: 26,
                           letterSpacing: -1,
@@ -791,8 +801,8 @@ const MainScreen = ({navigation, route}: any) => {
                       ]}>
                       <Text
                         style={{
-                          color: '#262626',
-                          fontFamily: 'Pretendard-Regular',
+                          color: theme.color.texticon.onNormal.highestemp,
+                          fontFamily: theme.font.regular,
                           fontSize: 16,
                           lineHeight: 26,
                           letterSpacing: -1,
@@ -801,8 +811,8 @@ const MainScreen = ({navigation, route}: any) => {
                       </Text>
                       <Text
                         style={{
-                          color: '#FE7901',
-                          fontFamily: 'Pretendard-Medium',
+                          color: theme.color.texticon.onNormal.primary,
+                          fontFamily: theme.font.medium,
                           fontSize: 24,
                           lineHeight: 32,
                           letterSpacing: -1,
@@ -817,7 +827,7 @@ const MainScreen = ({navigation, route}: any) => {
                       style={{
                         paddingVertical: 24,
                         paddingHorizontal: 20,
-                        backgroundColor: 'white',
+                        backgroundColor: theme.color.surface.normal.bg1,
                         borderRadius: 24,
                         display: 'flex',
                         flexDirection: 'column',
@@ -841,20 +851,20 @@ const MainScreen = ({navigation, route}: any) => {
                             backgroundColor:
                               selectedContext.selectedLog.action ===
                               'stamp_saved'
-                                ? '#FFEBD7'
-                                : '#E8F1FF',
+                                ? theme.palette.green[100]
+                                : theme.palette.blue[50],
                           }}>
                           <Text
                             style={{
                               fontSize: 14,
                               lineHeight: 24,
                               letterSpacing: -1,
-                              fontFamily: 'Pretendard-Medium',
+                              fontFamily: theme.font.medium,
                               color:
                                 selectedContext.selectedLog.action ===
                                 'stamp_saved'
-                                  ? '#FF8400'
-                                  : '#3F8CFF',
+                                  ? theme.color.texticon.onNormal.success
+                                  : theme.color.texticon.onNormal.primary,
                             }}>
                             {selectedContext.selectedLog.action ===
                             'stamp_saved'
@@ -865,8 +875,8 @@ const MainScreen = ({navigation, route}: any) => {
                         </View>
                         <Text
                           style={{
-                            color: '#73777B',
-                            fontFamily: 'Pretendard-Regular',
+                            color: theme.color.texticon.onNormal.midemp,
+                            fontFamily: theme.font.regular,
                             fontSize: 16,
                             lineHeight: 26,
                             letterSpacing: -1,
@@ -886,8 +896,8 @@ const MainScreen = ({navigation, route}: any) => {
                         ]}>
                         <Text
                           style={{
-                            color: '#171717',
-                            fontFamily: 'Pretendard-Medium',
+                            color: theme.color.texticon.onNormal.highestemp,
+                            fontFamily: theme.font.medium,
                             fontSize: 16,
                             lineHeight: 24,
                             letterSpacing: -1,
@@ -898,8 +908,8 @@ const MainScreen = ({navigation, route}: any) => {
                         </Text>
                         <Text
                           style={{
-                            color: '#171717',
-                            fontFamily: 'Pretendard-Medium',
+                            color: theme.color.texticon.onNormal.highestemp,
+                            fontFamily: theme.font.medium,
                             fontSize: 20,
                             lineHeight: 24,
                             letterSpacing: -1,
@@ -921,7 +931,7 @@ const MainScreen = ({navigation, route}: any) => {
                           {
                             borderRadius: 6,
                             paddingVertical: 15,
-                            backgroundColor: '#EFEFEF',
+                            backgroundColor: theme.color.surface.normal.container10,
                             marginTop: 12,
                             cursor: 'pointer',
                           },
@@ -946,8 +956,8 @@ const MainScreen = ({navigation, route}: any) => {
                       ]}>
                       <Text
                         style={{
-                          color: '#262626',
-                          fontFamily: 'Pretendard-Regular',
+                          color: theme.color.texticon.onNormal.highestemp,
+                          fontFamily: theme.font.regular,
                           fontSize: 16,
                           lineHeight: 26,
                           letterSpacing: -1,
@@ -984,8 +994,8 @@ const MainScreen = ({navigation, route}: any) => {
                       ]}>
                       <Text
                         style={{
-                          color: '#262626',
-                          fontFamily: 'Pretendard-Regular',
+                          color: theme.color.texticon.onNormal.highestemp,
+                          fontFamily: theme.font.regular,
                           fontSize: 16,
                           lineHeight: 26,
                           letterSpacing: -1,
@@ -994,8 +1004,8 @@ const MainScreen = ({navigation, route}: any) => {
                       </Text>
                       <Text
                         style={{
-                          color: '#FE7901',
-                          fontFamily: 'Pretendard-Medium',
+                          color: theme.color.texticon.onNormal.primary,
+                          fontFamily: theme.font.medium,
                           fontSize: 24,
                           lineHeight: 32,
                           letterSpacing: -1,
@@ -1011,7 +1021,7 @@ const MainScreen = ({navigation, route}: any) => {
                         flex: 1,
                         paddingVertical: 24,
                         paddingHorizontal: 20,
-                        backgroundColor: 'white',
+                        backgroundColor: theme.color.surface.normal.bg1,
                         borderRadius: 24,
                         display: 'flex',
                         flexDirection: 'column',
@@ -1032,8 +1042,8 @@ const MainScreen = ({navigation, route}: any) => {
                         <Text
                           style={{
                             fontSize: 16,
-                            fontFamily: 'Pretendard-Regular',
-                            color: '#191D2B',
+                            fontFamily: theme.font.regular,
+                            color: theme.color.texticon.onNormal.highestemp,
                             lineHeight: 26,
                             letterSpacing: -1,
                           }}>
@@ -1048,7 +1058,7 @@ const MainScreen = ({navigation, route}: any) => {
                               styles.listBox,
                               {
                                 borderBottomWidth: 1,
-                                borderBottomColor: '#E5E5E5',
+                                borderBottomColor: theme.palette.gray[200],
                                 paddingVertical: 16,
                               },
                             ]}>
@@ -1071,19 +1081,19 @@ const MainScreen = ({navigation, route}: any) => {
                                   height: 32,
                                   backgroundColor:
                                     log.action === 'stamp_saved'
-                                      ? '#FFEBD7'
-                                      : '#E8F1FF',
+                                      ? theme.palette.green[100]
+                                      : theme.palette.blue[50],
                                 }}>
                                 <Text
                                   style={{
                                     fontSize: 14,
                                     lineHeight: 24,
                                     letterSpacing: -1,
-                                    fontFamily: 'Pretendard-Medium',
+                                    fontFamily: theme.font.medium,
                                     color:
                                       log.action === 'stamp_saved'
-                                        ? '#FF8400'
-                                        : '#3F8CFF',
+                                        ? theme.color.texticon.onNormal.success
+                                        : theme.color.texticon.onNormal.primary,
                                   }}>
                                   {log.action === 'stamp_saved'
                                     ? '적립'
@@ -1093,11 +1103,11 @@ const MainScreen = ({navigation, route}: any) => {
                               </View>
                               <Text
                                 style={{
-                                  color: 'black',
+                                  color: theme.color.texticon.onNormal.highestemp,
                                   fontSize: 14,
                                   lineHeight: 24,
                                   letterSpacing: -1,
-                                  fontFamily: 'Pretendard-Light',
+                                  fontFamily: theme.font.light,
                                 }}>
                                 {log.note}
                               </Text>
@@ -1105,7 +1115,7 @@ const MainScreen = ({navigation, route}: any) => {
                             <Text
                               style={{
                                 width: 120,
-                                color: '#878B8F',
+                                color: theme.color.texticon.onNormal.midemp,
                                 fontSize: 14,
                                 lineHeight: 24,
                                 letterSpacing: -1,
@@ -1122,8 +1132,8 @@ const MainScreen = ({navigation, route}: any) => {
                 <>
                   <Text
                     style={{
-                      color: '#D4D4D4',
-                      fontFamily: 'Pretendard-Medium',
+                      color: theme.palette.gray[200],
+                      fontFamily: theme.font.medium,
                       fontSize: 20,
                       lineHeight: 28,
                       letterSpacing: -1,
@@ -1132,8 +1142,8 @@ const MainScreen = ({navigation, route}: any) => {
                   </Text>
                   <Text
                     style={{
-                      color: '#D4D4D4',
-                      fontFamily: 'Pretendard-Medium',
+                      color: theme.palette.gray[200],
+                      fontFamily: theme.font.medium,
                       fontSize: 20,
                       lineHeight: 28,
                       letterSpacing: -1,
@@ -1159,7 +1169,7 @@ const MainScreen = ({navigation, route}: any) => {
             onPress={() => setFilterModalVisible(false)}>
             <Pressable
               style={{
-                backgroundColor: 'white',
+                backgroundColor: theme.color.surface.normal.bg1,
                 borderTopLeftRadius: 20,
                 borderTopRightRadius: 20,
                 paddingHorizontal: 32,
@@ -1170,11 +1180,11 @@ const MainScreen = ({navigation, route}: any) => {
               onPress={e => e.stopPropagation()}>
               <Text
                 style={{
-                  fontFamily: 'Pretendard-SemiBold',
+                  fontFamily: theme.font.semibold,
                   fontSize: 24,
                   lineHeight: 32,
                   letterSpacing: -1,
-                  color: 'black',
+                  color: theme.color.texticon.onNormal.highestemp,
                 }}>
                 내역 타입
               </Text>
@@ -1207,11 +1217,11 @@ const MainScreen = ({navigation, route}: any) => {
                         style={{
                           fontSize: 20,
                           lineHeight: 28,
-                          fontFamily: 'Pretendard-Regular',
+                          fontFamily: theme.font.regular,
                           color:
                             searchContext.filter === item.value
-                              ? '#FE7901'
-                              : 'black',
+                              ? theme.color.texticon.onNormal.primary
+                              : theme.color.texticon.onNormal.highestemp,
                         }}>
                         {item.label}
                       </Text>
@@ -1240,7 +1250,7 @@ const MainScreen = ({navigation, route}: any) => {
             onPress={() => setCustomerSearchVisible(false)}>
             <Pressable
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.color.surface.normal.bg1,
                 borderRadius: 24,
                 padding: 36,
                 width: '90%',
@@ -1250,9 +1260,9 @@ const MainScreen = ({navigation, route}: any) => {
               onPress={() => {}}>
               <Text
                 style={{
-                  fontFamily: 'Pretendard-SemiBold',
+                  fontFamily: theme.font.semibold,
                   fontSize: 22,
-                  color: '#191D2B',
+                  color: theme.color.texticon.onNormal.highestemp,
                   letterSpacing: -0.5,
                 }}>
                 고객 번호 조회
@@ -1260,7 +1270,7 @@ const MainScreen = ({navigation, route}: any) => {
               {/* 번호 표시 */}
               <View
                 style={{
-                  backgroundColor: '#F6F6F6',
+                  backgroundColor: theme.color.surface.normal.container10,
                   borderRadius: 12,
                   paddingVertical: 16,
                   paddingHorizontal: 20,
@@ -1271,7 +1281,7 @@ const MainScreen = ({navigation, route}: any) => {
                     fontFamily: 'SFUIDisplay-Medium',
                     fontSize: 28,
                     color:
-                      customerSearchInput.length > 0 ? '#191D2B' : '#D0D0D0',
+                      customerSearchInput.length > 0 ? theme.color.texticon.onNormal.highestemp : theme.palette.gray[200],
                     letterSpacing: 2,
                   }}>
                   {customerSearchInput.length > 0
@@ -1297,7 +1307,7 @@ const MainScreen = ({navigation, route}: any) => {
                             width: 90,
                             height: 56,
                             backgroundColor:
-                              key === '' ? 'transparent' : pressed ? '#E8E8E8' : '#F6F6F6',
+                              key === '' ? 'transparent' : pressed ? theme.palette.gray[200] : theme.color.surface.normal.container10,
                             borderRadius: 10,
                             justifyContent: 'center',
                             alignItems: 'center',
@@ -1309,7 +1319,7 @@ const MainScreen = ({navigation, route}: any) => {
                             style={{
                               fontSize: key === 'del' ? 18 : 26,
                               fontFamily: 'SFUIDisplay-Medium',
-                              color: '#3A3A3A',
+                              color: theme.color.texticon.onNormal.highestemp,
                             }}>
                             {key === 'del' ? '⌫' : key}
                           </Text>
@@ -1322,7 +1332,7 @@ const MainScreen = ({navigation, route}: any) => {
               {/* 조회 버튼 */}
               <Pressable
                 style={({pressed}) => ({
-                  backgroundColor: pressed ? '#B86E48' : '#D4845A',
+                  backgroundColor: pressed ? theme.palette.blue[600] : theme.color.surface.brand.primary,
                   borderRadius: 14,
                   paddingVertical: 16,
                   alignItems: 'center',
@@ -1330,9 +1340,9 @@ const MainScreen = ({navigation, route}: any) => {
                 onPress={handleCustomerSearch}>
                 <Text
                   style={{
-                    fontFamily: 'Pretendard-SemiBold',
+                    fontFamily: theme.font.semibold,
                     fontSize: 18,
-                    color: '#FFFFFF',
+                    color: theme.color.surface.normal.bg1,
                   }}>
                   조회하기
                 </Text>
@@ -1362,7 +1372,8 @@ const MainScreen = ({navigation, route}: any) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) =>
+  StyleSheet.create({
   container: {
     flex: 1,
     // backgroundColor: '#FFFAE3',
@@ -1399,14 +1410,14 @@ const styles = StyleSheet.create({
   button: {
     width: 112,
     height: 40,
-    backgroundColor: 'white',
+    backgroundColor: theme.color.surface.normal.bg1,
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 8,
     gap: 6,
-    shadowColor: '#000000',
+    shadowColor: theme.color.etc.absolute.black,
     shadowOffset: {
       width: 0,
       height: 4.5,
@@ -1421,8 +1432,8 @@ const styles = StyleSheet.create({
     gap: 0,
   },
   buttonText: {
-    color: '#191D2B',
-    fontFamily: 'Pretendard-Medium',
+    color: theme.color.texticon.onNormal.highestemp,
+    fontFamily: theme.font.medium,
     fontSize: 16,
     lineHeight: 26,
     letterSpacing: -1,
@@ -1436,11 +1447,11 @@ const styles = StyleSheet.create({
   modalView: {
     height: 120,
     width: 'auto',
-    backgroundColor: 'white',
+    backgroundColor: theme.color.surface.normal.bg1,
     borderRadius: 10,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: theme.color.etc.absolute.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -1450,7 +1461,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   buttonClose: {
-    backgroundColor: '#2196F3',
+    backgroundColor: theme.color.surface.brand.primary,
     height: 50,
     width: 120,
     borderRadius: 10,
@@ -1458,7 +1469,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   textStyle: {
-    color: 'white',
+    color: theme.color.etc.absolute.white,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -1467,21 +1478,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   titleText: {
-    fontFamily: 'Pretendard-Semibold',
+    fontFamily: theme.font.semibold,
     fontSize: 24,
     lineHeight: 32,
     letterSpacing: -1,
   },
   titleSideText: {
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     fontSize: 16,
     lineHeight: 26,
     letterSpacing: -1,
-    color: '#8A8A8A',
+    color: theme.color.texticon.onNormal.midemp,
   },
   emptyText: {
-    color: '#93989E',
-    fontFamily: 'Pretendard-Regular',
+    color: theme.color.texticon.onNormal.midemp,
+    fontFamily: theme.font.regular,
     fontSize: 16,
     lineHeight: 24,
     letterSpacing: -1,
@@ -1491,18 +1502,18 @@ const styles = StyleSheet.create({
     height: 36,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: '#F8F8F8',
+    backgroundColor: theme.color.surface.normal.container10,
     display: 'flex',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   searchInputText: {
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     fontSize: 16,
     lineHeight: 20,
     letterSpacing: -1,
-    color: '#232323',
+    color: theme.color.texticon.onNormal.highestemp,
   },
   filterBox: {
     width: 100,
@@ -1511,17 +1522,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#EAEAEA',
+    borderColor: theme.palette.gray[200],
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
   },
   filterBoxText: {
-    fontFamily: 'Pretendard-Regular',
+    fontFamily: theme.font.regular,
     fontSize: 16,
     lineHeight: 20,
     letterSpacing: -1,
-    color: '#383838',
+    color: theme.color.texticon.onNormal.highestemp,
   },
 });
 
