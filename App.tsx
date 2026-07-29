@@ -1,7 +1,8 @@
 import './gesture-handler.native';
-import React from 'react';
+import React, {useEffect} from 'react';
 
 import {NavigationContainer} from '@react-navigation/native';
+import {BottomSheetModalProvider} from '@gorhom/bottom-sheet';
 
 import Toast, {BaseToast, ToastConfig} from 'react-native-toast-message';
 
@@ -9,6 +10,7 @@ import {AuthProvider, ThemeProvider} from './src/contexts';
 import RootNavigator from './src/navigation/RootNavigator';
 import MyCustomToast from './src/components/MyCustomToast';
 import {GestureHandlerRootView} from 'react-native-gesture-handler';
+import {configureGoogle} from './src/services/auth';
 
 // Custom ToastConfig
 const toastConfig: ToastConfig = {
@@ -19,9 +21,15 @@ const toastConfig: ToastConfig = {
 };
 
 function App(): React.JSX.Element {
+  // 구글 OAuth는 signIn 전에 반드시 configure가 선행되어야 한다. 앱 시작 시 1회.
+  useEffect(() => {
+    configureGoogle().catch(() => {});
+  }, []);
+
   return (
     <GestureHandlerRootView style={{flex: 1}}>
-      <NavigationContainer
+      <BottomSheetModalProvider>
+        <NavigationContainer
         theme={{
           dark: false,
           colors: {
@@ -51,9 +59,10 @@ function App(): React.JSX.Element {
             },
           },
         }}>
-        <RootNavigator />
-      </NavigationContainer>
-      <Toast config={toastConfig} />
+          <RootNavigator />
+        </NavigationContainer>
+        <Toast config={toastConfig} />
+      </BottomSheetModalProvider>
     </GestureHandlerRootView>
   );
 }

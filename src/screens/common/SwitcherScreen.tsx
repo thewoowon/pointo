@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,15 +13,13 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
+import type {BottomSheetModal} from '@gorhom/bottom-sheet';
 import {useAuth, useFirestore, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {
-  signOutOwner,
-  getCurrentOwner,
-  reloadCurrentOwner,
-  resendVerificationEmail,
-} from '../../services/auth';
+import {signOutGoogle} from '../../services/auth';
 import {ShortRightArrowIcon} from '../../components/Icons';
+import PinPad from '../../components/PinPad';
+import StoreModeSheet, {SheetStore} from './StoreModeSheet';
 
 const SwitcherScreen = ({navigation}: any) => {
   const theme = useTheme();
@@ -35,23 +33,27 @@ const SwitcherScreen = ({navigation}: any) => {
     setStoreName,
     setMode,
     setIsAuthenticated,
+    lockDeviceToClient,
   } = useAuth();
   const {getOwnerStores, claimStoresByPhone, getOwnerSlotInfo} = useFirestore();
 
-  // ownerUid가 컨텍스트에 없으면 Firebase 현재 세션에서 폴백
-  const uid = ownerUid ?? getCurrentOwner()?.uid ?? null;
+  const uid = ownerUid;
 
   const [stores, setStores] = useState<{storeCode: string; name: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [slot, setSlot] = useState<{current: number; limit: number; canAdd: boolean}>({
-    current: 0,
-    limit: 3,
-    canAdd: true,
-  });
-  const [emailVerified, setEmailVerified] = useState(true);
+  const [slot, setSlot] = useState<{
+    current: number;
+    limit: number;
+    canAdd: boolean;
+  }>({current: 0, limit: 3, canAdd: true});
   const [claimVisible, setClaimVisible] = useState(false);
   const [phone, setPhone] = useState('');
   const [claiming, setClaiming] = useState(false);
+
+  // 모드 선택 시트 + 고객모드 고정 PIN 설정
+  const sheetRef = useRef<BottomSheetModal>(null);
+  const [selectedStore, setSelectedStore] = useState<SheetStore | null>(null);
+  const [pinVisible, setPinVisible] = useState(false);
 
   const load = useCallback(async () => {
     if (!uid) {
@@ -65,7 +67,6 @@ const SwitcherScreen = ({navigation}: any) => {
     ]);
     setStores(list);
     setSlot(slotInfo);
-    setEmailVerified(getCurrentOwner()?.emailVerified ?? true);
     setIsLoading(false);
     // useFirestore()는 매 렌더 새 함수 참조를 반환하므로 uid만 의존
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -78,11 +79,34 @@ const SwitcherScreen = ({navigation}: any) => {
   );
 
   const handleSelectStore = (store: {storeCode: string; name: string}) => {
-    initStoreCode(store.storeCode);
-    setStoreName(store.name);
-    setMode('supervisor');
+    setSelectedStore(store);
+    sheetRef.current?.present();
+  };
+
+  const enterMode = (mode: 'supervisor' | 'client') => {
+    if (!selectedStore) return;
+    sheetRef.current?.dismiss();
+    initStoreCode(selectedStore.storeCode);
+    setStoreName(selectedStore.name);
+    setMode(mode);
     setIsAuthenticated(true);
-    // RootNavigator가 isAuthenticated=true를 감지해 MainTab(관리자)로 전환
+    // RootNavigator가 isAuthenticated=true를 감지해 MainTab으로 전환
+  };
+
+  const handleLockClient = () => {
+    sheetRef.current?.dismiss();
+    // 시트 닫힘 애니메이션과 겹치지 않게 약간 지연 후 PIN 설정
+    setTimeout(() => setPinVisible(true), 250);
+  };
+
+  const handlePinSet = async (pin: string) => {
+    setPinVisible(false);
+    if (!selectedStore) return;
+    await lockDeviceToClient(selectedStore.storeCode, selectedStore.name, pin);
+    initStoreCode(selectedStore.storeCode);
+    setStoreName(selectedStore.name);
+    setMode('client');
+    setIsAuthenticated(true);
   };
 
   const handleAddStore = async () => {
@@ -123,36 +147,19 @@ const SwitcherScreen = ({navigation}: any) => {
   };
 
   const handleLogout = async () => {
-    try {
-      await signOutOwner();
-    } catch {}
+    await signOutGoogle();
     setOwnerUid(null);
     setOwnerEmail(null);
-    navigation.reset({index: 0, routes: [{name: 'ModeSelection'}]});
-  };
-
-  const handleResendVerification = async () => {
-    try {
-      await resendVerificationEmail();
-      Alert.alert('인증메일 재발송', '메일함을 확인해주세요.');
-    } catch {
-      Alert.alert('발송 실패', '잠시 후 다시 시도해주세요.');
-    }
-  };
-
-  const handleCheckVerified = async () => {
-    const user = await reloadCurrentOwner();
-    if (user?.emailVerified) {
-      setEmailVerified(true);
-      Alert.alert('인증 완료', '이메일 인증이 완료됐어요.');
-    } else {
-      Alert.alert('아직 미완료', '메일의 인증 링크를 클릭한 뒤 다시 눌러주세요.');
-    }
+    navigation.reset({index: 0, routes: [{name: 'Login'}]});
   };
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.color.surface.normal.bg1} translucent={false} />
+      <StatusBar
+        barStyle="dark-content"
+        backgroundColor={theme.color.surface.normal.bg1}
+        translucent={false}
+      />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
           <View style={{flex: 1}}>
@@ -168,27 +175,13 @@ const SwitcherScreen = ({navigation}: any) => {
 
         {isLoading ? (
           <View style={styles.loading}>
-            <ActivityIndicator size="large" color={theme.color.surface.brand.primary} />
+            <ActivityIndicator
+              size="large"
+              color={theme.color.surface.brand.primary}
+            />
           </View>
         ) : (
           <ScrollView contentContainerStyle={styles.scrollContent}>
-            {/* 이메일 인증 넛지 */}
-            {!emailVerified && (
-              <View style={styles.verifyBanner}>
-                <Text style={styles.verifyText}>
-                  이메일 인증이 아직 완료되지 않았어요.
-                </Text>
-                <View style={styles.verifyActions}>
-                  <Pressable onPress={handleResendVerification}>
-                    <Text style={styles.verifyLink}>재발송</Text>
-                  </Pressable>
-                  <Pressable onPress={handleCheckVerified}>
-                    <Text style={styles.verifyLink}>인증 완료했어요</Text>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
             {stores.length === 0 ? (
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyTitle}>아직 연결된 매장이 없어요</Text>
@@ -199,7 +192,9 @@ const SwitcherScreen = ({navigation}: any) => {
                 <Pressable
                   style={styles.primaryBtn}
                   onPress={() => setClaimVisible(true)}>
-                  <Text style={styles.primaryBtnText}>전화번호로 기존 가게 연결</Text>
+                  <Text style={styles.primaryBtnText}>
+                    전화번호로 기존 가게 연결
+                  </Text>
                 </Pressable>
                 <Pressable style={styles.secondaryBtn} onPress={handleAddStore}>
                   <Text style={styles.secondaryBtnText}>새 가게 등록</Text>
@@ -249,7 +244,8 @@ const SwitcherScreen = ({navigation}: any) => {
             <Pressable style={styles.modalCard} onPress={() => {}}>
               <Text style={styles.modalTitle}>기존 가게 연결</Text>
               <Text style={styles.modalSubtitle}>
-                가게 등록 시 입력한 점주 연락처를 입력하면{'\n'}해당 가게가 계정에 연결돼요.
+                가게 등록 시 입력한 점주 연락처를 입력하면{'\n'}해당 가게가 계정에
+                연결돼요.
               </Text>
               <TextInput
                 style={styles.modalInput}
@@ -274,219 +270,216 @@ const SwitcherScreen = ({navigation}: any) => {
           </Pressable>
         </Modal>
       </SafeAreaView>
+
+      {/* 모드 선택 바텀시트 */}
+      <StoreModeSheet
+        ref={sheetRef}
+        store={selectedStore}
+        onSupervisor={() => enterMode('supervisor')}
+        onClient={() => enterMode('client')}
+        onLockClient={handleLockClient}
+      />
+
+      {/* 고객모드 고정 PIN 설정 */}
+      <PinPad
+        visible={pinVisible}
+        mode="set"
+        title="사용할 PIN을 설정해주세요"
+        subtitle="고객 모드에서 나올 때 이 PIN이 필요해요."
+        onSuccess={handlePinSet}
+        onCancel={() => setPinVisible(false)}
+      />
     </View>
   );
 };
 
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.color.surface.normal.container10,
-  },
-  safeArea: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.palette.gray[200],
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: theme.font.semibold,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  headerEmail: {
-    fontSize: 13,
-    fontFamily: theme.font.regular,
-    color: theme.color.texticon.onNormal.lowemp,
-    marginTop: 2,
-  },
-  logoutBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  logoutText: {
-    fontSize: 14,
-    fontFamily: theme.font.medium,
-    color: theme.color.texticon.onNormal.midemp,
-  },
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    padding: 20,
-    gap: 12,
-  },
-  verifyBanner: {
-    backgroundColor: theme.palette.blue[50],
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: theme.palette.blue[100],
-    padding: 14,
-    gap: 8,
-  },
-  verifyText: {
-    fontSize: 13,
-    fontFamily: theme.font.medium,
-    color: theme.palette.blue[700],
-  },
-  verifyActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  verifyLink: {
-    fontSize: 13,
-    fontFamily: theme.font.semibold,
-    color: theme.color.surface.brand.primary,
-  },
-  emptyBox: {
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: theme.palette.gray[200],
-    padding: 24,
-    alignItems: 'center',
-    gap: 10,
-    marginTop: 12,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontFamily: theme.font.semibold,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    fontFamily: theme.font.regular,
-    color: theme.color.texticon.onNormal.midemp,
-    textAlign: 'center',
-    lineHeight: 21,
-    marginBottom: 8,
-  },
-  slotRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-    marginBottom: 2,
-  },
-  slotText: {
-    fontSize: 14,
-    fontFamily: theme.font.semibold,
-    color: theme.color.texticon.onNormal.midemp,
-  },
-  claimLink: {
-    fontSize: 13,
-    fontFamily: theme.font.medium,
-    color: theme.color.surface.brand.primary,
-  },
-  storeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: theme.palette.gray[200],
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-  },
-  storeName: {
-    fontSize: 18,
-    fontFamily: theme.font.semibold,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  storeCode: {
-    fontSize: 13,
-    fontFamily: 'SFUIDisplay-Regular',
-    color: theme.color.texticon.onNormal.lowemp,
-    marginTop: 4,
-    letterSpacing: 1,
-  },
-  addBtn: {
-    height: 54,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.palette.gray[200],
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.color.surface.normal.bg1,
-    marginTop: 4,
-  },
-  addBtnText: {
-    fontSize: 15,
-    fontFamily: theme.font.medium,
-    color: theme.color.texticon.onNormal.midemp,
-  },
-  primaryBtn: {
-    height: 52,
-    width: '100%',
-    backgroundColor: theme.color.surface.brand.primary,
-    borderRadius: 14,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryBtnText: {
-    fontSize: 16,
-    fontFamily: theme.font.semibold,
-    color: theme.color.etc.absolute.white,
-  },
-  secondaryBtn: {
-    height: 52,
-    width: '100%',
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: theme.palette.gray[200],
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    fontSize: 15,
-    fontFamily: theme.font.medium,
-    color: theme.color.texticon.onNormal.highemp,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  modalCard: {
-    width: '100%',
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderRadius: 20,
-    padding: 24,
-    gap: 14,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontFamily: theme.font.semibold,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  modalSubtitle: {
-    fontSize: 14,
-    fontFamily: theme.font.regular,
-    color: theme.color.texticon.onNormal.midemp,
-    lineHeight: 21,
-  },
-  modalInput: {
-    height: 54,
-    backgroundColor: theme.color.surface.normal.container10,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    fontSize: 16,
-    fontFamily: theme.font.regular,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-});
+    container: {
+      flex: 1,
+      backgroundColor: theme.color.surface.normal.container10,
+    },
+    safeArea: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.palette.gray[200],
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    headerEmail: {
+      fontSize: 13,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
+      marginTop: 2,
+    },
+    logoutBtn: {
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+    },
+    logoutText: {
+      fontSize: 14,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.midemp,
+    },
+    loading: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scrollContent: {
+      padding: 20,
+      gap: 12,
+    },
+    emptyBox: {
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      padding: 24,
+      alignItems: 'center',
+      gap: 10,
+      marginTop: 12,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    emptySubtitle: {
+      fontSize: 14,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.midemp,
+      textAlign: 'center',
+      lineHeight: 21,
+      marginBottom: 8,
+    },
+    slotRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+      marginBottom: 2,
+    },
+    slotText: {
+      fontSize: 14,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.midemp,
+    },
+    claimLink: {
+      fontSize: 13,
+      fontFamily: theme.font.medium,
+      color: theme.color.surface.brand.primary,
+    },
+    storeCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      paddingVertical: 20,
+      paddingHorizontal: 20,
+    },
+    storeName: {
+      fontSize: 18,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    storeCode: {
+      fontSize: 13,
+      fontFamily: 'SFUIDisplay-Regular',
+      color: theme.color.texticon.onNormal.lowemp,
+      marginTop: 4,
+      letterSpacing: 1,
+    },
+    addBtn: {
+      height: 54,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.color.surface.normal.bg1,
+      marginTop: 4,
+    },
+    addBtnText: {
+      fontSize: 15,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.midemp,
+    },
+    primaryBtn: {
+      height: 52,
+      width: '100%',
+      backgroundColor: theme.color.surface.brand.primary,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    primaryBtnText: {
+      fontSize: 16,
+      fontFamily: theme.font.semibold,
+      color: theme.color.etc.absolute.white,
+    },
+    secondaryBtn: {
+      height: 52,
+      width: '100%',
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    secondaryBtnText: {
+      fontSize: 15,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.highemp,
+    },
+    modalBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 24,
+    },
+    modalCard: {
+      width: '100%',
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 20,
+      padding: 24,
+      gap: 14,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    modalSubtitle: {
+      fontSize: 14,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.midemp,
+      lineHeight: 21,
+    },
+    modalInput: {
+      height: 54,
+      backgroundColor: theme.color.surface.normal.container10,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      fontSize: 16,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+  });
 
 export default SwitcherScreen;

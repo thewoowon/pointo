@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useState} from 'react';
 import {
   Animated,
   Image,
@@ -13,7 +13,8 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
 import LottieView from 'lottie-react-native';
-import {useDeviceType} from '../../hooks';
+import {useAuth, useDeviceType} from '../../hooks';
+import PinPad from '../../components/PinPad';
 import {semanticColors as c, primitives as p, fontFamily as f} from '../../theme';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 import {
@@ -374,7 +375,27 @@ const IdleOverlay = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => {
 // ─── Main Screen ─────────────────────────────────────────────
 const NumberInputScreen = () => {
   const device = useDeviceType();
-  const ctx = useNumberInput();
+  const baseCtx = useNumberInput();
+  const {deviceLock, unlockDevice, setIsAuthenticated} = useAuth();
+  const [pinVisible, setPinVisible] = useState(false);
+
+  // 마찰완화 #3: 기기가 고객 전용으로 잠겨 있으면 로그아웃(관리자 복귀) 시 PIN 요구
+  const handleLogoutRequest = () => {
+    if (deviceLock.lockedStoreCode && deviceLock.pin) {
+      setPinVisible(true);
+    } else {
+      baseCtx.logout();
+    }
+  };
+
+  const handlePinSuccess = async () => {
+    setPinVisible(false);
+    await unlockDevice();
+    setIsAuthenticated(false);
+  };
+
+  // 레이아웃은 ctx.logout을 호출하므로, 잠금 인지형 핸들러로 교체해서 전달
+  const ctx = {...baseCtx, logout: handleLogoutRequest};
 
   return (
     <LinearGradient
@@ -393,6 +414,15 @@ const NumberInputScreen = () => {
           <PhoneLayout ctx={ctx} />
         )}
       </SafeAreaView>
+      <PinPad
+        visible={pinVisible}
+        mode="verify"
+        title="관리자 PIN을 입력해주세요"
+        subtitle="고객 모드를 해제하고 매장 관리로 돌아갑니다."
+        expectedPin={deviceLock.pin}
+        onSuccess={handlePinSuccess}
+        onCancel={() => setPinVisible(false)}
+      />
       <SignupModal ctx={ctx} />
       <Modal
         animationType="slide"

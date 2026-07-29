@@ -1,11 +1,6 @@
 export {
-  signUpWithEmail,
-  signInWithEmail,
-  signOutOwner,
-  getCurrentOwner,
-  reloadCurrentOwner,
-  resendVerificationEmail,
-  sendPasswordReset,
-  authErrorMessage,
-} from './auth';
-export type {AuthUser} from './auth';
+  configureGoogle,
+  signInWithGoogle,
+  signOutGoogle,
+} from './google';
+export type {GoogleAccount} from './google';

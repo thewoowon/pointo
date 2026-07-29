@@ -282,7 +282,7 @@ const MainScreen = ({navigation, route}: any) => {
                 {!isCompact && <Text style={styles.buttonText}>대시보드</Text>}
               </Pressable>
               <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={handleLogout}>
-                {!isCompact && <Text style={styles.buttonText}>로그아웃</Text>}
+                {!isCompact && <Text style={styles.buttonText}>내 매장</Text>}
                 <ProfileIcon width={isCompact ? 16 : 20} height={isCompact ? 16 : 20} />
               </Pressable>
             </View>

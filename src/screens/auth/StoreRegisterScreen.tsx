@@ -98,7 +98,7 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
     if (ownerUid) {
       navigation.navigate('Switcher');
     } else {
-      navigation.navigate('ModeSelection');
+      navigation.navigate('Login');
     }
   };
 

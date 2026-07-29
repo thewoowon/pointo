@@ -17,3 +17,4 @@ export {default as MagnifierIcon} from './MagnifierIcon';
 export {default as DownTriangleIcon} from './DownTriangleIcon';
 export {default as LeftBigArrowIcon} from './LeftBigArrowIcon';
 export {default as GearIcon} from './GearIcon';
+export {default as GoogleIcon} from './GoogleIcon';

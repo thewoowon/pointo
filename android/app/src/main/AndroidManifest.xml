@@ -21,6 +21,13 @@
             <action android:name="android.intent.action.MAIN" />
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
+        <!-- 구글 OAuth 콜백 (AOS 클라이언트 reversed client id) -->
+        <intent-filter>
+            <action android:name="android.intent.action.VIEW" />
+            <category android:name="android.intent.category.DEFAULT" />
+            <category android:name="android.intent.category.BROWSABLE" />
+            <data android:scheme="com.googleusercontent.apps.836272362687-205bupk7rrr34js29s32p6jlril4g800" />
+        </intent-filter>
       </activity>
     </application>
 </manifest>

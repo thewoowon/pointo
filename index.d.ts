@@ -1,6 +1,10 @@
 declare module '@env' {
   export const FIREBASE_API_KEY: string;
   export const API_URL: string;
+  export const GOOGLE_IOS_CLIENT_ID: string;
+  export const GOOGLE_IOS_URL_SCHEME: string;
+  export const GOOGLE_AOS_CLIENT_ID: string;
+  export const GOOGLE_SHA1: string;
 }
 
 declare module '*.svg' {
@@ -92,7 +96,7 @@ interface Store {
   ownerId?: string;
 }
 
-/** 이메일 계정으로 로그인하는 점주. Firestore `owners/{uid}` (uid = Firebase Auth uid) */
+/** 구글 계정으로 로그인하는 점주. Firestore `owners/{uid}` (uid = 구글 계정 고유 id) */
 interface Owner {
   email: string;
   createdAt: string;

@@ -16,6 +16,16 @@
 	<string>6.0</string>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<!-- 구글 OAuth 콜백 (iOS 클라이언트 reversed client id) -->
+				<string>com.googleusercontent.apps.836272362687-5ci0vt9g4a24lv5jiiehe33c80sok80o</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
