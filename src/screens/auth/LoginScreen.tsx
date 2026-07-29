@@ -12,13 +12,17 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {GoogleIcon} from '../../components/Icons';
-import {signInWithGoogle} from '../../services/auth';
+import {AppleIcon, GoogleIcon} from '../../components/Icons';
+import {
+  isAppleSignInSupported,
+  signInWithApple,
+  signInWithGoogle,
+} from '../../services/auth';
 
 type OwnerAccount = {uid: string; email: string};
 
 /** 로그인 제공자 식별 (로딩 스피너를 어느 버튼에 표시할지) */
-type Provider = 'google';
+type Provider = 'google' | 'apple';
 
 const LoginScreen = ({navigation}: any) => {
   const theme = useTheme();
@@ -29,6 +33,7 @@ const LoginScreen = ({navigation}: any) => {
 
   // 진행 중인 제공자(null이면 유휴). 어느 버튼에 스피너를 띄울지 결정한다.
   const [pending, setPending] = useState<Provider | null>(null);
+  const appleSupported = useMemo(() => isAppleSignInSupported(), []);
 
   // 이미 구글 로그인된 상태(예: '내 매장으로' 복귀)면 로그인 건너뛰고 스위처로
   useEffect(() => {
@@ -56,6 +61,23 @@ const LoginScreen = ({navigation}: any) => {
       Alert.alert(
         '로그인 실패',
         '구글 로그인에 실패했어요. 잠시 후 다시 시도해주세요.',
+      );
+    } finally {
+      setPending(null);
+    }
+  };
+
+  const handleApple = async () => {
+    setPending('apple');
+    try {
+      const account = await signInWithApple();
+      if (!account) return; // 사용자가 취소
+      await completeSignIn(account);
+    } catch (error) {
+      console.error('[login] apple sign-in failed:', error);
+      Alert.alert(
+        '로그인 실패',
+        'Apple 로그인에 실패했어요. 잠시 후 다시 시도해주세요.',
       );
     } finally {
       setPending(null);
@@ -98,6 +120,28 @@ const LoginScreen = ({navigation}: any) => {
             )}
           </Pressable>
 
+          {appleSupported && (
+            <Pressable
+              style={({pressed}) => [
+                styles.appleBtn,
+                {opacity: pending ? 0.9 : pressed ? 0.85 : 1},
+              ]}
+              onPress={handleApple}
+              disabled={pending !== null}>
+              {pending === 'apple' ? (
+                <ActivityIndicator color={theme.color.etc.absolute.white} />
+              ) : (
+                <>
+                  <AppleIcon
+                    width={20}
+                    height={20}
+                    color={theme.color.etc.absolute.white}
+                  />
+                  <Text style={styles.appleBtnText}>Apple로 계속하기</Text>
+                </>
+              )}
+            </Pressable>
+          )}
           <Text style={styles.legal}>
             로그인 시 서비스 이용약관 및 개인정보처리방침에 동의하게 됩니다.
           </Text>
@@ -157,6 +201,22 @@ const createStyles = (t: Theme) =>
       fontSize: 16,
       fontFamily: t.font.semibold,
       color: t.color.texticon.onNormal.highestemp,
+    },
+    appleBtn: {
+      width: '100%',
+      maxWidth: 420,
+      height: 56,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: t.spacing[3],
+      backgroundColor: t.color.etc.absolute.black,
+      borderRadius: t.radius.lg,
+    },
+    appleBtnText: {
+      fontSize: 16,
+      fontFamily: t.font.semibold,
+      color: t.color.etc.absolute.white,
     },
     legal: {
       width: '100%',
