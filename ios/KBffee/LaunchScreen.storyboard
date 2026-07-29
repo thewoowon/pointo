@@ -26,7 +26,7 @@
                             </imageView>
                         </subviews>
                         <viewLayoutGuide key="safeArea" id="Bcu-3y-fUS"/>
-                        <color key="backgroundColor" white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+                        <color key="backgroundColor" red="0.16078431372549018" green="0.45490196078431372" blue="1" alpha="1" colorSpace="calibratedRGB"/>
                         <constraints>
                             <constraint firstItem="paJ-pf-Xg0" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" constant="-62" id="csj-iy-XtD"/>
                             <constraint firstItem="paJ-pf-Xg0" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="oFb-dc-V9P"/>
@@ -39,6 +39,6 @@
         </scene>
     </scenes>
     <resources>
-        <image name="Logo" width="1743" height="496"/>
+        <image name="Logo" width="2020" height="512"/>
     </resources>
 </document>
