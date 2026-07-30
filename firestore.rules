@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ⚠️ 임시 규칙 — 이 앱은 아직 Firebase Auth를 도입하지 않아 클라이언트 요청을
+    //    인증으로 게이팅할 수 없다. 그래서 클라이언트가 실제로 쓰는 컬렉션만
+    //    명시적으로 개방(기존 test-mode 동작 유지, 무회귀)하고 나머지는 기본 거부한다.
+    //    이렇게 하면 (1) 서버 전용 컬렉션(ownerTokens) 노출 차단 (2) 2026-12-31
+    //    만료 폭탄 제거. 단, 개방 컬렉션은 여전히 무인증 접근이므로 추후 Firebase
+    //    Auth 도입 후 컬렉션별로 제대로 게이팅하는 보안 패스가 필요하다.
+
+    match /users/{doc=**}    { allow read, write: if true; }
+    match /terms/{doc=**}    { allow read, write: if true; }
+    match /stores/{doc=**}   { allow read, write: if true; }
+    match /sessions/{doc=**} { allow read, write: if true; }
+    match /logs/{doc=**}     { allow read, write: if true; }
+    match /owners/{doc=**}   { allow read, write: if true; }
+    // 점수 기능용 (현재 클라이언트 미사용, 향후 대비로 개방 유지)
+    match /ratings/{doc=**}  { allow read, write: if true; }
+
+    // 서버 전용 — Apple refresh token 저장소. 클라이언트 접근 전면 차단.
+    // (Functions는 Admin SDK로 규칙을 우회하므로 정상 동작)
+    match /ownerTokens/{uid} { allow read, write: if false; }
+
+    // 그 외 모든 경로: 기본 거부 (명시하지 않은 컬렉션은 클라이언트 접근 불가)
+  }
+}
