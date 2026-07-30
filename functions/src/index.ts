@@ -27,10 +27,12 @@ const APPLE_PRIVATE_KEY = defineSecret("APPLE_PRIVATE_KEY");
 
 /** .p8 키로 서명한 Apple client_secret(JWT) 생성. */
 function appleClientSecret(): string {
+  // Secret Manager에 저장 과정에서 개행이 escape(\n)될 수 있어 실제 개행으로 복원.
+  const privateKey = APPLE_PRIVATE_KEY.value().replace(/\\n/g, "\n");
   return appleSignin.getClientSecret({
     clientID: APPLE_CLIENT_ID.value(),
     teamID: APPLE_TEAM_ID.value(),
-    privateKey: APPLE_PRIVATE_KEY.value(),
+    privateKey,
     keyIdentifier: APPLE_KEY_ID.value(),
   });
 }

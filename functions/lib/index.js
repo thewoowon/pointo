@@ -61,10 +61,12 @@ const APPLE_KEY_ID = (0, params_1.defineSecret)("APPLE_KEY_ID");
 const APPLE_PRIVATE_KEY = (0, params_1.defineSecret)("APPLE_PRIVATE_KEY");
 /** .p8 키로 서명한 Apple client_secret(JWT) 생성. */
 function appleClientSecret() {
+    // Secret Manager에 저장 과정에서 개행이 escape(\n)될 수 있어 실제 개행으로 복원.
+    const privateKey = APPLE_PRIVATE_KEY.value().replace(/\\n/g, "\n");
     return apple_signin_auth_1.default.getClientSecret({
         clientID: APPLE_CLIENT_ID.value(),
         teamID: APPLE_TEAM_ID.value(),
-        privateKey: APPLE_PRIVATE_KEY.value(),
+        privateKey,
         keyIdentifier: APPLE_KEY_ID.value(),
     });
 }
