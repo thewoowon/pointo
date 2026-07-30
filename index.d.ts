@@ -110,6 +110,13 @@ interface Owner {
     productId?: string;
     expiresAt?: string;
   } | null;
+  /**
+   * 계정 상태. 'pending_deletion'이면 30일 유예 중 — 재로그인 시 매장 진입을 막고
+   * 복구/영구삭제만 노출한다. 없으면 'active'로 간주(레거시 호환).
+   */
+  accountStatus?: 'active' | 'pending_deletion';
+  /** 탈퇴 요청 시각(ISO). 스케줄 Function이 +30일 경과분을 hard delete. */
+  deletedAt?: string | null;
 }
 
 interface Log {

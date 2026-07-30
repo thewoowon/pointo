@@ -32,17 +32,42 @@ var __importStar = (this && this.__importStar) || (function () {
         return result;
     };
 })();
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.onStoreCreated = void 0;
+exports.purgeDeletedOwners = exports.registerAppleToken = exports.onStoreCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
+const scheduler_1 = require("firebase-functions/v2/scheduler");
+const https_1 = require("firebase-functions/v2/https");
 const firebase_functions_1 = require("firebase-functions");
 const app_1 = require("firebase-admin/app");
+const firestore_2 = require("firebase-admin/firestore");
 const nodemailer = __importStar(require("nodemailer"));
+const apple_signin_auth_1 = __importDefault(require("apple-signin-auth"));
 const params_1 = require("firebase-functions/params");
 (0, app_1.initializeApp)();
+const REGION = "asia-northeast3";
+/** 탈퇴 유예 기간(일). 이 기간이 지나면 스케줄러가 실삭제한다. */
+const GRACE_DAYS = 30;
 const ADMIN_EMAIL = "thewoowon@gmail.com";
 const gmailEmail = (0, params_1.defineString)("GMAIL_EMAIL");
 const gmailPassword = (0, params_1.defineString)("GMAIL_PASSWORD");
+// ─── Sign in with Apple 자격증명 (계정 삭제 시 토큰 revoke용) ──────────────
+// 네이티브 앱은 client_id = 앱 번들 식별자.
+const APPLE_CLIENT_ID = (0, params_1.defineString)("APPLE_CLIENT_ID");
+const APPLE_TEAM_ID = (0, params_1.defineSecret)("APPLE_TEAM_ID");
+const APPLE_KEY_ID = (0, params_1.defineSecret)("APPLE_KEY_ID");
+const APPLE_PRIVATE_KEY = (0, params_1.defineSecret)("APPLE_PRIVATE_KEY");
+/** .p8 키로 서명한 Apple client_secret(JWT) 생성. */
+function appleClientSecret() {
+    return apple_signin_auth_1.default.getClientSecret({
+        clientID: APPLE_CLIENT_ID.value(),
+        teamID: APPLE_TEAM_ID.value(),
+        privateKey: APPLE_PRIVATE_KEY.value(),
+        keyIdentifier: APPLE_KEY_ID.value(),
+    });
+}
 function getTransporter() {
     return nodemailer.createTransport({
         service: "gmail",
@@ -111,6 +136,123 @@ exports.onStoreCreated = (0, firestore_1.onDocumentCreated)({ document: "stores/
     }
     catch (error) {
         firebase_functions_1.logger.error("Failed to send email:", error);
+    }
+});
+// ─── 점주 계정 삭제 (Apple 토큰 저장 + 30일 유예 후 실삭제) ─────────────────
+/**
+ * Apple 로그인 직후 클라이언트가 호출. authorizationCode를 refresh token으로
+ * 교환해 ownerTokens/{uid}에 저장한다. (탈퇴 시점에 이 토큰으로 revoke)
+ * identityToken의 sub == uid 검증으로 계정 소유 확인.
+ */
+exports.registerAppleToken = (0, https_1.onRequest)({
+    region: REGION,
+    secrets: [APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY],
+    cors: true,
+}, async (req, res) => {
+    var _a;
+    try {
+        if (req.method !== "POST") {
+            res.status(405).send("Method Not Allowed");
+            return;
+        }
+        const { uid, authorizationCode, identityToken } = (_a = req.body) !== null && _a !== void 0 ? _a : {};
+        if (!uid || !authorizationCode || !identityToken) {
+            res.status(400).json({ error: "missing params" });
+            return;
+        }
+        // 신원 검증 — identityToken의 sub가 uid와 일치해야 함
+        const claims = await apple_signin_auth_1.default.verifyIdToken(identityToken, {
+            audience: APPLE_CLIENT_ID.value(),
+        });
+        if (claims.sub !== uid) {
+            res.status(403).json({ error: "uid mismatch" });
+            return;
+        }
+        const tokens = await apple_signin_auth_1.default.getAuthorizationToken(authorizationCode, {
+            clientID: APPLE_CLIENT_ID.value(),
+            clientSecret: appleClientSecret(),
+            // 네이티브 앱 code 교환은 redirect_uri가 없음 — 빈 값으로 전달
+            redirectUri: "",
+        });
+        if (!tokens.refresh_token) {
+            res.status(502).json({ error: "no refresh token" });
+            return;
+        }
+        await (0, firestore_2.getFirestore)().doc(`ownerTokens/${uid}`).set({
+            appleRefreshToken: tokens.refresh_token,
+            provider: "apple",
+            updatedAt: new Date().toISOString(),
+        }, { merge: true });
+        res.json({ ok: true });
+    }
+    catch (e) {
+        firebase_functions_1.logger.error("registerAppleToken failed:", e);
+        res.status(500).json({ error: "internal" });
+    }
+});
+/**
+ * 매일 실행. 탈퇴 유예(30일)가 지난 점주 계정을 실삭제한다.
+ *   1) Apple refresh token revoke
+ *   2) 소유 매장의 ownerId 해제 (매장·고객 데이터는 보존 — 재클레임 가능)
+ *   3) owners/{uid}, ownerTokens/{uid} 문서 삭제
+ */
+exports.purgeDeletedOwners = (0, scheduler_1.onSchedule)({
+    schedule: "every day 04:00",
+    timeZone: "Asia/Seoul",
+    region: REGION,
+    secrets: [APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY],
+}, async () => {
+    var _a, _b;
+    const db = (0, firestore_2.getFirestore)();
+    const cutoff = new Date(Date.now() - GRACE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    // 복합 인덱스 회피: accountStatus만 쿼리하고 deletedAt은 코드에서 필터
+    const snap = await db
+        .collection("owners")
+        .where("accountStatus", "==", "pending_deletion")
+        .get();
+    const due = snap.docs.filter((d) => { var _a; return ((_a = d.data().deletedAt) !== null && _a !== void 0 ? _a : "") <= cutoff; });
+    if (due.length === 0) {
+        firebase_functions_1.logger.info("purgeDeletedOwners: nothing due");
+        return;
+    }
+    for (const docSnap of due) {
+        const uid = docSnap.id;
+        const owner = docSnap.data();
+        try {
+            // 1) Apple 토큰 revoke
+            const tokRef = db.doc(`ownerTokens/${uid}`);
+            const tok = await tokRef.get();
+            const refreshToken = tok.exists ?
+                (_a = tok.data()) === null || _a === void 0 ? void 0 : _a.appleRefreshToken :
+                undefined;
+            if (refreshToken) {
+                await apple_signin_auth_1.default.revokeAuthorizationToken(refreshToken, {
+                    clientID: APPLE_CLIENT_ID.value(),
+                    clientSecret: appleClientSecret(),
+                    tokenTypeHint: "refresh_token",
+                });
+            }
+            // 2) 매장 소유 해제 (존재하지 않는 매장은 건너뜀)
+            const codes = (_b = owner === null || owner === void 0 ? void 0 : owner.storeCodes) !== null && _b !== void 0 ? _b : [];
+            for (const code of codes) {
+                try {
+                    await db.doc(`stores/${code}`).update({
+                        ownerId: firestore_2.FieldValue.delete(),
+                    });
+                }
+                catch (e) {
+                    firebase_functions_1.logger.warn(`unlink store ${code} failed:`, e);
+                }
+            }
+            // 3) 계정/토큰 문서 삭제
+            await docSnap.ref.delete();
+            if (tok.exists)
+                await tokRef.delete();
+            firebase_functions_1.logger.info(`purged owner ${uid} (unlinked ${codes.length} stores)`);
+        }
+        catch (e) {
+            firebase_functions_1.logger.error(`purge failed for owner ${uid}:`, e);
+        }
     }
 });
 //# sourceMappingURL=index.js.map

@@ -736,6 +736,40 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
+  /**
+   * 점주 계정 탈퇴 요청 — soft delete. 즉시 삭제하지 않고 30일 유예 상태로 표시한다.
+   * 실제 삭제(문서 제거 + Apple revoke + 매장 소유 해제)는 스케줄 Function이 담당.
+   * 성공 시 true.
+   */
+  async function requestAccountDeletion(uid: string): Promise<boolean> {
+    try {
+      const db = getFirestore();
+      await updateDoc(doc(db, 'owners', uid), {
+        accountStatus: 'pending_deletion',
+        deletedAt: new Date().toISOString(),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error requesting account deletion:', error);
+      return false;
+    }
+  }
+
+  /** 유예 기간 내 탈퇴 철회 — 계정을 다시 활성 상태로 되돌린다. 성공 시 true. */
+  async function restoreAccount(uid: string): Promise<boolean> {
+    try {
+      const db = getFirestore();
+      await updateDoc(doc(db, 'owners', uid), {
+        accountStatus: 'active',
+        deletedAt: null,
+      });
+      return true;
+    } catch (error) {
+      console.error('Error restoring account:', error);
+      return false;
+    }
+  }
+
   return {
     addUser,
     getUser,
@@ -765,6 +799,8 @@ const useFirestore = (storeCode?: string | null) => {
     getOwnerSlotInfo,
     linkStoreToOwner,
     getOwnerStores,
+    requestAccountDeletion,
+    restoreAccount,
   };
 };
 

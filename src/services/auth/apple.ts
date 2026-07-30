@@ -26,6 +26,12 @@ export type AppleAccount = {
   name?: string;
   photoUrl?: string;
   idToken?: string;
+  /**
+   * 서버가 refresh token으로 교환 → 계정 삭제 시 revoke에 사용.
+   * 최초 로그인에서 서버에 넘겨 저장해두면 탈퇴 시 재인증 없이 revoke 가능.
+   * 수명이 짧으므로(약 5분) 로그인 직후 즉시 서버로 보낸다.
+   */
+  authorizationCode?: string;
 };
 
 /* eslint-disable no-bitwise -- base64 디코딩은 비트 연산이 본질적으로 필요 */
@@ -73,6 +79,35 @@ const fullName = (name?: AppleRequestResponse['fullName']): string | undefined =
 export const isAppleSignInSupported = (): boolean =>
   Platform.OS === 'ios' && appleAuth.isSupported;
 
+/** registerAppleToken Function 엔드포인트 (asia-northeast3). */
+const APPLE_TOKEN_ENDPOINT =
+  'https://asia-northeast3-kbffee-a365e.cloudfunctions.net/registerAppleToken';
+
+/**
+ * 로그인 직후 authorizationCode를 서버로 보내 refresh token으로 교환·저장한다.
+ * (탈퇴 30일 후 실삭제 시 이 토큰으로 Apple 연결을 revoke)
+ * authorizationCode 수명이 짧으므로(약 5분) 로그인 직후 즉시 호출해야 한다.
+ * 실패해도 로그인 흐름은 막지 않는다 — 다음 로그인에서 갱신된다.
+ */
+export const registerAppleRefreshToken = async (
+  account: AppleAccount,
+): Promise<void> => {
+  if (!account.authorizationCode || !account.idToken) return;
+  try {
+    await fetch(APPLE_TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        uid: account.uid,
+        authorizationCode: account.authorizationCode,
+        identityToken: account.idToken,
+      }),
+    });
+  } catch (error) {
+    console.warn('[apple] refresh token 등록 실패:', error);
+  }
+};
+
 /** 애플 로그인. 취소 시 null, 성공 시 계정 정보 반환. 그 외 에러는 throw. */
 export const signInWithApple = async (): Promise<AppleAccount | null> => {
   if (!isAppleSignInSupported()) {
@@ -104,6 +139,7 @@ export const signInWithApple = async (): Promise<AppleAccount | null> => {
       email,
       name: fullName(response.fullName),
       idToken: response.identityToken ?? undefined,
+      authorizationCode: response.authorizationCode ?? undefined,
     };
   } catch (error) {
     const code =

@@ -17,7 +17,7 @@ import type {BottomSheetModal} from '@gorhom/bottom-sheet';
 import {useAuth, useFirestore, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 import {signOutGoogle} from '../../services/auth';
-import {ShortRightArrowIcon} from '../../components/Icons';
+import {ShortRightArrowIcon, GearIcon} from '../../components/Icons';
 import PinPad from '../../components/PinPad';
 import StoreModeSheet, {SheetStore} from './StoreModeSheet';
 
@@ -168,6 +168,12 @@ const SwitcherScreen = ({navigation}: any) => {
               <Text style={styles.headerEmail}>{ownerEmail}</Text>
             ) : null}
           </View>
+          <Pressable
+            style={styles.gearBtn}
+            onPress={() => navigation.navigate('AccountSettings')}
+            hitSlop={8}>
+            <GearIcon width={22} height={22} />
+          </Pressable>
           <Pressable style={styles.logoutBtn} onPress={handleLogout}>
             <Text style={styles.logoutText}>로그아웃</Text>
           </Pressable>
@@ -218,7 +224,6 @@ const SwitcherScreen = ({navigation}: any) => {
                     onPress={() => handleSelectStore(store)}>
                     <View style={{flex: 1}}>
                       <Text style={styles.storeName}>{store.name}</Text>
-                      <Text style={styles.storeCode}>코드 {store.storeCode}</Text>
                     </View>
                     <ShortRightArrowIcon width={20} height={20} />
                   </Pressable>
@@ -322,6 +327,9 @@ const createStyles = (theme: Theme) =>
       color: theme.color.texticon.onNormal.lowemp,
       marginTop: 2,
     },
+    gearBtn: {
+      padding: 6,
+    },
     logoutBtn: {
       paddingVertical: 6,
       paddingHorizontal: 12,
@@ -394,13 +402,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 18,
       fontFamily: theme.font.semibold,
       color: theme.color.texticon.onNormal.highestemp,
-    },
-    storeCode: {
-      fontSize: 13,
-      fontFamily: 'SFUIDisplay-Regular',
-      color: theme.color.texticon.onNormal.lowemp,
-      marginTop: 4,
-      letterSpacing: 1,
     },
     addBtn: {
       height: 54,
