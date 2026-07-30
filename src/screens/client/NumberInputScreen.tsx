@@ -149,7 +149,7 @@ const PhoneLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
         style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
         onPress={ctx.logout}>
         <ExitIcon width={14} height={14} color={c.texticon.onNormal.midemp} />
-        <Text style={s.footerLink}>로그아웃</Text>
+        <Text style={s.footerLink}>나가기</Text>
       </Pressable>
     </View>
   </View>

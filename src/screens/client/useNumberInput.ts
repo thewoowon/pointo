@@ -224,9 +224,9 @@ export function useNumberInput() {
   };
 
   const logout = () => {
-    Alert.alert('로그아웃', '고객 모드에서 로그아웃하시겠어요?', [
+    Alert.alert('나가기', '고객 모드를 종료할까요?', [
       {text: '취소', style: 'cancel'},
-      {text: '로그아웃', onPress: () => setIsAuthenticated(false)},
+      {text: '나가기', onPress: () => setIsAuthenticated(false)},
     ]);
   };
 

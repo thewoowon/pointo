@@ -108,7 +108,7 @@ const MainScreen = ({navigation, route}: any) => {
     }
 
     setIsAuthenticated(false);
-    initStoreCode('');
+    initStoreCode(null);
   };
 
   const handleSearch = () => {
