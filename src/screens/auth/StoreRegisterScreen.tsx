@@ -110,26 +110,22 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
             <Text style={styles.successEmoji}>🎉</Text>
             <Text style={styles.successTitle}>등록 완료</Text>
             <Text style={styles.successSubtitle}>
-              스토어가 개설되었어요.{'\n'}바로 로그인해서 사용할 수 있습니다.
-            </Text>
-
-            <View style={styles.codeBox}>
-              <Text style={styles.codeLabel}>스토어 코드</Text>
-              <Text style={styles.codeText}>{registeredCode}</Text>
-            </View>
-
-            <Text style={styles.noticeText}>
-              스토어 코드를 꼭 기억해주세요.{'\n'}관리자 로그인 시 필요합니다.
+              매장이 개설되었어요.{'\n'}내 매장에서 바로 시작할 수 있어요.
             </Text>
 
             <Pressable style={styles.confirmButton} onPress={handleGoHome}>
-              <Text style={styles.confirmButtonText}>홈으로 돌아가기</Text>
+              <Text style={styles.confirmButtonText}>바로 시작하기</Text>
             </Pressable>
           </View>
         </SafeAreaView>
       </View>
     );
   }
+
+  // 두 필드가 모두 채워져야 등록 버튼 활성화
+  const fieldsFilled =
+    storeName.trim().length > 0 && ownerPhone.trim().length > 0;
+  const canSubmit = fieldsFilled && !isLoading;
 
   // 등록 폼 화면
   return (
@@ -147,7 +143,8 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={{flex: 1}}>
           <ScrollView
-            contentContainerStyle={{flexGrow: 1, paddingBottom: theme.spacing[10]}}
+            style={{flex: 1}}
+            contentContainerStyle={{flexGrow: 1, paddingBottom: theme.spacing[6]}}
             keyboardShouldPersistTaps="handled">
             <View style={styles.innerContainer}>
               <View style={styles.formSection}>
@@ -181,20 +178,28 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
                   maxLength={13}
                 />
               </View>
-
-              <Pressable
-                style={({pressed}) => [
-                  styles.confirmButton,
-                  {opacity: isLoading || pressed ? 0.7 : 1},
-                ]}
-                onPress={handleRegister}
-                disabled={isLoading}>
-                <Text style={styles.confirmButtonText}>
-                  {isLoading ? '등록 중...' : '가게 등록하기'}
-                </Text>
-              </Pressable>
             </View>
           </ScrollView>
+
+          {/* 하단 고정 CTA — 키보드가 올라오면 KAV가 이 footer를 함께 밀어올린다 */}
+          <View style={styles.footer}>
+            <Pressable
+              style={({pressed}) => [
+                styles.confirmButton,
+                !fieldsFilled && styles.confirmButtonDisabled,
+                fieldsFilled && (isLoading || pressed) && {opacity: 0.7},
+              ]}
+              onPress={handleRegister}
+              disabled={!canSubmit}>
+              <Text
+                style={[
+                  styles.confirmButtonText,
+                  !fieldsFilled && styles.confirmButtonTextDisabled,
+                ]}>
+                {isLoading ? '등록 중...' : '가게 등록하기'}
+              </Text>
+            </Pressable>
+          </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
@@ -275,13 +280,18 @@ const createStyles = (t: Theme) =>
       color: t.color.texticon.onNormal.highestemp,
       backgroundColor: t.color.surface.normal.bg1,
     },
+    footer: {
+      paddingHorizontal: t.spacing[8],
+      paddingTop: t.spacing[3],
+      paddingBottom: t.spacing[4],
+      backgroundColor: t.color.surface.normal.container10,
+    },
     confirmButton: {
       justifyContent: 'center',
       alignItems: 'center',
       height: 60,
       backgroundColor: t.color.surface.brand.primary,
-      borderRadius: t.radius.lg,
-      marginTop: t.spacing[2],
+      borderRadius: t.radius.sm,
       shadowColor: t.color.surface.brand.primary,
       shadowOffset: {width: 0, height: 4},
       shadowOpacity: 0.4,
@@ -289,10 +299,19 @@ const createStyles = (t: Theme) =>
       elevation: 6,
       paddingHorizontal: t.spacing[5],
     },
+    // 필드 미입력 시: 브랜드 컬러·그림자 제거하고 중립 회색으로
+    confirmButtonDisabled: {
+      backgroundColor: '#E2E8F0',
+      shadowOpacity: 0,
+      elevation: 0,
+    },
     confirmButtonText: {
       fontSize: 18,
       fontFamily: t.font.semibold,
       color: t.color.texticon.onBrand.onPrimary,
+    },
+    confirmButtonTextDisabled: {
+      color: '#94A3B8',
     },
     // 완료 화면
     successContainer: {
@@ -316,42 +335,6 @@ const createStyles = (t: Theme) =>
       color: t.color.texticon.onNormal.midemp,
       textAlign: 'center',
       lineHeight: 28,
-    },
-    codeBox: {
-      alignItems: 'center',
-      backgroundColor: t.color.surface.normal.bg1,
-      borderRadius: t.radius.xl,
-      borderWidth: 1.5,
-      borderColor: t.palette.gray[200],
-      paddingVertical: t.spacing[6],
-      paddingHorizontal: t.spacing[10],
-      gap: t.spacing[2],
-      marginTop: t.spacing[2],
-      marginBottom: t.spacing[2],
-      shadowColor: t.color.etc.absolute.black,
-      shadowOffset: {width: 0, height: 4},
-      shadowOpacity: 0.1,
-      shadowRadius: 16,
-      elevation: 4,
-    },
-    codeLabel: {
-      fontSize: 14,
-      fontFamily: t.font.regular,
-      color: t.color.texticon.onNormal.midemp,
-      letterSpacing: 1,
-    },
-    codeText: {
-      fontSize: 44,
-      fontFamily: 'SFUIDisplay-Medium',
-      color: t.color.texticon.onNormal.highestemp,
-      letterSpacing: 6,
-    },
-    noticeText: {
-      fontSize: 15,
-      fontFamily: t.font.regular,
-      color: t.color.texticon.onNormal.midemp,
-      textAlign: 'center',
-      lineHeight: 24,
     },
   });
 
