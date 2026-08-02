@@ -309,7 +309,7 @@ const createStyles = (theme: Theme) =>
     topBtn: {width: 24, height: 24, justifyContent: 'center', alignItems: 'center'},
     title: {
       textAlign: 'center',
-      fontFamily: theme.font.bold,
+      fontFamily: theme.font.semibold,
       fontSize: 20,
       lineHeight: 30,
       letterSpacing: -0.5,
