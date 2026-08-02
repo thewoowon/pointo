@@ -1,5 +1,6 @@
-import React from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
+  Animated,
   Pressable,
   ScrollView,
   StatusBar,
@@ -8,560 +9,284 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useDeviceType} from '../../hooks';
-import {semanticColors as c, primitives as p, fontFamily as f} from '../../theme';
+import {useLayoutMode} from '../../hooks';
+import {
+  semanticColors as c,
+  primitives as p,
+  fontFamily as f,
+} from '../../theme';
 import {LeftArrowIcon} from '../../components/Icons';
-import {AnimatedBall, SnowflakeEffect} from '../../components/decorations';
 import {StampNearOverlay, CouponEarnedOverlay} from '../../components/overlay';
-import LinearGradient from 'react-native-linear-gradient';
+import {STAMP_ICONS} from '../../components/decorations';
 import {useDashboard} from './useDashboard';
 
-const SUMMER_COLORS = {
-  backgroundStart: p.blue[50],
-  backgroundEnd: p.blue[100],
-  accent: c.surface.brand.primary,
-  primary: c.texticon.onNormal.highestemp,
-  waveBlue: p.blue[300],
-  sandCream: p.amber[50],
-};
-
-const BALL_POSITIONS: {
-  position: {top?: number; left?: number; right?: number; bottom?: number};
-  color: string;
-  size: number;
-  zIndex: number;
-}[] = [
-  {position: {bottom: -11, left: -55}, color: p.yellow[400], size: 171, zIndex: 1},
-  {position: {bottom: -128, left: 45}, color: p.blue[300], size: 171, zIndex: 6},
-  {position: {bottom: -42, left: 177}, color: p.orange[400], size: 171, zIndex: 5},
-  {position: {bottom: -59, right: 78}, color: p.green[100], size: 171, zIndex: 3},
-  {position: {bottom: -34, right: -36}, color: p.yellow[400], size: 171, zIndex: 4},
-  {position: {bottom: 98, left: -48}, color: p.blue[200], size: 171, zIndex: 6},
-  {position: {bottom: 13, left: 67}, color: p.orange[400], size: 171, zIndex: 13},
-  {position: {bottom: 70, left: 210}, color: p.blue[100], size: 171, zIndex: 2},
-  {position: {bottom: 78, right: 36}, color: p.yellow[400], size: 171, zIndex: 7},
-  {position: {bottom: 191, left: -42}, color: p.blue[300], size: 171, zIndex: 4},
-  {position: {bottom: 160, left: 103}, color: p.green[100], size: 171, zIndex: 5},
-  {position: {bottom: 192, right: 62}, color: p.orange[400], size: 171, zIndex: 1},
-  {position: {bottom: 160, right: -57}, color: p.blue[200], size: 171, zIndex: 6},
-  {position: {bottom: 287, left: -53}, color: p.yellow[400], size: 171, zIndex: 3},
-  {position: {bottom: 262, left: 61}, color: p.blue[300], size: 171, zIndex: 2},
-  {position: {bottom: 279, left: 167}, color: p.orange[400], size: 171, zIndex: 3},
-  {position: {bottom: 334, left: 278}, color: p.blue[100], size: 171, zIndex: 13},
-  {position: {bottom: 300, right: -38}, color: p.green[100], size: 171, zIndex: 5},
-  {position: {top: 144, left: -5}, color: p.yellow[400], size: 171, zIndex: 5},
-  {position: {top: 172, left: 135}, color: p.blue[200], size: 171, zIndex: 1},
-  {position: {top: 204, right: -31}, color: p.blue[300], size: 171, zIndex: 5},
-];
+const BRAND = c.surface.brand.primary;
+const WHITE = c.etc.absolute.white;
 
 type DashboardViewProps = {
   phoneNumber: string;
   onClose: () => void;
 };
 
-// --- Stamp Card ---
-const StampCard = ({
-  user,
-  isPointMode,
-  storeConfig,
-  compact,
+// i로부터 결정론적 유사난수(0~1). 지터/회전/크기 변주에 사용 — 매 렌더 동일.
+const hash = (n: number) => {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+  return x - Math.floor(x);
+};
+
+// 해바라기 나선의 황금각(≈137.5°). 중심에서 바깥으로 고르게 퍼지는 핵심.
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+
+/**
+ * 스탬프 아이콘을 카드 하단 중심에서 바깥으로 퍼지듯(center-out) 채우는 장식 필드.
+ * 단일 원(ring)이 아니라 phyllotaxis(해바라기 나선) 분포라, 스탬프 수(capacity)가
+ * 적으면 중앙에 뭉치고 많으면 카드를 꽉 채운다 — 가운데가 비어 보이지 않음.
+ * 적립 수(filled)만큼만 중심→제자리로 stagger bloom 시킨다.
+ */
+const HeroStampField = ({
+  filled,
+  capacity,
+  topInset,
 }: {
-  user: User | null;
-  isPointMode: boolean;
-  storeConfig: any;
-  compact?: boolean;
+  filled: number;
+  capacity: number;
+  /** 전경 콘텐츠 높이 — 필드를 이만큼 아래로 내려 텍스트와 겹치지 않게 */
+  topInset: number;
 }) => {
-  const cardHeight = compact ? 320 : 734;
-  const stampFontSize = compact ? 56 : 76;
-  const stampLineHeight = compact ? 66 : 86;
-  const unitFontSize = compact ? 20 : 28;
-  const labelFontSize = compact ? 16 : 20;
-  const padding = compact ? 24 : 37;
+  const [box, setBox] = useState({w: 0, h: 0});
+  // capacity개의 애니메이션 값을 안정적으로 유지 (참조 고정)
+  const animsRef = useRef<Animated.Value[]>([]);
+  if (animsRef.current.length !== capacity) {
+    animsRef.current = Array.from(
+      {length: Math.max(capacity, 0)},
+      (_, i) => animsRef.current[i] ?? new Animated.Value(0),
+    );
+  }
+
+  const shown = Math.min(Math.max(filled, 0), capacity);
+
+  useEffect(() => {
+    if (box.w === 0 || shown === 0) return;
+    const anims = animsRef.current.slice(0, shown);
+    anims.forEach(v => v.setValue(0));
+    const seq = anims.map(v =>
+      Animated.spring(v, {
+        toValue: 1,
+        useNativeDriver: true,
+        friction: 7,
+        tension: 55,
+      }),
+    );
+    // 55ms씩 어긋나게 시작해 "중심에서 퍼져나가는" 인상을 준다.
+    Animated.stagger(55, seq).start();
+  }, [shown, box.w, box.h]);
+
+  if (capacity <= 0) return null;
+
+  // box는 topInset 아래의 하단 영역. 그 영역의 중심에서 바깥으로 채운다.
+  const cx = box.w / 2;
+  const cy = box.h / 2;
+  // 개수가 많을수록 아이콘을 작게 (겹침 방지)
+  const baseSize = Math.max(26, Math.min(50, 150 / Math.sqrt(capacity)));
+  // 채움 비율 — 1.0이면 영역 가장자리까지, >1이면 살짝 잘리며 꽉 참
+  const FILL = 1.05;
 
   return (
     <View
-      style={[
-        styles.flexColumnBox,
-        {
-          borderTopLeftRadius: 32,
-          borderTopRightRadius: 32,
-          width: compact ? '100%' : 533,
-          height: compact ? cardHeight : cardHeight,
-          backgroundColor: c.surface.normal.bg1,
-          shadowColor: c.etc.absolute.black,
-          shadowOffset: {width: 0, height: 4.5},
-          shadowOpacity: 0.07,
-          shadowRadius: 22,
-          elevation: 6,
-          position: 'relative',
-        },
-      ]}>
-      <View
-        style={{
-          flex: 1,
-          paddingTop: compact ? 28 : 59,
-          paddingLeft: padding,
-          paddingRight: padding,
-          paddingBottom: compact ? 16 : 28,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-        }}>
-        <View
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'row',
-            justifyContent: 'flex-start',
-            alignItems: 'center',
-          }}>
-          <Text
-            style={[
-              styles.labelSubText,
-              {color: SUMMER_COLORS.primary, fontSize: labelFontSize},
-            ]}>
-            {isPointMode ? '현재 보유 포인트' : '현재 보유 스탬프'}
-          </Text>
-        </View>
-        <View
-          style={{
-            width: '100%',
-            display: 'flex',
-            flexDirection: 'row',
-            justifyContent: 'flex-end',
-            alignItems: 'baseline',
-            gap: 18,
-            zIndex: 100,
-          }}>
-          {isPointMode ? (
-            <>
-              <Text
-                style={[
-                  styles.stampLeftText,
-                  {fontSize: stampFontSize, lineHeight: stampLineHeight},
-                ]}>
-                {user ? user.stamps.toLocaleString() : 0}
-              </Text>
-              <Text style={[styles.stampRightText, {fontSize: unitFontSize}]}>
-                {storeConfig.pointUnit}
-              </Text>
-            </>
-          ) : (
-            <>
-              <Text
-                style={[
-                  styles.stampLeftText,
-                  {fontSize: stampFontSize, lineHeight: stampLineHeight},
-                ]}>
-                {user ? user.stamps % storeConfig.stampsPerCoupon : 0}
-              </Text>
-              <Text style={[styles.stampRightText, {fontSize: unitFontSize}]}>
-                /{storeConfig.stampsPerCoupon}개
-              </Text>
-            </>
-          )}
-        </View>
-      </View>
-      <View
-        style={{
-          position: 'absolute',
-          width: '100%',
-          height: '100%',
-          overflow: 'hidden',
-        }}>
-        {!isPointMode &&
-          BALL_POSITIONS.slice(
-            0,
-            (user?.stamps ?? 0) % storeConfig.stampsPerCoupon,
-          ).map((ball, index) => (
-            <AnimatedBall key={index} index={index} ball={ball} />
-          ))}
-      </View>
+      style={[s.heroIconLayer, {top: topInset}]}
+      pointerEvents="none"
+      onLayout={e => {
+        const {width, height} = e.nativeEvent.layout;
+        setBox(prev =>
+          prev.w === width && prev.h === height ? prev : {w: width, h: height},
+        );
+      }}>
+      {box.w > 0 &&
+        Array.from({length: shown}).map((_, i) => {
+          const Icon = STAMP_ICONS[i % STAMP_ICONS.length];
+          const angle = i * GOLDEN_ANGLE + (hash(i + 100) - 0.5) * 0.5;
+          // capacity로 정규화한 반지름(0~1) → 개수 대비 항상 알맞게 퍼짐
+          const rNorm = Math.min(
+            Math.sqrt(i + 0.5) / Math.sqrt(capacity) + (hash(i) - 0.5) * 0.1,
+            1.05,
+          );
+          // 영역 종횡비에 맞춘 타원형 채움 — 가로로 넓은 하단을 꽉 채운다
+          const tx = cx + rNorm * (box.w / 2) * FILL * Math.cos(angle);
+          const ty = cy + rNorm * (box.h / 2) * FILL * Math.sin(angle);
+          const rot = (hash(i + 200) - 0.5) * 36;
+          const size = baseSize * (0.85 + hash(i + 300) * 0.3);
+          const v = animsRef.current[i];
+          return (
+            <Animated.View
+              key={i}
+              style={{
+                position: 'absolute',
+                left: tx - size / 2,
+                top: ty - size / 2,
+                opacity: v.interpolate({
+                  inputRange: [0, 0.4, 1],
+                  outputRange: [0, 0.9, 0.9],
+                }),
+                transform: [
+                  {
+                    translateX: v.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [cx - tx, 0],
+                    }),
+                  },
+                  {
+                    translateY: v.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [cy - ty, 0],
+                    }),
+                  },
+                  {
+                    scale: v.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0.2, 1],
+                    }),
+                  },
+                  {rotate: `${rot}deg`},
+                ],
+              }}>
+              <Icon size={size} color={WHITE} />
+            </Animated.View>
+          );
+        })}
     </View>
   );
 };
 
-// --- Change Summary Banner ---
-const ChangeBanner = ({
-  changeSummary,
-  isPointMode,
-  storeConfig,
+// ─── Blue hero card ──────────────────────────────────────────
+const HeroCard = ({
+  d,
+  expanded,
 }: {
-  changeSummary: {type: 'earn' | 'use'; amount: number; unit: string} | null;
-  isPointMode: boolean;
-  storeConfig: any;
+  d: ReturnType<typeof useDashboard>;
+  expanded: boolean;
 }) => {
-  if (!changeSummary) return null;
-
-  const label = isPointMode
-    ? changeSummary.type === 'earn'
-      ? '적립'
-      : '사용'
-    : changeSummary.type === 'earn'
-    ? '스탬프 적립'
-    : '쿠폰 사용';
+  const {user, isPointMode, storeConfig, levelInfo} = d;
+  const last4 = d.phoneNumber ? d.phoneNumber.slice(-4) : '';
+  const filled = user ? user.stamps % storeConfig.stampsPerCoupon : 0;
+  const numFont = expanded ? 64 : 52;
+  const numLine = expanded ? 72 : 60;
+  // 전경 텍스트 높이 — 아이콘 필드를 이 아래로 밀어내기 위해 측정
+  const [contentH, setContentH] = useState(0);
 
   return (
-    <View style={phoneSt.changeBanner}>
-      <Text style={phoneSt.changeBannerText}>
-        <Text
-          style={[
-            phoneSt.changeBannerText,
-            {color: SUMMER_COLORS.accent, fontFamily: f.semibold},
-          ]}>
-          {isPointMode
-            ? `${changeSummary.amount.toLocaleString()}${changeSummary.unit}`
-            : `${label} ${changeSummary.amount}${changeSummary.unit}`}
-        </Text>
-        {changeSummary.type === 'earn' ? ' 적립되었습니다' : ' 사용되었습니다'}
-      </Text>
-    </View>
-  );
-};
-
-// --- Phone Layout ---
-const PhoneLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
-  return (
-    <ScrollView
-      style={{flex: 1, paddingHorizontal: 20, paddingVertical: 20}}
-      contentContainerStyle={phoneSt.scrollContent}
-      showsVerticalScrollIndicator={false}>
-      {/* Header: back + timer */}
-      <View style={phoneSt.header}>
-        <Pressable style={phoneSt.backButton} onPress={d.goBack}>
-          <LeftArrowIcon color={SUMMER_COLORS.primary} />
-          <Text style={phoneSt.backText}>뒤로가기</Text>
-        </Pressable>
-        {d.timeLeft < 15 && (
-          <Text style={phoneSt.timerText}>
-            <Text
-              style={[phoneSt.timerText, {fontFamily: f.semibold}]}>
-              {d.timeLeft}
-            </Text>
-            초
-          </Text>
-        )}
-      </View>
-
-      {/* User Info */}
-      <View style={phoneSt.userInfo}>
-        {d.levelInfo && d.user && (
-          <View
-            style={[
-              phoneSt.levelBadge,
-              {backgroundColor: d.levelInfo.bgColor},
-            ]}>
-            <Text style={{fontSize: 14}}>{d.levelInfo.emoji}</Text>
-            <Text style={[phoneSt.levelName, {color: d.levelInfo.color}]}>
-              {d.levelInfo.name}
-            </Text>
-            <Text style={[phoneSt.levelNum, {color: d.levelInfo.color}]}>
-              Lv.{d.user.level}
-            </Text>
-          </View>
-        )}
-        <Text style={phoneSt.welcomeText}>
-          <Text
-            style={[
-              phoneSt.welcomeText,
-              {color: SUMMER_COLORS.accent, fontFamily: 'SFUIDisplay-Semibold'},
-            ]}>
-            {d.phoneNumberLabel()}
-          </Text>
-          {' 님 반갑습니다.'}
-        </Text>
-        <Text style={phoneSt.visitText}>{d.lastVisitMessage}</Text>
-      </View>
-
-      {/* Change summary */}
-      {d.hasChange && (
-        <ChangeBanner
-          changeSummary={d.changeSummary}
-          isPointMode={d.isPointMode}
-          storeConfig={d.storeConfig}
+    <View style={[s.hero, expanded && s.heroExpanded]}>
+      {/* 배경 아이콘 채움 (스탬프 모드) — 콘텐츠 아래에서 바깥으로 퍼지며 bloom */}
+      {!isPointMode && (
+        <HeroStampField
+          filled={filled}
+          capacity={storeConfig.stampsPerCoupon}
+          topInset={contentH}
         />
       )}
 
-      {/* Stamp Card */}
-      <StampCard
-        user={d.user}
-        isPointMode={d.isPointMode}
-        storeConfig={d.storeConfig}
-        compact
-      />
-
-      {/* Point/Coupon Info */}
-      <View style={phoneSt.infoSection}>
-        {d.isPointMode
-          ? d.user && (
-              <View style={phoneSt.infoCard}>
-                <Text style={phoneSt.infoTitle}>💰 보유 포인트</Text>
-                <Text style={phoneSt.infoBody}>
-                  {d.user.stamps.toLocaleString()}
-                  {d.storeConfig.pointUnit} 사용 가능
-                </Text>
-              </View>
-            )
-          : d.availableCoupons.map((c: any) => (
-              <View key={c.id} style={phoneSt.infoCard}>
-                <Text style={phoneSt.infoTitle}>
-                  🎫 {c.name} {c.count}장 무료로 사용 가능해요!
-                </Text>
-                <Text style={phoneSt.infoBody}>
-                  {c.expiry
-                    ? `${c.expiry}까지 사용 가능`
-                    : `스탬프 ${d.storeConfig.stampsPerCoupon}개 소진`}
-                </Text>
-              </View>
-            ))}
-      </View>
-
-      {/* Timer banner at bottom */}
-      <View style={phoneSt.timerBanner}>
-        <Text style={phoneSt.timerBannerText}>
-          <Text
-            style={[
-              phoneSt.timerBannerText,
-              {fontFamily: f.semibold},
-            ]}>
-            {d.timeLeft}
-          </Text>
-          초 후 화면이 종료됩니다
-        </Text>
-      </View>
-    </ScrollView>
-  );
-};
-
-// --- Tablet Layout ---
-const TabletLayout = ({d}: {d: ReturnType<typeof useDashboard>}) => {
-  return (
-    <View style={[styles.flexRowBox]}>
+      {/* 전경 콘텐츠 */}
       <View
-        style={[
-          {display: 'flex', flexDirection: 'row', justifyContent: 'center'},
-          {gap: 60},
-        ]}>
-        {/* Left Panel */}
-        {d.hasChange ? (
-          <View
-            style={[
-              styles.flexColumnBox,
-              {
-                height: '100%',
-                gap: 39,
-                width: 340,
-                alignItems: 'flex-start',
-                justifyContent: 'flex-start',
-                paddingTop: 134,
-                paddingBottom: 134,
-              },
-            ]}>
-            <View style={styles.labelBox}>
-              {(() => {
-                if (!d.changeSummary) return null;
-                if (d.isPointMode) {
-                  return (
-                    <>
-                      <Text style={styles.labelTitleText}>
-                        <Text
-                          style={[
-                            styles.labelTitleText,
-                            {color: SUMMER_COLORS.accent},
-                          ]}>
-                          {d.changeSummary.amount.toLocaleString()}
-                          {d.changeSummary.unit}
-                        </Text>
-                        이
-                      </Text>
-                      <Text style={styles.labelTitleText}>
-                        {d.changeSummary.type === 'earn'
-                          ? '적립되었습니다.'
-                          : '사용되었습니다.'}
-                      </Text>
-                    </>
-                  );
-                }
-                return (
-                  <>
-                    <Text style={styles.labelTitleText}>
-                      <Text
-                        style={[
-                          styles.labelTitleText,
-                          {color: SUMMER_COLORS.accent},
-                        ]}>
-                        {d.changeSummary.type === 'earn'
-                          ? `스탬프 ${d.changeSummary.amount}개`
-                          : `쿠폰 ${d.changeSummary.amount}장`}
-                      </Text>
-                      {d.changeSummary.type === 'earn' ? '가' : '이'}
-                    </Text>
-                    <Text style={styles.labelTitleText}>
-                      {d.changeSummary.type === 'earn'
-                        ? '적립되었습니다.'
-                        : '사용되었습니다.'}
-                    </Text>
-                  </>
-                );
-              })()}
+        style={s.heroContent}
+        onLayout={e => {
+          // 카드 패딩 오프셋 포함한 콘텐츠 실제 하단 + 여백
+          const {y, height} = e.nativeEvent.layout;
+          setContentH(y + height + 8);
+        }}>
+        <View style={s.heroTopRow}>
+          <Text style={s.heroGreeting}>
+            <Text style={s.heroGreetingName}>{last4}</Text>님 안녕하세요
+          </Text>
+          {levelInfo && user && (
+            <View style={s.levelPill}>
+              <Text style={{fontSize: 12}}>{levelInfo.emoji}</Text>
+              <Text style={s.levelPillText}>{levelInfo.name}</Text>
+              <Text style={s.levelPillLv}>Lv.{user.level}</Text>
             </View>
-            <View style={styles.labelBox}>
-              <Text
-                style={[styles.labelTitleText, {color: SUMMER_COLORS.accent}]}>
-                감사합니다
-              </Text>
-              <Text style={styles.labelSubText}>
-                <Text
-                  style={[
-                    styles.labelSubText,
-                    {width: 24, fontFamily: f.semibold},
-                  ]}>
-                  {d.timeLeft}
-                </Text>{' '}
-                초 후 화면이 종료됩니다
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View
-            style={[
-              styles.flexColumnBox,
-              {
-                height: '100%',
-                gap: 58,
-                width: 340,
-                alignItems: 'flex-start',
-                justifyContent: 'flex-start',
-                paddingTop: 134,
-                paddingBottom: 134,
-              },
-            ]}>
-            <Pressable style={[styles.flexBox, {gap: 7}]} onPress={d.goBack}>
-              <LeftArrowIcon color={SUMMER_COLORS.primary} />
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontFamily: f.regular,
-                  color: SUMMER_COLORS.primary,
-                  lineHeight: 28,
-                  letterSpacing: -1,
-                }}>
-                뒤로가기
-              </Text>
-            </Pressable>
-            <View style={styles.labelBox}>
-              {d.levelInfo && d.user && (
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    backgroundColor: d.levelInfo.bgColor,
-                    borderRadius: 20,
-                    paddingHorizontal: 14,
-                    paddingVertical: 6,
-                    alignSelf: 'flex-start',
-                    gap: 6,
-                    marginBottom: 4,
-                  }}>
-                  <Text style={{fontSize: 16}}>{d.levelInfo.emoji}</Text>
-                  <Text
-                    style={{
-                      fontFamily: f.semibold,
-                      fontSize: 14,
-                      color: d.levelInfo.color,
-                      letterSpacing: -0.3,
-                    }}>
-                    {d.levelInfo.name}
-                  </Text>
-                  <Text
-                    style={{
-                      fontFamily: f.regular,
-                      fontSize: 12,
-                      color: d.levelInfo.color,
-                      opacity: 0.7,
-                    }}>
-                    Lv.{d.user.level}
-                  </Text>
-                </View>
-              )}
-              <Text style={styles.labelSubText}>
-                <Text
-                  style={[
-                    styles.labelSubText,
-                    {
-                      color: SUMMER_COLORS.accent,
-                      fontFamily: 'SFUIDisplay-Semibold',
-                    },
-                  ]}>
-                  {d.phoneNumberLabel()}
-                </Text>
-                {' 님 반갑습니다.'}
-              </Text>
-              <Text style={styles.labelTitleText}>{d.lastVisitMessage}</Text>
-              {d.timeLeft < 10 && (
-                <Text>
-                  <Text
-                    style={[
-                      styles.labelSubText,
-                      {width: 24, fontFamily: f.semibold},
-                    ]}>
-                    {d.timeLeft}
-                  </Text>{' '}
-                  초 후 화면이 종료됩니다
-                </Text>
-              )}
-            </View>
-            <View style={styles.beverageWrapper}>
-              {d.isPointMode
-                ? d.user && (
-                    <View style={styles.beverageBox}>
-                      <View>
-                        <Text style={styles.beverageTitleText}>
-                          💰 보유 포인트
-                        </Text>
-                        <Text style={styles.beverageBodyText}>
-                          {d.user.stamps.toLocaleString()}
-                          {d.storeConfig.pointUnit} 사용 가능
-                        </Text>
-                      </View>
-                    </View>
-                  )
-                : d.availableCoupons.map((c: any) => (
-                    <View key={c.id} style={styles.beverageBox}>
-                      <View>
-                        <Text style={styles.beverageTitleText}>
-                          🎫 {c.name} {c.count}장 무료로 사용 가능해요!
-                        </Text>
-                        <Text style={styles.beverageBodyText}>
-                          {c.expiry
-                            ? `${c.expiry}까지 사용 가능`
-                            : `스탬프 ${d.storeConfig.stampsPerCoupon}개 소진`}
-                        </Text>
-                      </View>
-                    </View>
-                  ))}
-            </View>
-          </View>
-        )}
-
-        {/* Right: Stamp Card */}
-        <View
-          style={[
-            styles.flexColumnBox,
-            {justifyContent: 'flex-end'},
-          ]}>
-          <StampCard
-            user={d.user}
-            isPointMode={d.isPointMode}
-            storeConfig={d.storeConfig}
-          />
+          )}
         </View>
+
+        {isPointMode ? (
+          <>
+            <Text style={s.heroLabel}>현재 보유 포인트</Text>
+            <View style={s.heroValueRow}>
+              <Text
+                style={[
+                  s.heroNumber,
+                  {fontSize: numFont, lineHeight: numLine},
+                ]}>
+                {user ? user.stamps.toLocaleString() : 0}
+              </Text>
+              <Text style={s.heroUnit}>{storeConfig.pointUnit}</Text>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={s.heroLabel}>다음 무료 쿠폰까지</Text>
+            <View style={s.heroValueRow}>
+              <Text
+                style={[
+                  s.heroNumber,
+                  {fontSize: numFont, lineHeight: numLine},
+                ]}>
+                {filled}
+              </Text>
+              <Text style={s.heroUnit}>/ {storeConfig.stampsPerCoupon}개</Text>
+            </View>
+          </>
+        )}
       </View>
     </View>
   );
 };
 
-// --- Overlay ---
+// ─── Available coupons / point ───────────────────────────────
+const RewardSection = ({d}: {d: ReturnType<typeof useDashboard>}) => {
+  if (d.isPointMode) {
+    if (!d.user) return null;
+    return (
+      <View style={s.rewardSection}>
+        <Text style={s.rewardTitle}>사용 가능 포인트</Text>
+        <View style={s.rewardCard}>
+          <Text style={s.rewardName}>💰 보유 포인트</Text>
+          <Text style={s.rewardMeta}>
+            {d.user.stamps.toLocaleString()}
+            {d.storeConfig.pointUnit} 사용 가능
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  const coupons = d.availableCoupons;
+  return (
+    <View style={s.rewardSection}>
+      <Text style={s.rewardTitle}>사용 가능한 쿠폰</Text>
+      {coupons.length > 0 ? (
+        coupons.map((coupon: any) => (
+          <View key={coupon.id} style={s.rewardCard}>
+            <Text style={s.rewardName}>
+              🎫 {coupon.name}
+              <Text style={s.rewardCount}> {coupon.count}장</Text>
+            </Text>
+            <Text style={s.rewardMeta}>
+              {coupon.expiry
+                ? `${coupon.expiry}까지 사용 가능`
+                : '무료로 사용 가능해요'}
+            </Text>
+          </View>
+        ))
+      ) : (
+        <View style={[s.rewardCard, s.rewardEmpty]}>
+          <Text style={s.rewardEmptyText}>
+            조금만 더 모으면 무료 쿠폰이 나와요
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// ─── Overlay (적립 순간 연출) ─────────────────────────────────
 const OverlayRenderer = ({
   context,
   getCouponName,
@@ -572,24 +297,27 @@ const OverlayRenderer = ({
   dismissOverlay: () => void;
 }) => {
   const couponName = getCouponName(context.type);
-
   if (context.dStamp === 'one') {
     return (
       <StampNearOverlay
         show={context.show}
         remaining={1}
         couponName={couponName}
+        onDismiss={dismissOverlay}
       />
     );
-  } else if (context.dStamp === 'two') {
+  }
+  if (context.dStamp === 'two') {
     return (
       <StampNearOverlay
         show={context.show}
         remaining={2}
         couponName={couponName}
+        onDismiss={dismissOverlay}
       />
     );
-  } else if (context.dStamp === 'coupon') {
+  }
+  if (context.dStamp === 'coupon') {
     return (
       <CouponEarnedOverlay
         show={context.show}
@@ -601,246 +329,271 @@ const OverlayRenderer = ({
   return null;
 };
 
-// --- Main Component ---
+// 적립/사용 헤드라인 — 관리자가 실제로 적립했을 때(변화)만 노출
+const buildHeadline = (d: ReturnType<typeof useDashboard>): string | null => {
+  const cs = d.changeSummary;
+  if (!cs) return null;
+  if (d.isPointMode) {
+    const amt = `${cs.amount.toLocaleString()}${cs.unit}`;
+    return cs.type === 'earn'
+      ? `${amt} 적립되었습니다`
+      : `${amt} 사용되었습니다`;
+  }
+  return cs.type === 'earn'
+    ? `스탬프 ${cs.amount}개가 적립되었습니다`
+    : `쿠폰 ${cs.amount}장을 사용했습니다`;
+};
+
+// ─── Main ────────────────────────────────────────────────────
 const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
-  const deviceType = useDeviceType();
+  const {isExpanded} = useLayoutMode();
   const d = useDashboard(phoneNumber, onClose);
+  const headline = buildHeadline(d);
 
   return (
-    <LinearGradient
-      colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
-      style={styles.container}>
+    <View style={s.root}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor={SUMMER_COLORS.backgroundStart}
+        backgroundColor={c.surface.normal.bg1}
         translucent={false}
       />
-      <SafeAreaView style={styles.backgroundStyle}>
-        <SnowflakeEffect count={25} />
-        {deviceType === 'phone' ? (
-          <PhoneLayout d={d} />
-        ) : (
-          <TabletLayout d={d} />
-        )}
+      <SafeAreaView style={{flex: 1}}>
+        {/* Header bar: 뒤로가기 + 카운트다운 */}
+        <View style={s.headerBar}>
+          <Pressable style={s.backButton} onPress={d.goBack} hitSlop={8}>
+            <LeftArrowIcon color={c.texticon.onNormal.highestemp} />
+            <Text style={s.backText}>뒤로가기</Text>
+          </Pressable>
+          {d.timeLeft < 15 && (
+            <View style={s.timerChip}>
+              <Text style={s.timerChipText}>
+                <Text style={s.timerChipNum}>{d.timeLeft}</Text>초
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <ScrollView
+          style={{flex: 1}}
+          contentContainerStyle={[s.content, isExpanded && s.contentExpanded]}
+          showsVerticalScrollIndicator={false}>
+          {/* Top chrome: 상호명 + (조건부) 적립 헤드라인 */}
+          <View style={s.topChrome}>
+            {d.storeName ? (
+              <Text style={s.storeName}>{d.storeName}</Text>
+            ) : null}
+            {headline && (
+              <Text style={[s.headline, {fontSize: isExpanded ? 24 : 20}]}>
+                {headline}
+              </Text>
+            )}
+          </View>
+
+          {/* Blue hero card */}
+          <HeroCard d={d} expanded={isExpanded} />
+
+          {/* 사용 가능한 쿠폰 / 포인트 */}
+          <RewardSection d={d} />
+
+          {/* Bottom timer */}
+          <View style={s.bottomTimer}>
+            <Text style={s.bottomTimerText}>
+              <Text style={s.bottomTimerNum}>{d.timeLeft}</Text>초 후 화면이
+              종료됩니다
+            </Text>
+          </View>
+        </ScrollView>
       </SafeAreaView>
+
       <OverlayRenderer
         context={d.overlayContext}
         getCouponName={d.getCouponName}
         dismissOverlay={d.dismissOverlay}
       />
-    </LinearGradient>
+    </View>
   );
 };
 
-// --- Shared Styles ---
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  backgroundStyle: {
-    flex: 1,
-  },
-  flexBox: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  flexRowBox: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'flex-end',
-  },
-  flexColumnBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  labelBox: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    gap: 5,
-  },
-  labelTitleText: {
-    fontSize: 32,
-    fontFamily: f.medium,
-    lineHeight: 45,
-    letterSpacing: -1,
-    color: SUMMER_COLORS.primary,
-  },
-  labelSubText: {
-    fontSize: 20,
-    fontFamily: f.regular,
-    lineHeight: 28,
-    letterSpacing: -1,
-    color: c.texticon.onNormal.highemp,
-  },
-  stampLeftText: {
-    fontSize: 76,
-    fontFamily: f.medium,
-    lineHeight: 86,
-    letterSpacing: -1,
-    color: SUMMER_COLORS.accent,
-  },
-  stampRightText: {
-    fontSize: 28,
-    fontFamily: f.medium,
-    lineHeight: 38,
-    letterSpacing: -1,
-  },
-  beverageWrapper: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-    gap: 12,
-    marginTop: 40,
-  },
-  beverageBox: {
-    width: '100%',
-    height: 98,
-    backgroundColor: p.blue[50],
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 16,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  beverageTitleText: {
-    fontSize: 20,
-    lineHeight: 28,
-    fontFamily: f.medium,
-    color: SUMMER_COLORS.primary,
-    letterSpacing: -1,
-  },
-  beverageBodyText: {
-    fontSize: 16,
-    lineHeight: 26,
-    fontFamily: f.regular,
-    color: c.texticon.onNormal.highemp,
-    letterSpacing: -1,
-  },
-});
+// ─── Styles ──────────────────────────────────────────────────
+const s = StyleSheet.create({
+  root: {flex: 1, backgroundColor: c.surface.normal.bg1},
 
-// --- Phone Styles ---
-const phoneSt = StyleSheet.create({
-  scrollContent: {
-    gap: 20,
-  },
-  header: {
+  // Header bar
+  headerBar: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 7,
-  },
+  backButton: {flexDirection: 'row', alignItems: 'center', gap: 6},
   backText: {
     fontSize: 16,
     fontFamily: f.regular,
-    color: SUMMER_COLORS.primary,
+    color: c.texticon.onNormal.highestemp,
     letterSpacing: -0.5,
   },
-  timerText: {
-    fontSize: 14,
+  timerChip: {
+    backgroundColor: p.gray[100],
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  timerChipText: {
+    fontSize: 13,
     fontFamily: f.regular,
     color: c.texticon.onNormal.midemp,
   },
-  userInfo: {
-    gap: 6,
+  timerChipNum: {fontFamily: f.semibold, color: c.texticon.onNormal.highemp},
+
+  // Content
+  content: {
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 32,
+    gap: 24,
   },
-  levelBadge: {
+  contentExpanded: {maxWidth: 480},
+
+  // Top chrome
+  topChrome: {alignItems: 'center', gap: 10},
+  storeName: {
+    fontSize: 15,
+    fontFamily: f.medium,
+    color: c.texticon.onNormal.lowemp,
+    letterSpacing: -0.3,
+    textAlign: 'center',
+  },
+  headline: {
+    fontFamily: f.bold,
+    color: c.texticon.onNormal.highestemp,
+    letterSpacing: -0.8,
+    lineHeight: 38,
+    textAlign: 'center',
+  },
+
+  // Hero card
+  hero: {
+    width: '100%',
+    minHeight: 493,
+    borderRadius: 28,
+    backgroundColor: BRAND,
+    paddingHorizontal: 26,
+    paddingVertical: 32,
+    overflow: 'hidden',
+    shadowColor: BRAND,
+    shadowOffset: {width: 0, height: 8},
+    shadowOpacity: 0.28,
+    shadowRadius: 24,
+    elevation: 6,
+  },
+  heroExpanded: {minHeight: 493, padding: 36},
+  heroIconLayer: {position: 'absolute', top: 0, left: 0, right: 0, bottom: 0},
+  heroContent: {gap: 6},
+  heroTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 8,
+  },
+  heroGreeting: {
+    fontSize: 16,
+    fontFamily: f.medium,
+    color: 'rgba(255,255,255,0.85)',
+    letterSpacing: -0.5,
+  },
+  heroGreetingName: {fontFamily: 'SFUIDisplay-Semibold', color: WHITE},
+  levelPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    alignSelf: 'flex-start',
     gap: 4,
-    marginBottom: 2,
   },
-  levelName: {
+  levelPillText: {
     fontFamily: f.semibold,
     fontSize: 12,
+    color: WHITE,
     letterSpacing: -0.3,
   },
-  levelNum: {
+  levelPillLv: {
     fontFamily: f.regular,
-    fontSize: 10,
-    opacity: 0.7,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.75)',
   },
-  welcomeText: {
-    fontSize: 16,
+  heroLabel: {
+    marginTop: 6,
+    fontSize: 15,
     fontFamily: f.regular,
-    lineHeight: 24,
+    color: 'rgba(255,255,255,0.8)',
+    letterSpacing: -0.3,
+  },
+  heroValueRow: {flexDirection: 'row', alignItems: 'baseline', gap: 10},
+  heroNumber: {
+    fontFamily: 'SFUIDisplay-Semibold',
+    color: WHITE,
+    letterSpacing: -2,
+    fontVariant: ['tabular-nums'],
+  },
+  heroUnit: {
+    fontSize: 22,
+    fontFamily: f.medium,
+    color: 'rgba(255,255,255,0.9)',
     letterSpacing: -0.5,
+  },
+
+  // Reward section
+  rewardSection: {gap: 10},
+  rewardTitle: {
+    fontSize: 15,
+    fontFamily: f.semibold,
     color: c.texticon.onNormal.highemp,
-  },
-  visitText: {
-    fontSize: 24,
-    fontFamily: f.medium,
-    lineHeight: 34,
-    letterSpacing: -1,
-    color: SUMMER_COLORS.primary,
-  },
-  changeBanner: {
-    backgroundColor: p.blue[50],
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderWidth: 1,
-    borderColor: p.blue[100],
-  },
-  changeBannerText: {
-    fontSize: 16,
-    fontFamily: f.regular,
-    color: SUMMER_COLORS.primary,
-    lineHeight: 24,
     letterSpacing: -0.5,
+    marginLeft: 2,
   },
-  infoSection: {
-    gap: 10,
-  },
-  infoCard: {
+  rewardCard: {
     backgroundColor: p.blue[50],
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 14,
-    gap: 2,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    borderRadius: 16,
+    gap: 4,
   },
-  infoTitle: {
+  rewardName: {
     fontSize: 16,
     lineHeight: 24,
     fontFamily: f.medium,
-    color: SUMMER_COLORS.primary,
+    color: c.texticon.onNormal.highestemp,
     letterSpacing: -0.5,
   },
-  infoBody: {
+  rewardCount: {color: BRAND, fontFamily: f.semibold},
+  rewardMeta: {
     fontSize: 13,
     lineHeight: 20,
     fontFamily: f.regular,
-    color: c.texticon.onNormal.highemp,
-    letterSpacing: -0.5,
+    color: c.texticon.onNormal.midemp,
+    letterSpacing: -0.3,
   },
-  timerBanner: {
-    alignItems: 'center',
-    paddingVertical: 8,
+  rewardEmpty: {backgroundColor: p.gray[100], alignItems: 'center'},
+  rewardEmptyText: {
+    fontSize: 14,
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.midemp,
+    letterSpacing: -0.3,
   },
-  timerBannerText: {
+
+  // Bottom timer
+  bottomTimer: {alignItems: 'center', paddingVertical: 4},
+  bottomTimerText: {
     fontSize: 14,
     fontFamily: f.regular,
     color: c.texticon.onNormal.midemp,
   },
+  bottomTimerNum: {fontFamily: f.semibold, color: c.texticon.onNormal.highemp},
 });
 
 export default DashboardView;

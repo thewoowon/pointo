@@ -29,7 +29,7 @@ const LoginScreen = ({navigation}: any) => {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const {ownerUid, setOwnerUid, setOwnerEmail} = useAuth();
+  const {ownerUid, setOwnerUid, setOwnerEmail, setOwnerProvider} = useAuth();
   const {ensureOwnerProfile, getOwnerProfile} = useFirestore();
 
   // 진행 중인 제공자(null이면 유휴). 어느 버튼에 스피너를 띄울지 결정한다.
@@ -61,10 +61,11 @@ const LoginScreen = ({navigation}: any) => {
    * 구글·애플 공통 후처리: 프로필 보장 → 세션 세팅.
    * 실제 화면 이동은 ownerUid 변경을 감지하는 위 useEffect가 상태에 맞춰 처리한다.
    */
-  const completeSignIn = async (account: OwnerAccount) => {
+  const completeSignIn = async (account: OwnerAccount, provider: Provider) => {
     await ensureOwnerProfile(account.uid, account.email);
     setOwnerUid(account.uid);
     setOwnerEmail(account.email);
+    setOwnerProvider(provider);
   };
 
   const handleGoogle = async () => {
@@ -72,7 +73,7 @@ const LoginScreen = ({navigation}: any) => {
     try {
       const account = await signInWithGoogle();
       if (!account) return; // 사용자가 취소
-      await completeSignIn(account);
+      await completeSignIn(account, 'google');
     } catch (error) {
       console.error('[login] google sign-in failed:', error);
       Alert.alert(
@@ -91,7 +92,7 @@ const LoginScreen = ({navigation}: any) => {
       if (!account) return; // 사용자가 취소
       // 탈퇴 시 revoke용 refresh token 저장 (실패해도 로그인은 진행 — 비차단)
       void registerAppleRefreshToken(account);
-      await completeSignIn(account);
+      await completeSignIn(account, 'apple');
     } catch (error) {
       console.error('[login] apple sign-in failed:', error);
       Alert.alert(

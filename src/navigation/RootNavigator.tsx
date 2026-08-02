@@ -15,9 +15,7 @@ const RootNavigator = () => {
     );
   }
 
-  const initialTab = mode === 'supervisor' ? 'Supervisor' : 'Client';
-
-  return isAuthenticated ? <MainTab key={initialTab} initialTab={initialTab} /> : <AuthStack />;
+  return isAuthenticated ? <MainTab mode={mode} /> : <AuthStack />;
 };
 
 export default RootNavigator;

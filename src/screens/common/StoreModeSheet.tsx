@@ -7,7 +7,11 @@ import {
 } from '@gorhom/bottom-sheet';
 import {useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {StatisticIcon, ProfileIcon} from '../../components/Icons';
+import {
+  StatisticIcon,
+  ProfileIcon,
+  RightChevronIcon,
+} from '../../components/Icons';
 
 export type SheetStore = {storeCode: string; name: string};
 
@@ -50,23 +54,33 @@ const StoreModeSheet = forwardRef<BottomSheetModal, Props>(
           <Text style={styles.prompt}>어떤 모드로 열까요?</Text>
 
           <Pressable style={styles.row} onPress={onSupervisor}>
-            <View style={styles.iconWrap}>
-              <StatisticIcon width={24} height={24} />
+            <View style={styles.rowWrap}>
+              <View style={styles.iconWrapBlue}>
+                <StatisticIcon
+                  width={24}
+                  height={24}
+                  color={theme.color.texticon.onNormal.primary}
+                />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>관리자 모드</Text>
+                <Text style={styles.rowSub}>매장 관리 · 통계 · 설정</Text>
+              </View>
             </View>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>관리자 모드</Text>
-              <Text style={styles.rowSub}>매장 관리 · 통계 · 설정</Text>
-            </View>
+            <RightChevronIcon />
           </Pressable>
 
           <Pressable style={styles.row} onPress={onClient}>
-            <View style={styles.iconWrap}>
-              <ProfileIcon width={24} height={24} />
+            <View style={styles.rowWrap}>
+              <View style={styles.iconWrapEmber}>
+                <ProfileIcon width={24} height={24} color={'#F97316'} />
+              </View>
+              <View style={styles.rowText}>
+                <Text style={styles.rowTitle}>고객 모드</Text>
+                <Text style={styles.rowSub}>적립 · 쿠폰 사용 (카운터용)</Text>
+              </View>
             </View>
-            <View style={styles.rowText}>
-              <Text style={styles.rowTitle}>고객 모드</Text>
-              <Text style={styles.rowSub}>적립 · 쿠폰 사용 (카운터용)</Text>
-            </View>
+            <RightChevronIcon />
           </Pressable>
 
           <View style={styles.divider} />
@@ -97,16 +111,17 @@ const createStyles = (t: Theme) =>
       paddingBottom: t.spacing[8],
     },
     storeName: {
-      fontSize: 22,
+      fontSize: 14,
+      lineHeight: 24,
       fontFamily: t.font.semibold,
-      color: t.color.texticon.onNormal.highestemp,
+      color: t.color.texticon.onNormal.primary,
       marginTop: t.spacing[1],
     },
     prompt: {
-      fontSize: 14,
-      fontFamily: t.font.regular,
-      color: t.color.texticon.onNormal.midemp,
-      marginTop: t.spacing[1],
+      fontSize: 20,
+      fontFamily: t.font.bold,
+      color: t.color.texticon.onNormal.highemp,
+      lineHeight: 28,
       marginBottom: t.spacing[4],
     },
     row: {
@@ -114,30 +129,45 @@ const createStyles = (t: Theme) =>
       alignItems: 'center',
       gap: t.spacing[4],
       backgroundColor: t.color.surface.normal.container10,
-      borderRadius: t.radius.lg,
+      borderRadius: t.radius.md,
       paddingVertical: t.spacing[4],
       paddingHorizontal: t.spacing[4],
-      marginBottom: t.spacing[3],
+      marginBottom: t.spacing[2.5],
     },
-    iconWrap: {
+    rowWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: t.spacing[3.5],
+      flex: 1,
+    },
+    iconWrapBlue: {
       width: 44,
       height: 44,
       borderRadius: 12,
-      backgroundColor: t.color.surface.normal.bg1,
+      backgroundColor: '#D9E9FF',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    iconWrapEmber: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: '#FFEDD5',
       justifyContent: 'center',
       alignItems: 'center',
     },
     rowText: {
       flex: 1,
-      gap: 2,
     },
     rowTitle: {
-      fontSize: 17,
+      fontSize: 16,
+      lineHeight: 24,
       fontFamily: t.font.semibold,
-      color: t.color.texticon.onNormal.highestemp,
+      color: t.color.texticon.onNormal.highemp,
     },
     rowSub: {
-      fontSize: 13,
+      fontSize: 12,
+      lineHeight: 19,
       fontFamily: t.font.regular,
       color: t.color.texticon.onNormal.midemp,
     },

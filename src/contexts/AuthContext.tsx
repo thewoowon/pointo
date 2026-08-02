@@ -4,13 +4,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const AUTH_STORAGE_KEY = '@pointo_auth';
 const DEVICE_STORAGE_KEY = '@pointo_device';
 
+/** 점주가 로그인한 소셜 제공자 */
+export type OwnerProvider = 'google' | 'apple';
+
 type AuthSession = {
   storeCode: string;
   storeName: string | null;
   mode: 'supervisor' | 'client';
-  // 구글 계정 식별자
+  // 점주 계정 식별자
   ownerUid?: string | null;
   ownerEmail?: string | null;
+  ownerProvider?: OwnerProvider | null;
 };
 
 /**
@@ -41,6 +45,8 @@ type AuthContextType = {
   setOwnerUid: React.Dispatch<React.SetStateAction<string | null>>;
   ownerEmail: string | null;
   setOwnerEmail: React.Dispatch<React.SetStateAction<string | null>>;
+  ownerProvider: OwnerProvider | null;
+  setOwnerProvider: React.Dispatch<React.SetStateAction<OwnerProvider | null>>;
   // 기기 고객모드 잠금 (마찰완화)
   deviceLock: DeviceConfig;
   /** 이 기기를 고객 모드로 고정 + PIN 설정 */
@@ -73,6 +79,9 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   const [storeName, setStoreName] = useState<string | null>(null);
   const [ownerUid, setOwnerUid] = useState<string | null>(null);
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [ownerProvider, setOwnerProvider] = useState<OwnerProvider | null>(
+    null,
+  );
   const [deviceLock, setDeviceLock] = useState<DeviceConfig>(EMPTY_DEVICE_LOCK);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -116,6 +125,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         setMode(session.mode);
         setOwnerUid(session.ownerUid ?? null);
         setOwnerEmail(session.ownerEmail ?? null);
+        setOwnerProvider(session.ownerProvider ?? null);
         setIsAuthenticated(true);
       }
     } catch {
@@ -163,7 +173,14 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated && storeCode) {
-      persistSession({storeCode, storeName, mode, ownerUid, ownerEmail});
+      persistSession({
+        storeCode,
+        storeName,
+        mode,
+        ownerUid,
+        ownerEmail,
+        ownerProvider,
+      });
     } else if (!isAuthenticated) {
       persistSession(null);
     }
@@ -174,6 +191,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     mode,
     ownerUid,
     ownerEmail,
+    ownerProvider,
     isLoading,
     persistSession,
   ]);
@@ -194,6 +212,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         setOwnerUid,
         ownerEmail,
         setOwnerEmail,
+        ownerProvider,
+        setOwnerProvider,
         deviceLock,
         lockDeviceToClient,
         unlockDevice,

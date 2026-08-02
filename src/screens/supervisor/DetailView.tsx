@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useMemo} from 'react';
 import {
   Pressable,
   ScrollView,
@@ -6,31 +6,10 @@ import {
   StyleSheet,
   Text,
   View,
-  Alert,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {
-  useAuth,
-  useFirestore,
-  useAnalytics,
-  useStoreConfig,
-  useLayoutMode,
-  useTheme,
-} from '../../hooks';
+import {useLayoutMode, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {
-  doc,
-  getFirestore,
-  onSnapshot,
-  Timestamp,
-} from '@react-native-firebase/firestore';
-import {useFocusEffect} from '@react-navigation/native';
-import dayjs from 'dayjs';
-import {
-  AnalyticsEvent,
-  hashPhone,
-  getTierFromLevel,
-} from '../../analytics/events';
 import {
   CircleMinusIcon,
   CirclePlusIcon,
@@ -39,16 +18,8 @@ import {
   RefreshIcon,
 } from '../../components/Icons';
 import LinearGradient from 'react-native-linear-gradient';
-import {confirm} from '../../utils/alert';
-import {
-  normalizeUser,
-  flattenCouponsForFirestore,
-  makeUserContext,
-  totalSelected,
-  addCouponTimestamp,
-  removeCouponTimestamps,
-  filterExpiredCoupons,
-} from '../../utils/coupons';
+import {totalSelected} from '../../utils/coupons';
+import {useGivePoint} from './useGivePoint';
 
 const NUMBER_SEQUENCE = [
   [1, 2, 3],
@@ -57,7 +28,6 @@ const NUMBER_SEQUENCE = [
 ];
 
 const DetailView = ({
-  navigation,
   phoneNumber,
   updateLogs,
 }: {
@@ -69,490 +39,25 @@ const DetailView = ({
   const {isCompact} = useLayoutMode();
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const {storeCode} = useAuth();
-  const storeConfig = useStoreConfig(storeCode);
-  const {track} = useAnalytics();
-  const [mode, setMode] = useState<'earn' | 'use'>('earn');
-  const [number, setNumber] = useState('');
-  const [user, setUser] = useState<User>({
-    last_used: '',
-    level: 0,
-    stamps: 0,
-    phase: storeConfig.couponSequence[0] ?? 'americano',
-    coupons: {},
-    hasRated: false,
-  });
-
-  const [userContext, setUserContext] = useState<UserContext>({
-    selectedCoupon: {},
-    possibleCoupons: {},
-  });
-
-  const {updateUser, updateSession, addLog, resolveUserDocId} =
-    useFirestore(storeCode);
-
-  const isPointMode = storeConfig.mode === 'point';
-
-  const handleApprovePoint = async () => {
-    if (number.length === 0) {
-      Alert.alert('적립할 포인트를 입력해주세요', '다시 입력해주세요.');
-      return;
-    }
-    const pointValue = parseInt(number, 10);
-    if (isNaN(pointValue) || pointValue < 1) {
-      Alert.alert('적립할 포인트를 1 이상 입력해주세요', '다시 입력해주세요.');
-      return;
-    }
-
-    const newStamps = user.stamps + pointValue;
-    await updateUser(phoneNumber, {
-      stamps: newStamps,
-      last_used: new Date().toISOString().split('T')[0],
-    });
-
-    addLog({
-      action: 'stamp_saved',
-      phone_number: phoneNumber,
-      stamp: pointValue,
-      timestamp: Timestamp.now(),
-      note: `${pointValue.toLocaleString()}${storeConfig.pointUnit} 적립`,
-      store_code: storeCode ?? undefined,
-      user_level: user.level,
-    });
-
-    try {
-      const userId = hashPhone(phoneNumber);
-      const daysSinceSignup = user.created_at
-        ? dayjs().diff(dayjs(user.created_at), 'day')
-        : 0;
-      track(AnalyticsEvent.STAMP_EARNED, {
-        store_code: storeCode,
-        user_id: userId,
-        user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
-        user_level: user.level,
-        stamps_total: newStamps,
-        days_since_signup: daysSinceSignup,
-        stamp_count: pointValue,
-      });
-    } catch (error) {
-      console.log('Error logging point earned event:', error);
-    }
-
-    setNumber('');
-    updateLogs();
-  };
-
-  const handleUsingPoint = async () => {
-    const pointsToUse = parseInt(number, 10);
-    if (isNaN(pointsToUse) || pointsToUse < 1) {
-      Alert.alert('사용할 포인트를 입력해주세요', '다시 입력해주세요.');
-      return;
-    }
-    if (pointsToUse > user.stamps) {
-      Alert.alert('포인트 부족', '보유 포인트보다 많이 사용할 수 없습니다.');
-      return;
-    }
-
-    const newStamps = user.stamps - pointsToUse;
-    await updateUser(phoneNumber, {
-      stamps: newStamps,
-      last_used: new Date().toISOString().split('T')[0],
-    });
-
-    addLog({
-      action: 'stamp_used',
-      phone_number: phoneNumber,
-      stamp: pointsToUse,
-      timestamp: Timestamp.now(),
-      note: `${pointsToUse.toLocaleString()}${storeConfig.pointUnit} 사용`,
-      store_code: storeCode ?? undefined,
-      user_level: user.level,
-    });
-
-    try {
-      const daysSinceSignup = user.created_at
-        ? dayjs().diff(dayjs(user.created_at), 'day')
-        : 0;
-      track(AnalyticsEvent.COUPON_REDEEMED, {
-        store_code: storeCode,
-        user_id: hashPhone(phoneNumber),
-        user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
-        user_level: user.level,
-        stamps_total: newStamps,
-        days_since_signup: daysSinceSignup,
-        points_used: pointsToUse,
-      });
-    } catch (error) {
-      console.log('Error logging point used event:', error);
-    }
-
-    setNumber('');
-    updateLogs();
-  };
-
-  const handleApprove = async () => {
-    console.log('handleApprove', phoneNumber, number);
-    if (number.length === 0) {
-      Alert.alert('적립할 스탬프를 입력해주세요', '다시 입력해주세요.');
-      return;
-    }
-
-    const numberValue = parseInt(number, 10);
-
-    if (numberValue < 1) {
-      Alert.alert(
-        '적립할 스탬프를 1개 이상 입력해주세요',
-        '다시 입력해주세요.',
-      );
-      return;
-    }
-
-    if (numberValue > 100) {
-      Alert.alert(
-        '적립하는 쿠폰의 수가 많은 것 같아요',
-        '한 번 더 확인해주세요.',
-      );
-      return;
-    }
-
-    const spc = storeConfig.stampsPerCoupon;
-    // 레거시 누적 스탬프 보정 (23 → 3)
-    const currentStamps = user.stamps % spc;
-    const stampsAfterEarn = currentStamps + numberValue;
-    const difference = Math.floor(stampsAfterEarn / spc);
-    // 스탬프 카드 모델: 쿠폰 획득 시 나머지만 유지
-    const stampsTotal = stampsAfterEarn % spc;
-
-    const previousLevel = user.level;
-    let level = user.level;
-    let phase = user.phase;
-    const coupons = {...user.coupons};
-
-    const seq = storeConfig.couponSequence;
-    // phase가 현재 시퀀스에 없으면 첫 번째로 보정
-    if (seq.indexOf(phase) === -1) {
-      phase = seq[0];
-    }
-    let issuedAt = user.couponIssuedAt;
-    for (let index = 0; index < difference; index++) {
-      const currentIdx = seq.indexOf(phase);
-      coupons[phase] = (coupons[phase] ?? 0) + 1;
-      issuedAt = addCouponTimestamp(issuedAt, phase, 1);
-      if (phase === storeConfig.levelIncrementOn) {
-        level += 1;
-      }
-      phase = seq[(currentIdx + 1) % seq.length];
-    }
-
-    const updateContext = {
-      stamps: stampsTotal,
-      phase,
-      ...flattenCouponsForFirestore(coupons, storeConfig.couponTypes),
-      couponIssuedAt: issuedAt ?? {},
-      level,
-      last_used: new Date().toISOString().split('T')[0],
-    };
-
-    await updateUser(phoneNumber, updateContext);
-
-    addLog({
-      action: 'stamp_saved',
-      phone_number: phoneNumber,
-      stamp: numberValue,
-      timestamp: Timestamp.now(),
-      note: '',
-      store_code: storeCode ?? undefined,
-      user_level: level,
-      coupons_issued: difference,
-    });
-
-    try {
-      const userId = hashPhone(phoneNumber);
-      const daysSinceSignup = user.created_at
-        ? dayjs().diff(dayjs(user.created_at), 'day')
-        : 0;
-      const commonParams = {
-        store_code: storeCode,
-        user_id: userId,
-        user_tier: getTierFromLevel(level, storeConfig.levelTiers),
-        user_level: level,
-        stamps_total: stampsTotal,
-        days_since_signup: daysSinceSignup,
-      };
-
-      track(AnalyticsEvent.STAMP_EARNED, {
-        ...commonParams,
-        stamp_count: numberValue,
-      });
-
-      if (difference > 0) {
-        track(AnalyticsEvent.COUPON_ISSUED, {
-          ...commonParams,
-          coupons_issued: difference,
-          coupons_total: coupons,
-        });
-      }
-
-      const previousTier = getTierFromLevel(
-        previousLevel,
-        storeConfig.levelTiers,
-      );
-      const newTier = getTierFromLevel(level, storeConfig.levelTiers);
-      if (previousTier !== newTier) {
-        track(AnalyticsEvent.TIER_UP, {
-          ...commonParams,
-          from_tier: previousTier,
-          to_tier: newTier,
-          from_level: previousLevel,
-          to_level: level,
-        });
-      }
-    } catch (error) {
-      console.log('Error logging stamp earned event:', error);
-    }
-
-    setNumber('');
-
-    // Toast.show({
-    //   type: 'custom_type',
-    //   text1: `스탬프 ${numberValue}개 적립되었습니다`,
-    //   text2: phoneNumber,
-    //   visibilityTime: 5000,
-    //   onPress: () => {
-    //     Toast.hide();
-    //   },
-    // });
-
-    // await updateSession(`session_${storeCode}`, {
-    //   last_used: new Date().toISOString().split('T')[0],
-    //   phone: '',
-    //   mode: 'waiting',
-    // });
-
-    updateLogs();
-  };
-
-  const handleUsing = async () => {
-    console.log('handleUsing', phoneNumber);
-    const selected = totalSelected(userContext.selectedCoupon);
-    if (selected < 1) {
-      Alert.alert('사용할 쿠폰을 선택해주세요', '쿠폰을 눌러 선택해주세요.');
-      return;
-    }
-
-    // 쿠폰만 차감 (스탬프 카드 모델: 쿠폰 사용 시 스탬프 변동 없음)
-    const remainingCoupons: Record<string, number> = {};
-    for (const ct of storeConfig.couponTypes) {
-      remainingCoupons[ct.id] =
-        (userContext.possibleCoupons[ct.id] ?? 0) -
-        (userContext.selectedCoupon[ct.id] ?? 0);
-    }
-    const remainingIssuedAt = removeCouponTimestamps(
-      user.couponIssuedAt,
-      userContext.selectedCoupon,
-    );
-    await updateUser(phoneNumber, {
-      ...flattenCouponsForFirestore(remainingCoupons, storeConfig.couponTypes),
-      couponIssuedAt: remainingIssuedAt,
-    });
-
-    const noteString = storeConfig.couponTypes
-      .filter(ct => (userContext.selectedCoupon[ct.id] ?? 0) > 0)
-      .map(ct => `${ct.name} ${userContext.selectedCoupon[ct.id]}장`)
-      .join(' ');
-
-    addLog({
-      action: 'stamp_used',
-      phone_number: phoneNumber,
-      stamp: 0,
-      timestamp: Timestamp.now(),
-      note: noteString,
-      store_code: storeCode ?? undefined,
-      user_level: user.level,
-    });
-
-    try {
-      const daysSinceSignup = user.created_at
-        ? dayjs().diff(dayjs(user.created_at), 'day')
-        : 0;
-      track(AnalyticsEvent.COUPON_REDEEMED, {
-        store_code: storeCode,
-        user_id: hashPhone(phoneNumber),
-        user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
-        user_level: user.level,
-        stamps_total: user.stamps,
-        days_since_signup: daysSinceSignup,
-        coupons_redeemed: userContext.selectedCoupon,
-      });
-    } catch (error) {
-      console.log('Error logging coupon redeemed event:', error);
-    }
-
-    setNumber('');
-    updateLogs();
-  };
-
-  const switchMode = (newMode: 'earn' | 'use') => {
-    setMode(newMode);
-    setNumber('');
-    setUserContext(makeUserContext(user.coupons, storeConfig.couponTypes));
-  };
-
-  const refresh = async () => {
-    try {
-      track(AnalyticsEvent.STAMP_RESET, {
-        store_code: storeCode,
-        user_id: hashPhone(phoneNumber),
-      });
-    } catch (error) {
-      console.log('Error logging stamp reset event:', error);
-    }
-    console.log('refresh', phoneNumber);
-    const result = await confirm('쿠폰 입력 확인', '쿠폰을 초기화하시겠어요?');
-    if (!result) {
-      return;
-    }
-
-    setNumber('');
-    setUserContext(makeUserContext(user.coupons, storeConfig.couponTypes));
-  };
-
-  const onNumberPress = async (value: number | string) => {
-    // 스탬프 모드 사용 시 숫자 패드 비활성화 (쿠폰 선택만 가능)
-    if (mode === 'use' && !isPointMode) return;
-
-    if (typeof value === 'number') {
-      const maxLen = isPointMode ? 7 : 3;
-      if (number.length > maxLen) {
-        Alert.alert(
-          isPointMode
-            ? '적립하는 포인트가 많은 것 같아요'
-            : '적립하는 스탬프의 수가 많은 것 같아요',
-          '한 번 더 확인해주세요.',
-        );
-        return;
-      }
-
-      const nextNumber = parseInt(number + value, 10);
-
-      setNumber(nextNumber.toString());
-      return;
-    }
-
-    if (typeof value === 'string') {
-      if (value === 'c') {
-        setNumber(number.slice(0, -1));
-        return;
-      }
-
-      if (value === '+10') {
-        const maxLen = isPointMode ? 7 : 3;
-        if (number.length > maxLen) {
-          Alert.alert(
-            isPointMode
-              ? '적립하는 포인트가 많은 것 같아요'
-              : '적립하는 스탬프의 수가 많은 것 같아요',
-            '한 번 더 확인해주세요.',
-          );
-          return;
-        }
-
-        const nextNumber =
-          (parseInt(number, 10) || 0) + storeConfig.stampsPerCoupon;
-
-        setNumber(nextNumber.toString());
-        return;
-      }
-    }
-  };
-
-  const phoneNumberLabel = () => {
-    return `${phoneNumber.slice(0, 3)}-${phoneNumber.slice(
-      3,
-      7,
-    )}-${phoneNumber.slice(7)}`;
-  };
-
-  const close = async () => {
-    try {
-      track(AnalyticsEvent.SESSION_ENDED, {
-        store_code: storeCode,
-        user_id: hashPhone(phoneNumber),
-      });
-    } catch (error) {
-      console.log('Error logging session close event:', error);
-    }
-    console.log('close', phoneNumber);
-    await updateSession(`session_${storeCode}`, {
-      last_used: new Date().toISOString().split('T')[0],
-      phone: '',
-      mode: 'waiting',
-    });
-
-    // updateLogs();
-  };
-
-  const onClickCoupon = (typeId: string) => () => {
-    const newSelected = {
-      ...userContext.selectedCoupon,
-      [typeId]: (userContext.selectedCoupon[typeId] ?? 0) + 1,
-    };
-    const total = Object.values(newSelected).reduce((s, v) => s + v, 0);
-    setNumber(total.toString());
-    setUserContext({
-      ...userContext,
-      selectedCoupon: newSelected,
-    });
-  };
-
-  useFocusEffect(
-    useCallback(() => {
-      if (!phoneNumber) {
-        return;
-      }
-      const db = getFirestore();
-      let unsubscribe: (() => void) | null = null;
-      let cancelled = false;
-
-      const setup = async () => {
-        const docId = await resolveUserDocId(phoneNumber);
-        if (cancelled) return;
-        unsubscribe = onSnapshot(doc(db, 'users', docId), docSnap => {
-          if (docSnap.exists) {
-            const data = docSnap.data();
-            console.log('Detail Current data: ', data);
-            if (!data) {
-              console.log('No data found');
-              return;
-            }
-            const userProfile = normalizeUser(data, storeConfig.couponTypes);
-            const {coupons: validCoupons, issuedAt: validIssuedAt} =
-              filterExpiredCoupons(
-                userProfile.coupons,
-                userProfile.couponIssuedAt,
-                storeConfig.couponExpiryDays,
-              );
-            const filtered = {
-              ...userProfile,
-              coupons: validCoupons,
-              couponIssuedAt: validIssuedAt,
-            };
-            setUser(filtered);
-            setUserContext(
-              makeUserContext(filtered.coupons, storeConfig.couponTypes),
-            );
-          }
-        });
-      };
-
-      setup();
-
-      return () => {
-        cancelled = true;
-        unsubscribe?.();
-      };
-    }, [phoneNumber]),
-  );
+  const {
+    storeConfig,
+    isPointMode,
+    mode,
+    number,
+    user,
+    userContext,
+    setNumber,
+    switchMode,
+    refresh,
+    onNumberPress,
+    onClickCoupon,
+    phoneNumberLabel,
+    close,
+    handleApprove,
+    handleApprovePoint,
+    handleUsing,
+    handleUsingPoint,
+  } = useGivePoint(phoneNumber, updateLogs);
 
   return (
     <View style={styles.container}>
@@ -983,7 +488,7 @@ const DetailView = ({
                     ]}>
                     {NUMBER_SEQUENCE.map((row, rowIndex) => (
                       <View key={rowIndex} style={[styles.numberInputContainer, isCompact && {gap: 8}]}>
-                        {row.map((number, numberIndex) => (
+                        {row.map((num, numberIndex) => (
                           <Pressable
                             key={numberIndex}
                             style={({pressed}) => [
@@ -994,8 +499,8 @@ const DetailView = ({
                               styles.numberInputButton,
                               isCompact && {width: 64, height: 44},
                             ]}
-                            onPress={() => onNumberPress(number)}>
-                            <Text style={[styles.numberInputText, isCompact && {fontSize: 26}]}>{number}</Text>
+                            onPress={() => onNumberPress(num)}>
+                            <Text style={[styles.numberInputText, isCompact && {fontSize: 26}]}>{num}</Text>
                           </Pressable>
                         ))}
                       </View>

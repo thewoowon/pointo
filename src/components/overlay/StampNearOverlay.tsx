@@ -1,17 +1,28 @@
-import React from 'react';
-import {View, Text} from 'react-native';
+import React, {useEffect} from 'react';
+import {Pressable, View, Text} from 'react-native';
+
+const AUTO_DISMISS_MS = 2800;
 
 type Props = {
   show: boolean;
   remaining: 1 | 2;
   couponName?: string;
+  onDismiss?: () => void;
 };
 
-const StampNearOverlay = ({show, remaining, couponName}: Props) => {
+const StampNearOverlay = ({show, remaining, couponName, onDismiss}: Props) => {
+  // 노출되면 일정 시간 뒤 자동으로 닫힘 (카운터에서 손님이 안 만져도 복귀)
+  useEffect(() => {
+    if (!show || !onDismiss) return;
+    const t = setTimeout(onDismiss, AUTO_DISMISS_MS);
+    return () => clearTimeout(t);
+  }, [show, onDismiss]);
+
   if (!show) return null;
 
   return (
-    <View
+    <Pressable
+      onPress={onDismiss}
       style={{
         position: 'absolute',
         top: 0,
@@ -67,7 +78,7 @@ const StampNearOverlay = ({show, remaining, couponName}: Props) => {
           {couponName ?? '쿠폰'} 무료 쿠폰이 한장 생겨요!
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 };
 

@@ -66,9 +66,6 @@ const StoreSettingsScreen = ({navigation}: any) => {
   );
   const [companyName, setCompanyName] = useState(storeConfig.companyName);
   const [contactEmail, setContactEmail] = useState(storeConfig.contactEmail);
-  const [welcomeLine0, setWelcomeLine0] = useState(storeConfig.welcomeLines[0] ?? '');
-  const [welcomeLine1, setWelcomeLine1] = useState(storeConfig.welcomeLines[1] ?? '');
-  const [welcomeLine2, setWelcomeLine2] = useState(storeConfig.welcomeLines[2] ?? '');
   const [guideLine0, setGuideLine0] = useState(storeConfig.guideLines[0] ?? '');
   const [guideLine1, setGuideLine1] = useState(storeConfig.guideLines[1] ?? '');
   const [couponMode, setCouponMode] = useState<'single' | 'double'>(
@@ -93,9 +90,6 @@ const StoreSettingsScreen = ({navigation}: any) => {
     setCouponExpiryDays(String(storeConfig.couponExpiryDays ?? 180));
     setCompanyName(storeConfig.companyName);
     setContactEmail(storeConfig.contactEmail);
-    setWelcomeLine0(storeConfig.welcomeLines[0] ?? '');
-    setWelcomeLine1(storeConfig.welcomeLines[1] ?? '');
-    setWelcomeLine2(storeConfig.welcomeLines[2] ?? '');
     setGuideLine0(storeConfig.guideLines[0] ?? '');
     setGuideLine1(storeConfig.guideLines[1] ?? '');
     setCouponMode(storeConfig.couponTypes.length >= 2 ? 'double' : 'single');
@@ -194,7 +188,6 @@ const StoreSettingsScreen = ({navigation}: any) => {
       idleTimeoutMs: it * 1000,
       companyName,
       contactEmail,
-      welcomeLines: [welcomeLine0, welcomeLine1, welcomeLine2].filter(l => l.length > 0),
       guideLines: [guideLine0, guideLine1].filter(l => l.length > 0),
       couponTypes: newCouponTypes,
       couponSequence: newCouponSequence,
@@ -439,12 +432,6 @@ const StoreSettingsScreen = ({navigation}: any) => {
               keyboardType="numeric"
               placeholder="30"
             />
-          </Section>
-
-          <Section title="환영 메시지">
-            <Field label="1줄" value={welcomeLine0} onChangeText={setWelcomeLine0} />
-            <Field label="2줄" value={welcomeLine1} onChangeText={setWelcomeLine1} />
-            <Field label="3줄" value={welcomeLine2} onChangeText={setWelcomeLine2} />
           </Section>
 
           <Section title="안내 메시지">

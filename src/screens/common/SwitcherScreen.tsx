@@ -17,7 +17,12 @@ import type {BottomSheetModal} from '@gorhom/bottom-sheet';
 import {useAuth, useFirestore, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 import {signOutGoogle} from '../../services/auth';
-import {ShortRightArrowIcon, GearIcon} from '../../components/Icons';
+import {
+  SettingIcon,
+  GoogleIcon,
+  AppleIcon,
+  RightChevronIcon,
+} from '../../components/Icons';
 import PinPad from '../../components/PinPad';
 import StoreModeSheet, {SheetStore} from './StoreModeSheet';
 
@@ -27,8 +32,10 @@ const SwitcherScreen = ({navigation}: any) => {
   const {
     ownerUid,
     ownerEmail,
+    ownerProvider,
     setOwnerUid,
     setOwnerEmail,
+    setOwnerProvider,
     initStoreCode,
     setStoreName,
     setMode,
@@ -150,6 +157,7 @@ const SwitcherScreen = ({navigation}: any) => {
     await signOutGoogle();
     setOwnerUid(null);
     setOwnerEmail(null);
+    setOwnerProvider(null);
     navigation.reset({index: 0, routes: [{name: 'Login'}]});
   };
 
@@ -162,21 +170,48 @@ const SwitcherScreen = ({navigation}: any) => {
       />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <View style={{flex: 1}}>
+          <View
+            style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
             <Text style={styles.headerTitle}>내 매장</Text>
-            {ownerEmail ? (
-              <Text style={styles.headerEmail}>{ownerEmail}</Text>
-            ) : null}
           </View>
           <Pressable
             style={styles.gearBtn}
             onPress={() => navigation.navigate('AccountSettings')}
             hitSlop={8}>
-            <GearIcon width={22} height={22} />
+            <SettingIcon />
           </Pressable>
-          <Pressable style={styles.logoutBtn} onPress={handleLogout}>
-            <Text style={styles.logoutText}>로그아웃</Text>
-          </Pressable>
+        </View>
+
+        <View style={styles.profileBox}>
+          <View style={styles.profileWrap}>
+            <View style={{gap: 6}}>
+              {ownerEmail ? (
+                <Text style={styles.progileEmail}>{ownerEmail}</Text>
+              ) : null}
+              {ownerProvider ? (
+                <View style={styles.providerRow}>
+                  <View style={styles.providerTag}>
+                    {ownerProvider === 'apple' ? (
+                      <AppleIcon
+                        width={14}
+                        height={14}
+                        color={theme.color.texticon.onNormal.midemp}
+                      />
+                    ) : (
+                      <GoogleIcon width={14} height={14} />
+                    )}
+                    <Text style={styles.providerText}>
+                      {ownerProvider === 'apple' ? 'Apple' : 'Google'}
+                    </Text>
+                  </View>
+                  <Text style={styles.providerLabel}>계정으로 로그인</Text>
+                </View>
+              ) : null}
+            </View>
+            <Pressable style={styles.logoutBtn} onPress={handleLogout}>
+              <Text style={styles.logoutText}>로그아웃</Text>
+            </Pressable>
+          </View>
         </View>
 
         {isLoading ? (
@@ -210,28 +245,34 @@ const SwitcherScreen = ({navigation}: any) => {
               <>
                 <View style={styles.slotRow}>
                   <Text style={styles.slotText}>
-                    스토어 {slot.current}/{slot.limit}
+                    운영 중인 매장{'  '}
+                    <Text style={styles.slotNumber}>{slot.current}</Text>
+                    {/* /{slot.limit} */}
                   </Text>
-                  <Pressable onPress={() => setClaimVisible(true)}>
-                    <Text style={styles.claimLink}>기존 가게 연결</Text>
-                  </Pressable>
                 </View>
 
-                {stores.map(store => (
-                  <Pressable
-                    key={store.storeCode}
-                    style={styles.storeCard}
-                    onPress={() => handleSelectStore(store)}>
-                    <View style={{flex: 1}}>
-                      <Text style={styles.storeName}>{store.name}</Text>
-                    </View>
-                    <ShortRightArrowIcon width={20} height={20} />
-                  </Pressable>
-                ))}
+                <View style={styles.storeList}>
+                  {stores.map(store => (
+                    <Pressable
+                      key={store.storeCode}
+                      style={styles.storeCard}
+                      onPress={() => handleSelectStore(store)}>
+                      <View style={{flex: 1}}>
+                        <Text style={styles.storeName}>{store.name}</Text>
+                      </View>
+                      <RightChevronIcon />
+                    </Pressable>
+                  ))}
+                </View>
 
-                <Pressable style={styles.addBtn} onPress={handleAddStore}>
-                  <Text style={styles.addBtnText}>+ 새 스토어 추가</Text>
-                </Pressable>
+                <View style={styles.btnContainer}>
+                  <Pressable style={styles.addBtn} onPress={handleAddStore}>
+                    <Text style={styles.addBtnText}>새 매장 추가하기</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setClaimVisible(true)}>
+                    <Text style={styles.claimLink}>기존 매장 불러오기</Text>
+                  </Pressable>
+                </View>
               </>
             )}
           </ScrollView>
@@ -249,8 +290,8 @@ const SwitcherScreen = ({navigation}: any) => {
             <Pressable style={styles.modalCard} onPress={() => {}}>
               <Text style={styles.modalTitle}>기존 가게 연결</Text>
               <Text style={styles.modalSubtitle}>
-                가게 등록 시 입력한 점주 연락처를 입력하면{'\n'}해당 가게가 계정에
-                연결돼요.
+                가게 등록 시 입력한 점주 연락처를 입력하면{'\n'}해당 가게가
+                계정에 연결돼요.
               </Text>
               <TextInput
                 style={styles.modalInput}
@@ -308,17 +349,14 @@ const createStyles = (theme: Theme) =>
       flex: 1,
     },
     header: {
+      height: 40,
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      backgroundColor: theme.color.surface.normal.bg1,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.palette.gray[200],
+      backgroundColor: 'transparent',
     },
     headerTitle: {
-      fontSize: 20,
-      fontFamily: theme.font.semibold,
+      fontSize: 16,
+      fontFamily: theme.font.medium,
       color: theme.color.texticon.onNormal.highestemp,
     },
     headerEmail: {
@@ -328,11 +366,18 @@ const createStyles = (theme: Theme) =>
       marginTop: 2,
     },
     gearBtn: {
-      padding: 6,
+      position: 'absolute',
+      right: 0,
+      margin: 24,
     },
     logoutBtn: {
+      borderStyle: 'solid',
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      borderRadius: 6,
       paddingVertical: 6,
       paddingHorizontal: 12,
+      backgroundColor: theme.color.surface.normal.bg1,
     },
     logoutText: {
       fontSize: 14,
@@ -347,6 +392,58 @@ const createStyles = (theme: Theme) =>
     scrollContent: {
       padding: 20,
       gap: 12,
+    },
+    profileBox: {
+      padding: 20,
+      marginTop: 12,
+    },
+    profileWrap: {
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 14,
+      gap: 4,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      // shadow
+      shadowColor: theme.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.02,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    progileEmail: {
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    providerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    providerTag: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      borderStyle: 'solid',
+      borderWidth: 0.6,
+      borderColor: '#747775',
+      borderRadius: 100,
+      paddingHorizontal: 7,
+      paddingVertical: 5,
+    },
+    providerText: {
+      fontSize: 8,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    providerLabel: {
+      fontSize: 12,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
     },
     emptyBox: {
       backgroundColor: theme.color.surface.normal.bg1,
@@ -376,48 +473,66 @@ const createStyles = (theme: Theme) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 4,
-      marginBottom: 2,
     },
     slotText: {
       fontSize: 14,
-      fontFamily: theme.font.semibold,
-      color: theme.color.texticon.onNormal.midemp,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.lowemp,
+      lineHeight: 24,
+    },
+    slotNumber: {
+      fontSize: 13,
+      fontFamily: theme.font.bold,
+      color: theme.color.texticon.onNormal.primary,
     },
     claimLink: {
-      fontSize: 13,
-      fontFamily: theme.font.medium,
+      fontSize: 14,
+      fontFamily: theme.font.semibold,
       color: theme.color.surface.brand.primary,
+    },
+    storeList: {
+      gap: 10,
+      marginBottom: 20,
     },
     storeCard: {
       flexDirection: 'row',
       alignItems: 'center',
       backgroundColor: theme.color.surface.normal.bg1,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.palette.gray[200],
+      borderRadius: 14,
       paddingVertical: 20,
       paddingHorizontal: 20,
+      // shadow
+      shadowColor: theme.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.02,
+      shadowRadius: 6,
+      elevation: 2,
     },
     storeName: {
-      fontSize: 18,
-      fontFamily: theme.font.semibold,
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    addBtn: {
-      height: 54,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.palette.gray[200],
-      borderStyle: 'dashed',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: theme.color.surface.normal.bg1,
-      marginTop: 4,
-    },
-    addBtnText: {
       fontSize: 15,
       fontFamily: theme.font.medium,
-      color: theme.color.texticon.onNormal.midemp,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    btnContainer: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 10,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    addBtn: {
+      borderRadius: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.color.surface.brand.primary,
+      paddingHorizontal: 12,
+      paddingVertical: 9,
+    },
+    addBtnText: {
+      fontSize: 16,
+      fontFamily: theme.font.semibold,
+      color: theme.color.etc.absolute.white,
+      lineHeight: 26,
     },
     primaryBtn: {
       height: 52,

@@ -1,55 +1,12 @@
-import {createBottomTabNavigator} from '@react-navigation/bottom-tabs';
 import SupervisorScreen from '../screens/supervisor';
 import ClientScreen from '../screens/client';
 
-const Tab = createBottomTabNavigator();
-
-const MainTab = ({initialTab = 'Supervisor'}: {initialTab?: string}) => (
-  <Tab.Navigator
-    initialRouteName={initialTab}
-    screenOptions={{
-      // 간격 조정
-      tabBarStyle: {
-        display: 'none',
-        height: 86,
-        paddingVertical: 10,
-      },
-      tabBarItemStyle: {
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 5,
-      },
-      tabBarLabelStyle: {
-        fontSize: 13,
-        fontFamily: 'Pretendard-Medium',
-        color: '#8E979E',
-      },
-      tabBarActiveTintColor: 'blue', // 활성화된 탭의 텍스트 색상
-      tabBarInactiveTintColor: 'gray', // 비활성화된 탭의 텍스트 색상
-    }}>
-    <Tab.Screen
-      name="Supervisor"
-      component={SupervisorScreen}
-      options={{
-        headerShown: false,
-        tabBarItemStyle: {
-          display: 'none',
-        },
-      }}
-    />
-    <Tab.Screen
-      name="Client"
-      component={ClientScreen}
-      options={{
-        headerShown: false,
-        tabBarItemStyle: {
-          display: 'none',
-        },
-      }}
-    />
-  </Tab.Navigator>
-);
+/**
+ * 로그인 후 진입하는 메인 영역. 탭바는 노출하지 않고 mode에 따라
+ * 관리자(Supervisor) / 고객(Client) 스택 중 하나만 렌더한다.
+ * mode가 바뀌면 컴포넌트 타입이 바뀌어 자연스럽게 새로 마운트된다.
+ */
+const MainTab = ({mode}: {mode: 'supervisor' | 'client'}) =>
+  mode === 'supervisor' ? <SupervisorScreen /> : <ClientScreen />;
 
 export default MainTab;

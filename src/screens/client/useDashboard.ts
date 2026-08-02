@@ -36,7 +36,7 @@ type OverlayContext = {
 };
 
 export function useDashboard(phoneNumber: string, onClose: () => void) {
-  const {storeCode} = useAuth();
+  const {storeCode, storeName} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const isPointMode = storeConfig.mode === 'point';
   const [timeLeft, setTimeLeft] = useState(60);
@@ -297,6 +297,8 @@ export function useDashboard(phoneNumber: string, onClose: () => void) {
   }, [timeLeft]);
 
   return {
+    phoneNumber,
+    storeName,
     storeConfig,
     isPointMode,
     timeLeft,

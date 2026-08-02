@@ -27,6 +27,7 @@ export function useNumberInput() {
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [idleVisible, setIdleVisible] = useState(false);
+  const [idleBgIndex, setIdleBgIndex] = useState(0);
 
   const hintOpacity = useRef(new Animated.Value(1)).current;
   const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,6 +68,8 @@ export function useNumberInput() {
 
   const dismissIdle = useCallback(() => {
     setIdleVisible(false);
+    // 다음 유휴 진입 때 배경을 번갈아 보여줘 화면이 정적이지 않게
+    setIdleBgIndex(i => (i + 1) % 2);
     resetIdleTimer();
   }, [resetIdleTimer]);
 
@@ -253,6 +256,7 @@ export function useNumberInput() {
     setPrivacyVisible,
     isLoading,
     idleVisible,
+    idleBgIndex,
     hintOpacity,
     phoneNumberLabel,
     onNumberPress,

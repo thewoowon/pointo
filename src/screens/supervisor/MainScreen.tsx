@@ -27,18 +27,24 @@ import {
   ExitIcon,
   LeftArrowIcon,
   MagnifierIcon,
-  ProfileIcon,
   RefreshIcon,
   ShortLeftArrowIcon,
   ShortRightArrowIcon,
   StatisticIcon,
   GearIcon,
+  QrIcon,
 } from '../../components/Icons';
 import dayjs from 'dayjs';
 // import {BackgroundDeco} from '../../components/background';
+import QRCode from 'react-native-qrcode-svg';
 import DetailView from './DetailView';
+import GivePointSheet from './GivePointSheet';
 import {useMasterDetail} from '../../components';
 import {LoadingOverlay} from '../../components/overlay';
+import {maskPhone, phoneLast4, logActionStyle} from './logDisplay';
+
+// 고객 셀프 적립용 포인토 웹. 스토어 코드를 붙여 해당 매장으로 진입시킴.
+const POINTO_WEB_URL = 'https://pointo-web-chi.vercel.app';
 
 const FILTER_LIST: {
   label: string;
@@ -97,6 +103,7 @@ const MainScreen = ({navigation, route}: any) => {
   const [customerSearchVisible, setCustomerSearchVisible] = useState(false);
   const [customerSearchInput, setCustomerSearchInput] = useState('');
   const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [qrVisible, setQrVisible] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -261,29 +268,62 @@ const MainScreen = ({navigation, route}: any) => {
         <View style={styles.innerContainer}>
           <View
             style={[
-              styles.flexRowBox,
+              styles.headerBar,
               {
-                justifyContent: 'space-between',
-                backgroundColor: theme.color.texticon.onNormal.highemp,
-                paddingVertical: isCompact ? 10 : 18,
-                paddingHorizontal: isCompact ? 12 : 24,
+                paddingVertical: isCompact ? 12 : 16,
+                paddingHorizontal: isCompact ? 16 : 24,
               },
             ]}>
-            {storeName ? (
-              <Text style={{color: theme.color.surface.normal.bg1, fontSize: isCompact ? 13 : 16, fontFamily: theme.font.semibold}}>{storeName}</Text>
-            ) : <View />}
-            <View style={[styles.flexRowBox, {gap: isCompact ? 6 : 8}]}>
-              <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={() => navigation.navigate('StoreSettings')}>
-                <GearIcon width={isCompact ? 16 : 22} height={isCompact ? 16 : 22} />
-                {!isCompact && <Text style={styles.buttonText}>설정</Text>}
+            {/* 좌: 나가기 = 로그아웃 (기존 "내 매장") */}
+            <Pressable style={styles.headerExit} onPress={handleLogout} hitSlop={8}>
+              <ExitIcon
+                width={isCompact ? 18 : 22}
+                height={isCompact ? 18 : 22}
+                color={theme.color.texticon.onNormal.highestemp}
+              />
+              <Text style={[styles.headerExitText, isCompact && {fontSize: 15}]}>
+                나가기
+              </Text>
+            </Pressable>
+
+            {/* 중앙: 화면 타이틀 */}
+            <Text
+              style={[styles.headerTitle, isCompact && {fontSize: 17}]}
+              pointerEvents="none">
+              적립내역
+            </Text>
+
+            {/* 우: QR(기능) · 통계 · 설정 — 진입점 3개 보존 */}
+            <View style={[styles.headerSide, {gap: isCompact ? 6 : 12}]}>
+              <Pressable
+                style={styles.headerIconBtn}
+                onPress={() => setQrVisible(true)}
+                hitSlop={8}>
+                <QrIcon
+                  width={isCompact ? 20 : 24}
+                  height={isCompact ? 20 : 24}
+                  color={theme.color.texticon.onNormal.highestemp}
+                />
               </Pressable>
-              <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={handleStatistics}>
-                <StatisticIcon width={isCompact ? 18 : 24} height={isCompact ? 18 : 24} />
-                {!isCompact && <Text style={styles.buttonText}>대시보드</Text>}
+              <Pressable
+                style={styles.headerIconBtn}
+                onPress={handleStatistics}
+                hitSlop={8}>
+                <StatisticIcon
+                  width={isCompact ? 19 : 23}
+                  height={isCompact ? 19 : 23}
+                  color={theme.color.texticon.onNormal.highestemp}
+                />
               </Pressable>
-              <Pressable style={[styles.button, isCompact && styles.buttonCompact]} onPress={handleLogout}>
-                {!isCompact && <Text style={styles.buttonText}>내 매장</Text>}
-                <ProfileIcon width={isCompact ? 16 : 20} height={isCompact ? 16 : 20} />
+              <Pressable
+                style={styles.headerIconBtn}
+                onPress={() => navigation.navigate('StoreSettings')}
+                hitSlop={8}>
+                <GearIcon
+                  width={isCompact ? 20 : 24}
+                  height={isCompact ? 20 : 24}
+                  color={theme.color.texticon.onNormal.highestemp}
+                />
               </Pressable>
             </View>
           </View>
@@ -353,6 +393,37 @@ const MainScreen = ({navigation, route}: any) => {
                     }}>
                     <Text style={styles.filterBoxText}>취소</Text>
                   </Pressable>
+                </View>
+              ) : isCompact ? (
+                <View style={styles.mDateRow}>
+                  <View style={styles.mDateLeft}>
+                    <Text style={styles.mBigDate}>
+                      {date.format('M월 D일')}
+                    </Text>
+                    <Text style={styles.mDateCount}>{logs.length}건</Text>
+                  </View>
+                  <View style={styles.mDateNav}>
+                    <Pressable
+                      style={styles.mRoundBtn}
+                      onPress={() =>
+                        setSearchContext({
+                          ...searchContext,
+                          status: 'active',
+                        })
+                      }>
+                      <MagnifierIcon />
+                    </Pressable>
+                    <Pressable
+                      style={styles.mRoundBtn}
+                      onPress={() => handleDateMinusChange(1)}>
+                      <ShortLeftArrowIcon width={20} height={20} />
+                    </Pressable>
+                    <Pressable
+                      style={styles.mRoundBtn}
+                      onPress={() => handleDatePlusChange(1)}>
+                      <ShortRightArrowIcon width={20} height={20} />
+                    </Pressable>
+                  </View>
                 </View>
               ) : (
                 <View
@@ -550,80 +621,35 @@ const MainScreen = ({navigation, route}: any) => {
                         )
                         .map((statistic, index) =>
                           isCompact ? (
+                          (() => {
+                            const st = logActionStyle(statistic.action, theme);
+                            return (
                           <Pressable
                             key={index}
-                            style={{
-                              backgroundColor: theme.color.surface.normal.container10,
-                              borderRadius: 10,
-                              padding: 12,
-                              gap: 6,
-                            }}
+                            style={styles.mCard}
                             onPress={() => handleClickLog(statistic)}>
-                            <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
-                              <View style={{flexDirection: 'row', alignItems: 'center', gap: 8}}>
-                                <View
-                                  style={{
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    borderRadius: 5,
-                                    paddingHorizontal: 8,
-                                    height: 26,
-                                    backgroundColor:
-                                      statistic.action === 'stamp_saved'
-                                        ? theme.palette.green[100]
-                                        : theme.palette.blue[50],
-                                  }}>
-                                  <Text
-                                    style={{
-                                      fontSize: 12,
-                                      fontFamily: theme.font.medium,
-                                      color:
-                                        statistic.action === 'stamp_saved'
-                                          ? theme.color.texticon.onNormal.success
-                                          : theme.color.texticon.onNormal.primary,
-                                    }}>
-                                    {statistic.action === 'stamp_saved'
-                                      ? '적립'
-                                      : '사용'}{' '}
-                                    {statistic.stamp}
-                                  </Text>
-                                </View>
-                                <Text
-                                  style={{
-                                    color: theme.color.texticon.onNormal.highestemp,
-                                    fontSize: 13,
-                                    fontFamily: theme.font.medium,
-                                    letterSpacing: -0.5,
-                                  }}>
-                                  {statistic.phone_number.replace(
-                                    /(\d{3})(\d{4})(\d{4})/,
-                                    '$1-$2-$3',
-                                  )}
-                                </Text>
-                              </View>
-                              <Text
-                                style={{
-                                  color: theme.color.texticon.onNormal.midemp,
-                                  fontSize: 11,
-                                  letterSpacing: -0.5,
-                                }}>
-                                {dayjs(statistic.timestamp).format('HH:mm')}
+                            <View style={{flex: 1}}>
+                              <Text style={styles.mCardTime}>
+                                {dayjs(statistic.timestamp).format(
+                                  'YY.MM.DD  HH:mm',
+                                )}
+                              </Text>
+                              <Text style={styles.mCardPhone}>
+                                {phoneLast4(statistic.phone_number)}
                               </Text>
                             </View>
-                            {statistic.note ? (
-                              <Text
-                                style={{
-                                  color: theme.color.texticon.onNormal.midemp,
-                                  fontSize: 12,
-                                  fontFamily: theme.font.light,
-                                  letterSpacing: -0.3,
-                                }}
-                                numberOfLines={1}>
-                                {statistic.note}
+                            <View style={[styles.mPill, {backgroundColor: st.bg}]}>
+                              <Text style={[styles.mPillText, {color: st.fg}]}>
+                                {st.label} {statistic.stamp}
                               </Text>
-                            ) : null}
+                            </View>
                           </Pressable>
+                            );
+                          })()
                           ) : (
+                          (() => {
+                            const st = logActionStyle(statistic.action, theme);
+                            return (
                           <Pressable
                             key={index}
                             style={styles.listBox}
@@ -644,29 +670,20 @@ const MainScreen = ({navigation, route}: any) => {
                                   display: 'flex',
                                   justifyContent: 'center',
                                   alignItems: 'center',
-                                  borderRadius: 6,
+                                  borderRadius: 8,
                                   width: 62,
                                   height: 32,
-                                  backgroundColor:
-                                    statistic.action === 'stamp_saved'
-                                      ? theme.palette.green[100]
-                                      : theme.palette.blue[50],
+                                  backgroundColor: st.bg,
                                 }}>
                                 <Text
                                   style={{
                                     fontSize: 14,
                                     lineHeight: 24,
-                                    letterSpacing: -1,
-                                    fontFamily: theme.font.medium,
-                                    color:
-                                      statistic.action === 'stamp_saved'
-                                        ? theme.color.texticon.onNormal.success
-                                        : theme.color.texticon.onNormal.primary,
+                                    letterSpacing: -0.5,
+                                    fontFamily: theme.font.semibold,
+                                    color: st.fg,
                                   }}>
-                                  {statistic.action === 'stamp_saved'
-                                    ? '적립'
-                                    : '사용'}{' '}
-                                  {statistic.stamp}
+                                  {st.label} {statistic.stamp}
                                 </Text>
                               </View>
                               <Text
@@ -678,10 +695,7 @@ const MainScreen = ({navigation, route}: any) => {
                                   letterSpacing: -1,
                                   fontFamily: theme.font.medium,
                                 }}>
-                                {statistic.phone_number.replace(
-                                  /(\d{3})(\d{4})(\d{4})/,
-                                  '$1-$2-$3',
-                                )}
+                                {maskPhone(statistic.phone_number)}
                               </Text>
                               <Text
                                 style={{
@@ -707,6 +721,8 @@ const MainScreen = ({navigation, route}: any) => {
                               )}
                             </Text>
                           </Pressable>
+                            );
+                          })()
                           ),
                         )
                     ) : (
@@ -725,6 +741,14 @@ const MainScreen = ({navigation, route}: any) => {
                   </View>
                 </ScrollView>
               </View>
+              {isCompact &&
+                date.format('YYYY-MM-DD') !==
+                  dayjs().format('YYYY-MM-DD') && (
+                  <Pressable style={styles.mTodayFab} onPress={handleSetToday}>
+                    <RefreshIcon width={16} height={16} />
+                    <Text style={styles.mTodayFabText}>오늘로 돌아가기</Text>
+                  </Pressable>
+                )}
             </View>}
             {showDetailPanel && <View
               style={[
@@ -1155,6 +1179,77 @@ const MainScreen = ({navigation, route}: any) => {
             </View>}
           </View>
         </View>
+        {/* QR 셀프 적립 — 포인토 웹 링크(구현 대기: 웹 URL + QR 라이브러리) */}
+        <Modal
+          animationType="fade"
+          transparent={true}
+          visible={qrVisible}
+          presentationStyle="overFullScreen"
+          supportedOrientations={['portrait', 'landscape']}
+          onRequestClose={() => setQrVisible(false)}>
+          <Pressable
+            style={{
+              flex: 1,
+              backgroundColor: 'rgba(0,0,0,0.45)',
+              justifyContent: 'center',
+              alignItems: 'center',
+            }}
+            onPress={() => setQrVisible(false)}>
+            <Pressable
+              style={{
+                backgroundColor: theme.color.surface.normal.bg1,
+                borderRadius: 24,
+                padding: 32,
+                width: '90%',
+                maxWidth: 380,
+                alignItems: 'center',
+                gap: 16,
+              }}
+              onPress={e => e.stopPropagation()}>
+              <Text
+                style={{
+                  fontFamily: theme.font.semibold,
+                  fontSize: 20,
+                  letterSpacing: -0.5,
+                  color: theme.color.texticon.onNormal.highestemp,
+                }}>
+                고객 셀프 적립
+              </Text>
+              <View
+                style={{
+                  width: 232,
+                  height: 232,
+                  borderRadius: 20,
+                  backgroundColor: theme.color.etc.absolute.white,
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                }}>
+                <QRCode
+                  value={
+                    storeCode
+                      ? `${POINTO_WEB_URL}?store=${storeCode}`
+                      : POINTO_WEB_URL
+                  }
+                  size={200}
+                  backgroundColor="white"
+                  color={theme.color.texticon.onNormal.highestemp}
+                />
+              </View>
+              <Text
+                style={{
+                  fontFamily: theme.font.regular,
+                  fontSize: 14,
+                  lineHeight: 22,
+                  letterSpacing: -0.3,
+                  textAlign: 'center',
+                  color: theme.color.texticon.onNormal.midemp,
+                }}>
+                손님이 이 QR을 스캔하면 웹에서 전화번호로 로그인해 직접
+                적립할 수 있어요.
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Modal>
         <Modal
           animationType="slide"
           transparent={true}
@@ -1351,21 +1446,29 @@ const MainScreen = ({navigation, route}: any) => {
           </Pressable>
         </Modal>
 
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          presentationStyle="overFullScreen" // or "pageSheet" 등 시도
-          supportedOrientations={['portrait', 'landscape']}>
-          <DetailView
-            navigation={navigation}
+        {isCompact ? (
+          <GivePointSheet
+            visible={modalVisible}
             phoneNumber={phoneNumber}
-            onClose={() => {
-              setModalVisible(false);
-            }}
             updateLogs={updateLogs}
           />
-        </Modal>
+        ) : (
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={modalVisible}
+            presentationStyle="overFullScreen" // or "pageSheet" 등 시도
+            supportedOrientations={['portrait', 'landscape']}>
+            <DetailView
+              navigation={navigation}
+              phoneNumber={phoneNumber}
+              onClose={() => {
+                setModalVisible(false);
+              }}
+              updateLogs={updateLogs}
+            />
+          </Modal>
+        )}
         {/* <BackgroundDeco backgroundColor="#FFFAE3" /> */}
       </SafeAreaView>
     </View>
@@ -1406,6 +1509,129 @@ const createStyles = (theme: Theme) =>
     justifyContent: 'space-between',
     alignItems: 'center',
     gap: 16,
+  },
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: theme.color.surface.normal.bg1,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.palette.gray[100],
+  },
+  headerExit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    zIndex: 1,
+  },
+  headerExitText: {
+    fontFamily: theme.font.medium,
+    fontSize: 17,
+    letterSpacing: -0.5,
+    color: theme.color.texticon.onNormal.highestemp,
+  },
+  headerTitle: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    textAlign: 'center',
+    fontFamily: theme.font.semibold,
+    fontSize: 19,
+    letterSpacing: -0.5,
+    color: theme.color.texticon.onNormal.highestemp,
+  },
+  headerSide: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 1,
+  },
+  headerIconBtn: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // ─── 모바일 적립내역 (신규 시안) ───
+  mDateRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  mDateLeft: {flexDirection: 'row', alignItems: 'baseline', gap: 8},
+  mBigDate: {
+    fontFamily: theme.font.bold,
+    fontSize: 26,
+    letterSpacing: -1,
+    color: theme.color.texticon.onNormal.highestemp,
+  },
+  mDateCount: {
+    fontFamily: theme.font.regular,
+    fontSize: 13,
+    letterSpacing: -0.5,
+    color: theme.color.texticon.onNormal.midemp,
+  },
+  mDateNav: {flexDirection: 'row', alignItems: 'center', gap: 8},
+  mRoundBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: theme.color.surface.normal.container10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  mCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    gap: 12,
+  },
+  mCardTime: {
+    fontFamily: theme.font.regular,
+    fontSize: 12,
+    letterSpacing: -0.3,
+    color: theme.color.texticon.onNormal.lowemp,
+    marginBottom: 4,
+  },
+  mCardPhone: {
+    fontFamily: 'SFUIDisplay-Semibold',
+    fontSize: 20,
+    letterSpacing: 0.5,
+    color: theme.color.texticon.onNormal.highestemp,
+  },
+  mPill: {
+    borderRadius: 999,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+  },
+  mPillText: {
+    fontFamily: theme.font.semibold,
+    fontSize: 13,
+    letterSpacing: -0.3,
+  },
+  mTodayFab: {
+    position: 'absolute',
+    bottom: 20,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: theme.color.surface.normal.bg1,
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    shadowColor: theme.color.etc.absolute.black,
+    shadowOffset: {width: 0, height: 4},
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  mTodayFabText: {
+    fontFamily: theme.font.medium,
+    fontSize: 15,
+    letterSpacing: -0.5,
+    color: theme.color.texticon.onNormal.highemp,
   },
   button: {
     width: 112,

@@ -1,7 +1,7 @@
 import React, {useState} from 'react';
 import {
   Animated,
-  Image,
+  ImageBackground,
   Modal,
   Pressable,
   ScrollView,
@@ -12,14 +12,16 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import LinearGradient from 'react-native-linear-gradient';
-import LottieView from 'lottie-react-native';
-import {useAuth, useDeviceType} from '../../hooks';
+import {useAuth, useLayoutMode} from '../../hooks';
 import PinPad from '../../components/PinPad';
-import {semanticColors as c, primitives as p, fontFamily as f} from '../../theme';
+import {
+  semanticColors as c,
+  primitives as p,
+  fontFamily as f,
+} from '../../theme';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 import {
   CheckIcon,
-  CircleXIcon,
   ExitIcon,
   LeftBigArrowIcon,
   XIcon,
@@ -28,12 +30,12 @@ import {LoadingOverlay} from '../../components/overlay';
 import DashboardView from './DashboardView';
 import {useNumberInput} from './useNumberInput';
 
-const POINTO_LOGO = require('../../../src/assets/images/pointo_1024.png');
-const APPSTORE_QR = require('../../../src/assets/images/pointo_appstore_qr.png');
+const IDLE_BACKGROUNDS = [
+  require('../../../src/assets/images/bg_pointo_1.png'),
+  require('../../../src/assets/images/bg_pointo_2.png'),
+];
 
 const SUMMER_COLORS = {
-  backgroundStart: p.blue[50],
-  backgroundEnd: p.blue[100],
   accent: c.surface.brand.primary,
   primary: c.texticon.onNormal.highestemp,
 };
@@ -44,33 +46,30 @@ const NUMBER_SEQUENCE = [
   [7, 8, 9],
 ];
 
-// ─── Keypad (공통) ───────────────────────────────────────────
+// 전화번호 표시: '010 - 1234 - 5678' 처럼 하이픈 앞뒤로 여백을 둔다.
+const formatDisplay = (label: string) =>
+  ('010' + (label || '-')).replace(/-/g, ' - ').trimEnd();
+
+// ─── Keypad ──────────────────────────────────────────────────
 const Keypad = ({
   onPress,
-  size,
+  expanded,
 }: {
   onPress: (v: number | string) => void;
-  size: 'compact' | 'large';
+  expanded: boolean;
 }) => {
-  const btnHeight = size === 'compact' ? 58 : 77;
-  const fontSize = size === 'compact' ? 32 : 42;
+  const btnHeight = expanded ? 64 : 58;
+  const fontSize = expanded ? 30 : 28;
+  const keyStyle = ({pressed}: {pressed: boolean}) => [
+    s.keyBtn,
+    {height: btnHeight, backgroundColor: pressed ? p.gray[100] : 'transparent'},
+  ];
   return (
-    <View style={{width: '100%', gap: size === 'compact' ? 8 : 12}}>
+    <View style={{width: '100%', gap: expanded ? 6 : 4}}>
       {NUMBER_SEQUENCE.map((row, ri) => (
         <View key={ri} style={s.keyRow}>
           {row.map(n => (
-            <Pressable
-              key={n}
-              style={({pressed}) => [
-                s.keyBtn,
-                {
-                  height: btnHeight,
-                  backgroundColor: pressed
-                    ? p.blue[100]
-                    : 'rgba(255,255,255,0.96)',
-                },
-              ]}
-              onPress={() => onPress(n)}>
+            <Pressable key={n} style={keyStyle} onPress={() => onPress(n)}>
               <Text style={[s.keyText, {fontSize}]}>{n}</Text>
             </Pressable>
           ))}
@@ -78,112 +77,84 @@ const Keypad = ({
       ))}
       <View style={s.keyRow}>
         <View style={[s.keyBtn, {height: btnHeight}]} />
-        <Pressable
-          style={({pressed}) => [
-            s.keyBtn,
-            {
-              height: btnHeight,
-              backgroundColor: pressed ? p.blue[100] : 'rgba(255,255,255,0.96)',
-            },
-          ]}
-          onPress={() => onPress(0)}>
+        <Pressable style={keyStyle} onPress={() => onPress(0)}>
           <Text style={[s.keyText, {fontSize}]}>0</Text>
         </Pressable>
-        <Pressable
-          style={({pressed}) => [
-            s.keyBtn,
-            {
-              height: btnHeight,
-              backgroundColor: pressed ? p.blue[100] : 'rgba(255,255,255,0.96)',
-            },
-          ]}
-          onPress={() => onPress('c')}>
-          <LeftBigArrowIcon />
+        <Pressable style={keyStyle} onPress={() => onPress('c')}>
+          <LeftBigArrowIcon
+            width={36}
+            height={36}
+            strokeWidth={4}
+            color="#1B1B1B"
+          />
         </Pressable>
       </View>
     </View>
   );
 };
 
-// ─── Phone Layout ────────────────────────────────────────────
-const PhoneLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
-  <View style={s.phoneContainer}>
-    <View style={s.phoneInner}>
-      {ctx.storeName ? (
-        <Text style={s.phoneStoreName}>{ctx.storeName}</Text>
-      ) : null}
-      <View style={s.phoneNumberRow}>
-        <View style={s.phoneNumberDisplay}>
-          <Text style={s.phoneNumberText}>010</Text>
-          <Text style={s.phoneNumberText}>{ctx.phoneNumberLabel()}</Text>
-        </View>
-        {ctx.number.length > 0 && (
-          <Pressable onPress={ctx.clearNumber}>
-            <CircleXIcon width={22} height={22} color={c.texticon.onNormal.midemp} />
-          </Pressable>
-        )}
-      </View>
-      <View style={s.divider} />
-      <Keypad onPress={ctx.onNumberPress} size="compact" />
-      <View style={s.phoneConfirmWrap}>
-        <Pressable style={s.confirmBtn} onPress={ctx.onConfirmPress}>
-          <LinearGradient
-            colors={[p.blue[200], c.surface.brand.primary]}
-            locations={[0.2, 1]}
-            start={{x: 0, y: 0}}
-            end={{x: 1, y: 1}}
-            style={s.confirmGradient}>
-            <Text style={s.confirmText}>조회하기</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
-    </View>
-    <View style={s.phoneFooter}>
-      <Pressable onPress={() => ctx.setPrivacyVisible(true)}>
-        <Text style={s.footerLink}>개인정보 처리방침</Text>
-      </Pressable>
-      <Pressable onPress={ctx.onDeleteAccountPress}>
-        <Text style={s.footerLink}>회원 탈퇴</Text>
-      </Pressable>
-      <Pressable
-        style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
-        onPress={ctx.logout}>
-        <ExitIcon width={14} height={14} color={c.texticon.onNormal.midemp} />
-        <Text style={s.footerLink}>나가기</Text>
-      </Pressable>
-    </View>
-  </View>
-);
-
-// ─── Tablet Layout ───────────────────────────────────────────
-const TabletLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
-  <View style={s.tabletContainer}>
-    <View style={s.tabletLeft}>
-      <View style={s.tabletWelcome}>
-        {ctx.storeConfig.welcomeLines.map((line, i) => (
-          <Text key={i} style={s.tabletWelcomeText}>
-            {line}
-          </Text>
-        ))}
-        <View style={{marginTop: 10}}>
+// ─── Input Layout (폰·태블릿 통일) ──────────────────────────────
+const InputLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => {
+  const {isExpanded} = useLayoutMode();
+  const complete = ctx.number.length === 8;
+  const numFontSize = isExpanded ? 32 : 24;
+  return (
+    <View style={[s.content, isExpanded && s.contentExpanded]}>
+      <View style={s.topBlock}>
+        {ctx.storeName ? (
+          <Text style={s.storeName}>{ctx.storeName}</Text>
+        ) : null}
+        <View style={s.titleWrap}>
           {ctx.storeConfig.guideLines.map((line, i) => (
-            <Text key={i} style={s.tabletGuideText}>
+            <Text
+              key={i}
+              style={[
+                s.title,
+                {
+                  fontSize: isExpanded ? 24 : 20,
+                  lineHeight: isExpanded ? 32 : 28,
+                },
+              ]}>
               {line}
             </Text>
           ))}
         </View>
-        <LottieView
-          source={require('../../../lottie/coffee.json')}
-          autoPlay
-          loop
-          style={{width: 200, height: 200, alignSelf: 'center'}}
-        />
+
+        <View style={s.inputBox}>
+          <Text style={s.inputLabel}>번호를 입력해주세요</Text>
+          {/* 고스트로 전체 마스크 폭을 고정하고, 실제 값은 그 위에 왼쪽
+              정렬로 얹는다. 각 자리는 픽셀 고정 · 블록 전체는 가운데.
+              tabular-nums로 모든 숫자 폭을 동일하게 맞춰 흔들림을 없앤다. */}
+          <View style={s.numberWrap}>
+            <Text
+              style={[s.inputNumber, s.numberGhost, {fontSize: numFontSize}]}>
+              010 - 0000 - 0000
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[s.inputNumber, s.numberReal, {fontSize: numFontSize}]}>
+              {formatDisplay(ctx.phoneNumberLabel())}
+            </Text>
+          </View>
+        </View>
       </View>
-      <View style={s.tabletFooter}>
-        <Text style={s.tabletCopyright}>
-          © 2025 {ctx.storeConfig.companyName}. All rights reserved.
-        </Text>
-        <View style={s.tabletFooterLinks}>
+
+      <View style={s.keypadZone}>
+        <View style={s.keypadInner}>
+          <Keypad onPress={ctx.onNumberPress} expanded={isExpanded} />
+        </View>
+      </View>
+
+      <View style={s.bottomBlock}>
+        <Pressable
+          style={[s.confirmBtn, complete ? s.confirmOn : s.confirmOff]}
+          onPress={ctx.onConfirmPress}
+          disabled={!complete}>
+          <Text style={[s.confirmText, !complete && s.confirmTextOff]}>
+            확인
+          </Text>
+        </Pressable>
+        <View style={s.footer}>
           <Pressable onPress={() => ctx.setPrivacyVisible(true)}>
             <Text style={s.footerLink}>개인정보 처리방침</Text>
           </Pressable>
@@ -193,53 +164,18 @@ const TabletLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
           <Pressable
             style={{flexDirection: 'row', alignItems: 'center', gap: 4}}
             onPress={ctx.logout}>
-            <ExitIcon width={14} height={14} color={c.texticon.onNormal.midemp} />
-            <Text style={s.footerLink}>로그아웃</Text>
+            <ExitIcon
+              width={14}
+              height={14}
+              color={c.texticon.onNormal.midemp}
+            />
+            <Text style={s.footerLink}>나가기</Text>
           </Pressable>
         </View>
       </View>
     </View>
-    <View style={s.tabletRight}>
-      <View style={s.tabletCard}>
-        <View style={s.tabletCardInner}>
-          {ctx.storeName ? (
-            <Text style={s.tabletStoreName}>{ctx.storeName}</Text>
-          ) : null}
-          <View style={s.tabletNumberRow}>
-            <View style={{flexDirection: 'row', alignItems: 'center'}}>
-              <Text style={s.tabletNumberText}>010</Text>
-              <Text style={s.tabletNumberText}>{ctx.phoneNumberLabel()}</Text>
-            </View>
-            {ctx.number.length > 0 && (
-              <Pressable onPress={ctx.clearNumber}>
-                <CircleXIcon width={24} height={24} color={c.texticon.onNormal.midemp} />
-              </Pressable>
-            )}
-          </View>
-          <View style={s.divider} />
-          <Keypad onPress={ctx.onNumberPress} size="large" />
-        </View>
-        <View style={s.tabletConfirmWrap}>
-          <Pressable
-            style={({pressed}) => [
-              s.confirmBtn,
-              {width: pressed ? 409 : 421, maxWidth: 421},
-            ]}
-            onPress={ctx.onConfirmPress}>
-            <LinearGradient
-              colors={[p.blue[300], c.surface.brand.primary]}
-              locations={[0.2, 1]}
-              start={{x: 0, y: 0}}
-              end={{x: 1, y: 1}}
-              style={s.confirmGradient}>
-              <Text style={s.confirmText}>조회하기</Text>
-            </LinearGradient>
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  </View>
-);
+  );
+};
 
 // ─── Signup Modal (공통) ─────────────────────────────────────
 const SignupModal = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
@@ -322,7 +258,9 @@ const SignupModal = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => (
             disabled={!ctx.agree}>
             <LinearGradient
               colors={
-                ctx.agree ? [c.surface.brand.primary, p.blue[600]] : [p.gray[200], p.gray[200]]
+                ctx.agree
+                  ? [c.surface.brand.primary, p.blue[600]]
+                  : [p.gray[200], p.gray[200]]
               }
               locations={[0.2, 1]}
               start={{x: 0, y: 0}}
@@ -342,39 +280,30 @@ const IdleOverlay = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => {
   if (!ctx.idleVisible) return null;
   return (
     <Pressable style={s.idleOverlay} onPress={ctx.dismissIdle}>
-      <LinearGradient
-        colors={[p.blue[50], p.blue[100]]}
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 1}}
-        style={s.idleGradient}>
-        <Image
-          source={POINTO_LOGO}
-          style={{width: 80, height: 80, borderRadius: 20}}
+      <ImageBackground
+        source={IDLE_BACKGROUNDS[ctx.idleBgIndex]}
+        style={s.idleBg}
+        resizeMode="cover">
+        {/* 어떤 이미지가 와도 슬로건이 읽히도록 은은한 다크 스크림 */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.15)', 'rgba(0,0,0,0.30)', 'rgba(0,0,0,0.60)']}
+          locations={[0, 0.5, 1]}
+          style={StyleSheet.absoluteFill}
         />
-        <View style={{alignItems: 'center', gap: 6}}>
-          <Text style={s.idleTitle}>{ctx.storeName ?? '우리 매장'}도</Text>
-          <Text style={s.idleTitle}>포인토 쓰고 있어요</Text>
+        <View style={s.idleSloganWrap}>
+          <Text style={s.idleSlogan}>함께 모으는 즐거움</Text>
+          <Text style={s.idleWordmark}>Pointo</Text>
         </View>
-        <Text style={s.idleSubtitle}>
-          종이 쿠폰 없이, 번호만으로 적립 끝.{'\n'}앱 하나면 어디서든 스탬프
-          관리.
-        </Text>
-        <Image
-          source={APPSTORE_QR}
-          style={{width: 140, height: 140, borderRadius: 12, marginTop: 8}}
-        />
-        <Text style={s.idleQrHint}>QR을 스캔하면 앱스토어로 이동해요</Text>
         <Animated.Text style={[s.idleTapHint, {opacity: ctx.hintOpacity}]}>
           화면을 터치하면 돌아갑니다
         </Animated.Text>
-      </LinearGradient>
+      </ImageBackground>
     </Pressable>
   );
 };
 
 // ─── Main Screen ─────────────────────────────────────────────
 const NumberInputScreen = () => {
-  const device = useDeviceType();
   const baseCtx = useNumberInput();
   const {deviceLock, unlockDevice, setIsAuthenticated} = useAuth();
   const [pinVisible, setPinVisible] = useState(false);
@@ -398,21 +327,15 @@ const NumberInputScreen = () => {
   const ctx = {...baseCtx, logout: handleLogoutRequest};
 
   return (
-    <LinearGradient
-      colors={[SUMMER_COLORS.backgroundStart, SUMMER_COLORS.backgroundEnd]}
-      style={{flex: 1}}>
+    <View style={s.root}>
       <StatusBar
         barStyle="dark-content"
-        backgroundColor={SUMMER_COLORS.backgroundStart}
+        backgroundColor={c.surface.normal.bg1}
         translucent={false}
       />
       <SafeAreaView style={{flex: 1}}>
         <LoadingOverlay isLoading={ctx.isLoading} />
-        {device === 'tablet' ? (
-          <TabletLayout ctx={ctx} />
-        ) : (
-          <PhoneLayout ctx={ctx} />
-        )}
+        <InputLayout ctx={ctx} />
       </SafeAreaView>
       <PinPad
         visible={pinVisible}
@@ -442,178 +365,116 @@ const NumberInputScreen = () => {
         companyName={ctx.storeConfig.companyName}
         contactEmail={ctx.storeConfig.contactEmail}
       />
-    </LinearGradient>
+    </View>
   );
 };
 
 // ─── Styles ──────────────────────────────────────────────────
 const s = StyleSheet.create({
-  // Keypad
-  keyRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-  },
-  keyBtn: {
-    flex: 1,
-    maxWidth: 151,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 10,
-  },
-  keyText: {color: c.texticon.onNormal.highestemp, fontFamily: 'SFUIDisplay-Regular'},
+  // Root
+  root: {flex: 1, backgroundColor: c.surface.normal.bg1},
+  content: {flex: 1, width: '100%', paddingHorizontal: 24, alignSelf: 'center'},
+  contentExpanded: {maxWidth: 480},
 
-  // Phone
-  phoneContainer: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    justifyContent: 'center',
-  },
-  phoneInner: {width: '100%', alignItems: 'center'},
-  phoneStoreName: {
+  // Top block (store name + title + input)
+  topBlock: {alignItems: 'center', paddingTop: 32},
+  storeName: {
     fontSize: 15,
-    fontFamily: f.semibold,
-    color: c.surface.brand.primary,
-    alignSelf: 'flex-start',
-    marginBottom: 12,
-    paddingHorizontal: 9,
-  },
-  phoneNumberRow: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 9,
-    marginBottom: 20,
-  },
-  phoneNumberDisplay: {flexDirection: 'row', alignItems: 'center'},
-  phoneNumberText: {
-    fontSize: 36,
-    color: c.texticon.onNormal.highestemp,
-    fontFamily: 'SFUIDisplay-Medium',
-    lineHeight: 40,
-    letterSpacing: -1,
-  },
-  phoneConfirmWrap: {width: '100%', alignItems: 'center', marginTop: 24},
-  phoneFooter: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 16,
-    paddingVertical: 16,
-  },
-
-  // Tablet
-  tabletContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 60,
-    paddingHorizontal: 20,
-  },
-  tabletLeft: {
-    width: 340,
-    justifyContent: 'space-between',
-    paddingTop: 134,
-    paddingBottom: 134,
-  },
-  tabletWelcome: {gap: 10},
-  tabletWelcomeText: {
-    fontSize: 36,
     fontFamily: f.medium,
-    lineHeight: 48,
-    letterSpacing: -1,
-    color: c.texticon.onNormal.highestemp,
-  },
-  tabletGuideText: {
-    fontSize: 24,
-    fontFamily: f.light,
-    lineHeight: 32,
-    letterSpacing: -1,
-    color: c.texticon.onNormal.highemp,
-  },
-  tabletFooter: {gap: 6},
-  tabletCopyright: {
-    fontSize: 16,
-    lineHeight: 24,
-    fontFamily: f.light,
-    color: p.blue[700],
+    color: c.texticon.onNormal.lowemp,
     textAlign: 'center',
   },
-  tabletFooterLinks: {flexDirection: 'row', alignSelf: 'center', gap: 16},
-  tabletRight: {justifyContent: 'flex-end', height: '100%'},
-  tabletCard: {
-    width: 533,
-    height: 734,
-    backgroundColor: c.surface.normal.bg1,
-    borderTopLeftRadius: 32,
-    borderTopRightRadius: 32,
-    paddingTop: 24,
-    paddingHorizontal: 15,
-    shadowColor: c.etc.absolute.black,
-    shadowOffset: {width: 0, height: 4.5},
-    shadowOpacity: 0.07,
-    shadowRadius: 22,
-    elevation: 6,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tabletCardInner: {width: '100%', paddingHorizontal: 24},
-  tabletStoreName: {
-    fontSize: 15,
+  titleWrap: {marginTop: 12, alignItems: 'center'},
+  title: {
     fontFamily: f.semibold,
-    color: c.surface.brand.primary,
-    marginBottom: 20,
-    paddingHorizontal: 9,
+    color: c.texticon.onNormal.highestemp,
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    lineHeight: 38,
   },
-  tabletNumberRow: {
+
+  // Input box
+  inputBox: {
     width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 32,
-    paddingHorizontal: 9,
+    marginTop: 28,
+    borderWidth: 1.5,
+    borderColor: c.surface.brand.primary,
+    borderRadius: 10,
+    backgroundColor: c.surface.normal.bg1,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 20,
+    shadowColor: c.surface.brand.primary,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 2,
+    gap: 6,
   },
-  tabletNumberText: {
-    fontSize: 44,
+  inputLabel: {
+    fontSize: 13,
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.lowemp,
+    marginBottom: 6,
+  },
+  inputNumber: {
+    fontFamily: 'SFUIDisplay-Medium',
+    color: c.texticon.onNormal.highestemp,
+    letterSpacing: 0.5,
+    fontVariant: ['tabular-nums'],
+  },
+  numberWrap: {alignSelf: 'center'},
+  numberGhost: {opacity: 0},
+  numberReal: {position: 'absolute', left: 0, top: 0},
+
+  // Keypad
+  keypadZone: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  keypadInner: {width: '100%', maxWidth: 360},
+  keyRow: {flexDirection: 'row', gap: 8},
+  keyBtn: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 14,
+  },
+  keyText: {
     color: c.texticon.onNormal.highestemp,
     fontFamily: 'SFUIDisplay-Medium',
-    lineHeight: 48,
-    letterSpacing: -1,
   },
-  tabletConfirmWrap: {width: '100%', alignItems: 'center', marginTop: 55.5},
 
-  // Confirm button (shared)
+  // Bottom block (CTA + footer)
+  bottomBlock: {paddingBottom: 12},
   confirmBtn: {
     width: '100%',
-    maxWidth: 344,
-    height: 64,
-    borderRadius: 24,
-    shadowColor: p.blue[700],
-    shadowOffset: {width: 0, height: 4.5},
-    shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 6,
+    height: 56,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
   },
+  confirmOn: {backgroundColor: c.surface.brand.primary},
+  confirmOff: {backgroundColor: p.gray[100]},
   confirmGradient: {
     width: '100%',
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 16,
   },
-  confirmText: {fontSize: 16, color: c.etc.absolute.white, fontFamily: f.regular},
-
-  // Divider
-  divider: {
-    width: '100%',
-    height: 0.5,
-    backgroundColor: p.blue[100],
-    marginBottom: 12,
+  confirmText: {
+    fontSize: 16,
+    color: c.etc.absolute.white,
+    fontFamily: f.semibold,
   },
+  confirmTextOff: {color: c.texticon.onNormal.lowemp},
 
   // Footer link
+  footer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 16,
+    marginTop: 18,
+  },
   footerLink: {
     fontSize: 13,
     fontFamily: f.regular,
@@ -656,7 +517,10 @@ const s = StyleSheet.create({
     fontFamily: f.medium,
     color: c.texticon.onNormal.highestemp,
   },
-  modalWelcomeAccent: {color: c.surface.brand.primary, fontFamily: 'SFUIDisplay-Semibold'},
+  modalWelcomeAccent: {
+    color: c.surface.brand.primary,
+    fontFamily: 'SFUIDisplay-Semibold',
+  },
   modalTitle: {
     width: '100%',
     fontSize: 28,
@@ -723,39 +587,47 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  idleGradient: {
+  idleBg: {
     flex: 1,
     width: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 24,
   },
-  idleTitle: {
-    fontSize: 36,
+  idleSloganWrap: {
+    alignItems: 'center',
+    gap: 8,
+  },
+  idleSlogan: {
+    fontSize: 32,
     fontFamily: f.semibold,
-    color: c.texticon.onNormal.highestemp,
+    color: '#FFFFFF',
     textAlign: 'center',
     letterSpacing: -1,
-    lineHeight: 50,
+    lineHeight: 32,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: {width: 0, height: 2},
+    textShadowRadius: 12,
   },
-  idleSubtitle: {
-    fontSize: 20,
-    fontFamily: f.light,
-    color: c.texticon.onNormal.highemp,
+  idleWordmark: {
+    fontSize: 32,
+    fontFamily: f.extrabold,
+    color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     lineHeight: 32,
-  },
-  idleQrHint: {
-    fontSize: 13,
-    fontFamily: f.regular,
-    color: c.texticon.onNormal.midemp,
-    marginTop: 4,
+    letterSpacing: 2,
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: {width: 0, height: 2},
+    textShadowRadius: 12,
   },
   idleTapHint: {
-    fontSize: 18,
+    position: 'absolute',
+    bottom: 48,
+    fontSize: 16,
     fontFamily: f.light,
-    color: c.texticon.onNormal.highestemp,
-    marginTop: 8,
+    color: 'rgba(255,255,255,0.85)',
+    textShadowColor: 'rgba(0,0,0,0.35)',
+    textShadowOffset: {width: 0, height: 1},
+    textShadowRadius: 8,
   },
 });
 

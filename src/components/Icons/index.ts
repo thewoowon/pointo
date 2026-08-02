@@ -17,5 +17,8 @@ export {default as MagnifierIcon} from './MagnifierIcon';
 export {default as DownTriangleIcon} from './DownTriangleIcon';
 export {default as LeftBigArrowIcon} from './LeftBigArrowIcon';
 export {default as GearIcon} from './GearIcon';
+export {default as QrIcon} from './QrIcon';
 export {default as GoogleIcon} from './GoogleIcon';
 export {default as AppleIcon} from './AppleIcon';
+export {default as SettingIcon} from './SettingIcon';
+export {default as RightChevronIcon} from './RightChevronIcon';
