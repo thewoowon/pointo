@@ -80,12 +80,15 @@ const AccountSettingsScreen = ({navigation}: any) => {
       />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
-          <View style={styles.backWrap}>
-            <Pressable onPress={() => navigation.goBack()}>
-              <Text style={styles.backText}>뒤로</Text>
-            </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>설정</Text>
           </View>
-          <Text style={styles.headerTitle}>설정</Text>
+          <Pressable
+            style={styles.backWrap}
+            onPress={() => navigation.goBack()}
+            hitSlop={8}>
+            <Text style={styles.backText}>뒤로</Text>
+          </Pressable>
         </View>
 
         <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -137,17 +140,23 @@ const createStyles = (t: Theme) =>
       flex: 1,
     },
     header: {
+      height: 40,
       flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'transparent',
+    },
+    headerCenter: {
+      flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingVertical: t.spacing[3.5],
-      backgroundColor: t.color.surface.normal.bg1,
-      borderBottomWidth: 1,
-      borderColor: t.palette.gray[200],
     },
     backWrap: {
       position: 'absolute',
-      left: t.spacing[4],
+      left: 0,
+      top: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      paddingHorizontal: t.spacing[5],
     },
     backText: {
       fontSize: 14,
@@ -155,8 +164,8 @@ const createStyles = (t: Theme) =>
       color: t.color.texticon.onNormal.highestemp,
     },
     headerTitle: {
-      fontSize: 18,
-      fontFamily: t.font.semibold,
+      fontSize: 16,
+      fontFamily: t.font.medium,
       color: t.color.texticon.onNormal.highestemp,
     },
     scrollContent: {

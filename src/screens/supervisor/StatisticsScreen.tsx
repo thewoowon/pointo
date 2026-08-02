@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -10,10 +10,15 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import dayjs from 'dayjs';
-import {useAuth, useFirestore, useStoreConfig, useDeviceType} from '../../hooks';
-import {semanticColors as c, primitives as pal, fontFamily as f} from '../../theme';
+import {
+  useAuth,
+  useFirestore,
+  useStoreConfig,
+  useDeviceType,
+  useTheme,
+} from '../../hooks';
+import type {Theme} from '../../theme';
 import {useFocusEffect} from '@react-navigation/native';
-import {LeftArrowIcon} from '../../components/Icons';
 import {
   computePortfolioKpis,
   fmtFloat,
@@ -51,10 +56,18 @@ const HOUR_BLOCKS: {label: string; from: number; to: number}[] = [
   {label: '21시~', from: 21, to: 24},
 ];
 
-// 단일 브랜드 액센트 (차트/활성 상태에만 절제해서 사용)
-const ACCENT = c.surface.brand.primary;
-
 const StatisticsScreen = ({navigation}: any) => {
+  const theme = useTheme();
+  const c = theme.color;
+  const pal = theme.palette;
+  const f = theme.font;
+  // 단일 브랜드 액센트 (차트/활성 상태에만 절제해서 사용)
+  const ACCENT = c.surface.brand.primary;
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const {StatCard, KpiCard, SummaryItem} = useMemo(
+    () => createSubComponents(styles),
+    [styles],
+  );
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const isPhone = useDeviceType() === 'phone';
@@ -238,14 +251,15 @@ const StatisticsScreen = ({navigation}: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={c.surface.normal.bg1} translucent={false} />
       <SafeAreaView style={styles.safeArea}>
-        {/* 헤더 */}
+        {/* 헤더 — Switcher 기준 (투명 · 중앙 타이틀) */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <LeftArrowIcon width={20} height={20} />
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
             <Text style={styles.backText}>뒤로</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>대시보드</Text>
-          <Pressable style={styles.refreshBtn} onPress={() => loadData(period)}>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>통계</Text>
+          </View>
+          <Pressable style={styles.refreshBtn} onPress={() => loadData(period)} hitSlop={8}>
             <Text style={styles.refreshText}>새로고침</Text>
           </Pressable>
         </View>
@@ -258,15 +272,15 @@ const StatisticsScreen = ({navigation}: any) => {
           <ScrollView
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}>
-            {/* 가게 정보 */}
+            {/* 회원 요약 */}
             <View style={styles.storeInfoRow}>
               <View style={{flex: 1}}>
-                <Text style={styles.storeName}>{storeName}</Text>
-                <Text style={styles.storeCode}>코드 {storeCode}</Text>
-              </View>
-              <View style={styles.memberBadge}>
-                <Text style={styles.memberBadgeNumber}>{memberCount}</Text>
+                <Text style={styles.storeNameLine}>{storeName}</Text>
                 <Text style={styles.memberBadgeLabel}>총 회원</Text>
+                <Text style={styles.memberCountLarge}>
+                  {memberCount.toLocaleString()}
+                  <Text style={styles.memberCountUnit}> 명</Text>
+                </Text>
               </View>
             </View>
 
@@ -590,80 +604,100 @@ const StatisticsScreen = ({navigation}: any) => {
 };
 
 // ─── 서브 컴포넌트 ────────────────────────────────────────────
+// styles에 바인딩해 한 번만 생성 (컴포넌트 안 useMemo에서 호출).
 
-const StatCard = ({
-  label,
-  value,
-  unit,
-  minWidth,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  minWidth?: `${number}%`;
-}) => (
-  <View
-    style={[
-      styles.statCard,
-      minWidth
-        ? {minWidth: minWidth as any, flex: undefined, flexBasis: minWidth as any}
-        : undefined,
-    ]}>
-    <Text style={styles.statValue}>
-      {value}
-      <Text style={styles.statUnit}> {unit}</Text>
-    </Text>
-    <Text style={styles.statLabel}>{label}</Text>
-  </View>
-);
+type Styles = ReturnType<typeof createStyles>;
 
-const KpiCard = ({
-  label,
-  value,
-  unit,
-  subtitle,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  subtitle?: string;
-}) => (
-  <View style={styles.kpiCard}>
-    <Text style={styles.kpiCardLabel}>{label}</Text>
-    <Text style={styles.kpiCardValue}>
-      {value}
-      {unit ? <Text style={styles.kpiCardUnit}> {unit}</Text> : null}
-    </Text>
-    {subtitle ? <Text style={styles.kpiCardSubtitle}>{subtitle}</Text> : null}
-  </View>
-);
+const createSubComponents = (styles: Styles) => {
+  const StatCard = ({
+    label,
+    value,
+    unit,
+    minWidth,
+  }: {
+    label: string;
+    value: number;
+    unit: string;
+    minWidth?: `${number}%`;
+  }) => (
+    <View
+      style={[
+        styles.statCard,
+        minWidth
+          ? {minWidth: minWidth as any, flex: undefined, flexBasis: minWidth as any}
+          : undefined,
+      ]}>
+      <Text style={styles.statValue}>
+        {value}
+        <Text style={styles.statUnit}> {unit}</Text>
+      </Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
 
-const SummaryItem = ({
-  label,
-  value,
-  unit,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-}) => (
-  <View style={styles.summaryItem}>
-    <Text style={styles.summaryValue}>{value}</Text>
-    <Text style={styles.summaryUnit}>{unit}</Text>
-    <Text style={styles.summaryLabel}>{label}</Text>
-  </View>
-);
+  const KpiCard = ({
+    label,
+    value,
+    unit,
+    subtitle,
+  }: {
+    label: string;
+    value: string;
+    unit: string;
+    subtitle?: string;
+  }) => (
+    <View style={styles.kpiCard}>
+      <Text style={styles.kpiCardLabel}>{label}</Text>
+      <Text style={styles.kpiCardValue}>
+        {value}
+        {unit ? <Text style={styles.kpiCardUnit}> {unit}</Text> : null}
+      </Text>
+      {subtitle ? <Text style={styles.kpiCardSubtitle}>{subtitle}</Text> : null}
+    </View>
+  );
+
+  const SummaryItem = ({
+    label,
+    value,
+    unit,
+  }: {
+    label: string;
+    value: number;
+    unit: string;
+  }) => (
+    <View style={styles.summaryItem}>
+      <Text style={styles.summaryValue}>{value}</Text>
+      <Text style={styles.summaryUnit}>{unit}</Text>
+      <Text style={styles.summaryLabel}>{label}</Text>
+    </View>
+  );
+
+  return {StatCard, KpiCard, SummaryItem};
+};
 
 // ─── 스타일 ──────────────────────────────────────────────────
 
-const TEXT_PRIMARY = c.texticon.onNormal.highestemp;
-const TEXT_SECONDARY = c.texticon.onNormal.midemp;
-const TEXT_MUTED = c.texticon.onNormal.lowemp;
-const SURFACE = c.surface.normal.bg1;
-const HAIRLINE = pal.gray[200];
-const TRACK = c.surface.normal.container10;
+const createStyles = (theme: Theme) => {
+  const c = theme.color;
+  const pal = theme.palette;
+  const f = theme.font;
+  const ACCENT = c.surface.brand.primary;
+  const TEXT_PRIMARY = c.texticon.onNormal.highestemp;
+  const TEXT_SECONDARY = c.texticon.onNormal.midemp;
+  const TEXT_MUTED = c.texticon.onNormal.lowemp;
+  const SURFACE = c.surface.normal.bg1;
+  const TRACK = c.surface.normal.container10;
 
-const styles = StyleSheet.create({
+  // 보더 대신 옅은 섀도우로 카드를 띄운다 (리뉴얼 방향)
+  const CARD_SHADOW = {
+    shadowColor: c.etc.absolute.black,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  } as const;
+
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.surface.normal.container10,
@@ -672,39 +706,52 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: SURFACE,
-    borderBottomWidth: 1,
-    borderBottomColor: HAIRLINE,
-  },
-  backButton: {
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    width: 80,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  backText: {
-    fontSize: 16,
-    fontFamily: f.regular,
-    color: c.texticon.onNormal.highemp,
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontFamily: f.semibold,
+    fontSize: 16,
+    fontFamily: f.medium,
     color: TEXT_PRIMARY,
   },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  backText: {
+    fontSize: 14,
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highestemp,
+  },
   refreshBtn: {
-    width: 80,
-    alignItems: 'flex-end',
+    position: 'absolute',
+    right: 20,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
   },
   refreshText: {
     fontSize: 14,
     fontFamily: f.medium,
     color: ACCENT,
+  },
+  storeNameLine: {
+    fontSize: 15,
+    fontFamily: f.semibold,
+    color: TEXT_PRIMARY,
+    marginBottom: 8,
+    letterSpacing: -0.3,
   },
   loadingContainer: {
     flex: 1,
@@ -723,35 +770,23 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
     borderRadius: 16,
     padding: 20,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
-  },
-  storeName: {
-    fontSize: 22,
-    fontFamily: f.semibold,
-    color: TEXT_PRIMARY,
-  },
-  storeCode: {
-    fontSize: 13,
-    fontFamily: 'SFUIDisplay-Regular',
-    color: TEXT_MUTED,
-    marginTop: 4,
-    letterSpacing: 1,
-  },
-  memberBadge: {
-    alignItems: 'center',
-    backgroundColor: c.surface.normal.container10,
-    borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-  },
-  memberBadgeNumber: {
-    fontSize: 28,
-    fontFamily: f.semibold,
-    color: TEXT_PRIMARY,
+    ...CARD_SHADOW,
   },
   memberBadgeLabel: {
-    fontSize: 12,
+    fontSize: 13,
+    fontFamily: f.regular,
+    color: TEXT_SECONDARY,
+    letterSpacing: -0.2,
+  },
+  memberCountLarge: {
+    fontSize: 32,
+    fontFamily: f.semibold,
+    color: TEXT_PRIMARY,
+    marginTop: 2,
+    letterSpacing: -0.5,
+  },
+  memberCountUnit: {
+    fontSize: 16,
     fontFamily: f.regular,
     color: TEXT_SECONDARY,
   },
@@ -809,8 +844,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     alignItems: 'center',
     gap: 6,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+    ...CARD_SHADOW,
   },
   statValue: {
     fontSize: 28,
@@ -831,8 +865,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
     borderRadius: 16,
     padding: 20,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+    ...CARD_SHADOW,
   },
   barChart: {
     flexDirection: 'row',
@@ -873,8 +906,7 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     gap: 2,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+    ...CARD_SHADOW,
   },
   summaryValue: {
     fontSize: 24,
@@ -897,8 +929,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 4,
     paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+    ...CARD_SHADOW,
   },
   visitorRow: {
     flexDirection: 'row',
@@ -925,8 +956,7 @@ const styles = StyleSheet.create({
     backgroundColor: SURFACE,
     borderRadius: 16,
     padding: 20,
-    borderWidth: 1,
-    borderColor: HAIRLINE,
+    ...CARD_SHADOW,
   },
   kpiHeader: {
     flexDirection: 'row',
@@ -1001,6 +1031,7 @@ const styles = StyleSheet.create({
     fontFamily: f.regular,
     color: TEXT_MUTED,
   },
-});
+  });
+};
 
 export default StatisticsScreen;

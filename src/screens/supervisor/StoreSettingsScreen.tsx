@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {
   Alert,
   Pressable,
@@ -10,43 +10,60 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore, useStoreConfig} from '../../hooks';
-import {semanticColors as c, primitives as pal, fontFamily as f} from '../../theme';
-import {LeftArrowIcon} from '../../components/Icons';
+import {useAuth, useFirestore, useStoreConfig, useTheme} from '../../hooks';
+import type {Theme} from '../../theme';
 
-const Section = ({title, children}: {title: string; children: React.ReactNode}) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-    {children}
-  </View>
-);
+// styles에 바인딩한 서브컴포넌트를 한 번만 생성 (컴포넌트 안 useMemo에서 호출).
+// 렌더마다 재정의하지 않으므로 Field 내부 TextInput 포커스가 유지된다.
+type Styles = ReturnType<typeof createStyles>;
 
-const Field = ({
-  label,
-  value,
-  onChangeText,
-  keyboardType = 'default',
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  keyboardType?: 'default' | 'numeric' | 'email-address';
-  placeholder?: string;
-}) => (
-  <View style={styles.field}>
-    <Text style={styles.fieldLabel}>{label}</Text>
-    <TextInput
-      style={styles.fieldInput}
-      value={value}
-      onChangeText={onChangeText}
-      keyboardType={keyboardType}
-      placeholder={placeholder}
-    />
-  </View>
-);
+const createSubComponents = (styles: Styles) => {
+  const Section = ({
+    title,
+    children,
+  }: {
+    title: string;
+    children: React.ReactNode;
+  }) => (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+
+  const Field = ({
+    label,
+    value,
+    onChangeText,
+    keyboardType = 'default',
+    placeholder,
+  }: {
+    label: string;
+    value: string;
+    onChangeText: (text: string) => void;
+    keyboardType?: 'default' | 'numeric' | 'email-address';
+    placeholder?: string;
+  }) => (
+    <View style={styles.field}>
+      <Text style={styles.fieldLabel}>{label}</Text>
+      <TextInput
+        style={styles.fieldInput}
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType}
+        placeholder={placeholder}
+      />
+    </View>
+  );
+
+  return {Section, Field};
+};
 
 const StoreSettingsScreen = ({navigation}: any) => {
+  const theme = useTheme();
+  const c = theme.color;
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const {Section, Field} = useMemo(() => createSubComponents(styles), [styles]);
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const {updateStoreConfig} = useFirestore(storeCode);
@@ -212,20 +229,14 @@ const StoreSettingsScreen = ({navigation}: any) => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={c.surface.normal.bg1} translucent={false} />
       <SafeAreaView style={styles.safeArea}>
+        {/* 헤더 — Switcher 기준 (투명 · 중앙 타이틀) */}
         <View style={styles.header}>
-          <Pressable style={styles.backButton} onPress={() => navigation.goBack()}>
-            <LeftArrowIcon width={20} height={20} />
+          <Pressable style={styles.backButton} onPress={() => navigation.goBack()} hitSlop={8}>
             <Text style={styles.backText}>뒤로</Text>
           </Pressable>
-          <Text style={styles.headerTitle}>매장 설정</Text>
-          <Pressable
-            style={[styles.saveButton, isSaving && {opacity: 0.5}]}
-            onPress={handleSave}
-            disabled={isSaving}>
-            <Text style={styles.saveButtonText}>
-              {isSaving ? '저장 중...' : '저장'}
-            </Text>
-          </Pressable>
+          <View style={styles.headerCenter}>
+            <Text style={styles.headerTitle}>매장 설정</Text>
+          </View>
         </View>
 
         <ScrollView
@@ -455,14 +466,30 @@ const StoreSettingsScreen = ({navigation}: any) => {
             />
           </Section>
 
-          <View style={{height: 60}} />
+          <View style={{height: 24}} />
         </ScrollView>
+
+        {/* 하단 고정 저장 CTA */}
+        <View style={styles.ctaBar}>
+          <Pressable
+            style={[styles.saveButton, isSaving && {opacity: 0.5}]}
+            onPress={handleSave}
+            disabled={isSaving}>
+            <Text style={styles.saveButtonText}>
+              {isSaving ? '저장 중...' : '저장'}
+            </Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (theme: Theme) => {
+  const c = theme.color;
+  const pal = theme.palette;
+  const f = theme.font;
+  return StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: c.surface.normal.container10,
@@ -471,41 +498,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: c.surface.normal.bg1,
-    borderBottomWidth: 1,
-    borderBottomColor: pal.gray[200],
-  },
-  backButton: {
+    height: 44,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    width: 80,
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
   },
-  backText: {
-    fontSize: 16,
-    fontFamily: f.regular,
-    color: c.texticon.onNormal.highemp,
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontFamily: f.semibold,
+    fontSize: 16,
+    fontFamily: f.medium,
     color: c.texticon.onNormal.highestemp,
+  },
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    top: 0,
+    bottom: 0,
+    justifyContent: 'center',
+  },
+  backText: {
+    fontSize: 14,
+    fontFamily: f.regular,
+    color: c.texticon.onNormal.highestemp,
+  },
+  ctaBar: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 12,
+    backgroundColor: c.surface.normal.container10,
+    borderTopWidth: 1,
+    borderTopColor: pal.gray[200],
   },
   saveButton: {
     backgroundColor: c.surface.brand.primary,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    width: 80,
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: 'center',
   },
   saveButtonText: {
-    fontSize: 15,
+    fontSize: 16,
     fontFamily: f.semibold,
     color: c.etc.absolute.white,
   },
@@ -634,6 +670,7 @@ const styles = StyleSheet.create({
     fontFamily: f.semibold,
     color: c.etc.absolute.white,
   },
-});
+  });
+};
 
 export default StoreSettingsScreen;
