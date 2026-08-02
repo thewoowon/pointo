@@ -3,6 +3,7 @@ import {LoginScreen, StoreRegisterScreen} from '../screens/auth';
 import {
   SwitcherScreen,
   AccountSettingsScreen,
+  DeletionConfirmScreen,
   DeletionPendingScreen,
 } from '../screens/common';
 
@@ -24,6 +25,7 @@ const AuthStack = () => (
     />
     <Stack.Screen name="StoreRegister" component={StoreRegisterScreen} />
     <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+    <Stack.Screen name="DeletionConfirm" component={DeletionConfirmScreen} />
     <Stack.Screen
       name="DeletionPending"
       component={DeletionPendingScreen}

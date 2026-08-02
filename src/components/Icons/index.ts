@@ -22,3 +22,5 @@ export {default as GoogleIcon} from './GoogleIcon';
 export {default as AppleIcon} from './AppleIcon';
 export {default as SettingIcon} from './SettingIcon';
 export {default as RightChevronIcon} from './RightChevronIcon';
+export {default as AlertCircleIcon} from './AlertCircleIcon';
+export {default as ClockIcon} from './ClockIcon';

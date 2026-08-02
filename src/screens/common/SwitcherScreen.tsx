@@ -238,7 +238,7 @@ const SwitcherScreen = ({navigation}: any) => {
                   </Text>
                 </Pressable>
                 <Pressable style={styles.secondaryBtn} onPress={handleAddStore}>
-                  <Text style={styles.secondaryBtnText}>새 가게 등록</Text>
+                  <Text style={styles.secondaryBtnText}>새 매장 등록</Text>
                 </Pressable>
               </View>
             ) : (
@@ -339,6 +339,9 @@ const SwitcherScreen = ({navigation}: any) => {
   );
 };
 
+// 태블릿에서 콘텐츠가 가로로 꽉 차지 않도록 캡하는 단일 컬럼 폭
+const CONTENT_MAX_WIDTH = 480;
+
 const createStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
@@ -392,12 +395,16 @@ const createStyles = (theme: Theme) =>
     scrollContent: {
       padding: 20,
       gap: 12,
+      alignItems: 'center',
     },
     profileBox: {
       padding: 20,
       marginTop: 12,
+      alignItems: 'center',
     },
     profileWrap: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
       backgroundColor: theme.color.surface.normal.bg1,
       borderRadius: 14,
       gap: 4,
@@ -446,10 +453,10 @@ const createStyles = (theme: Theme) =>
       color: theme.color.texticon.onNormal.lowemp,
     },
     emptyBox: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
       backgroundColor: theme.color.surface.normal.bg1,
       borderRadius: 16,
-      borderWidth: 1,
-      borderColor: theme.palette.gray[200],
       padding: 24,
       alignItems: 'center',
       gap: 10,
@@ -469,6 +476,8 @@ const createStyles = (theme: Theme) =>
       marginBottom: 8,
     },
     slotRow: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
@@ -491,6 +500,8 @@ const createStyles = (theme: Theme) =>
       color: theme.color.surface.brand.primary,
     },
     storeList: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
       gap: 10,
       marginBottom: 20,
     },
@@ -514,6 +525,8 @@ const createStyles = (theme: Theme) =>
       color: theme.color.texticon.onNormal.highestemp,
     },
     btnContainer: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
       display: 'flex',
       flexDirection: 'column',
       gap: 10,

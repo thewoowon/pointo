@@ -1,6 +1,5 @@
 import React, {useMemo, useState} from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StatusBar,
@@ -9,26 +8,25 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useAuth, useFirestore, useTheme} from '../../hooks';
+import {useAuth, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 import {signOutGoogle} from '../../services/auth';
-import {ShortRightArrowIcon} from '../../components/Icons';
+import {RightChevronIcon} from '../../components/Icons';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
 /**
  * 계정 설정 — Switcher(계정 허브)에서 진입한다.
  * 로그인 계정 확인 · 개인정보처리방침 · 로그아웃 · 회원 탈퇴.
- * 회원 탈퇴는 즉시 삭제가 아니라 30일 유예(soft delete) 후 서버가 실삭제한다.
+ * 회원 탈퇴는 전용 확인 화면(DeletionConfirm)에서 진행하며, 즉시 삭제가 아니라
+ * 30일 유예(soft delete) 후 서버가 실삭제한다.
  */
 const AccountSettingsScreen = ({navigation}: any) => {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
-  const {ownerUid, ownerEmail, setOwnerUid, setOwnerEmail} = useAuth();
-  const {requestAccountDeletion} = useFirestore();
+  const {ownerEmail, setOwnerUid, setOwnerEmail} = useAuth();
 
   const [privacyVisible, setPrivacyVisible] = useState(false);
-  const [busy, setBusy] = useState(false);
 
   const handleLogout = async () => {
     await signOutGoogle();
@@ -37,38 +35,9 @@ const AccountSettingsScreen = ({navigation}: any) => {
     navigation.reset({index: 0, routes: [{name: 'Login'}]});
   };
 
-  const proceedDeletion = async () => {
-    if (!ownerUid) return;
-    setBusy(true);
-    const ok = await requestAccountDeletion(ownerUid);
-    setBusy(false);
-    if (!ok) {
-      Alert.alert('오류', '탈퇴 처리 중 문제가 발생했어요. 잠시 후 다시 시도해주세요.');
-      return;
-    }
-    // 유예 상태 화면으로 이동 — 복구/영구삭제 안내는 거기서 담당
-    navigation.reset({index: 0, routes: [{name: 'DeletionPending'}]});
-  };
-
   const handleDeleteAccount = () => {
-    // 1단계: 무슨 일이 벌어지는지 안내
-    Alert.alert(
-      '회원 탈퇴',
-      '탈퇴하면 30일 후 계정과 개인정보가 영구 삭제돼요.\n30일 안에 다시 로그인하면 복구할 수 있어요.\n\n계속할까요?',
-      [
-        {text: '취소', style: 'cancel'},
-        {
-          text: '탈퇴 진행',
-          style: 'destructive',
-          // 2단계: 최종 확인
-          onPress: () =>
-            Alert.alert('정말 탈퇴하시겠어요?', '이 계정으로 더 이상 매장에 접근할 수 없어요.', [
-              {text: '취소', style: 'cancel'},
-              {text: '탈퇴하기', style: 'destructive', onPress: proceedDeletion},
-            ]),
-        },
-      ],
-    );
+    // 탈퇴로 사라지는 것을 명확히 보여주는 전용 확인 화면으로
+    navigation.navigate('DeletionConfirm');
   };
 
   return (
@@ -100,24 +69,22 @@ const AccountSettingsScreen = ({navigation}: any) => {
 
           {/* 약관/정책 */}
           <Text style={styles.sectionLabel}>약관</Text>
-          <Pressable
-            style={styles.row}
-            onPress={() => setPrivacyVisible(true)}>
+          <Pressable style={styles.row} onPress={() => setPrivacyVisible(true)}>
             <Text style={styles.rowText}>개인정보 처리방침</Text>
-            <ShortRightArrowIcon width={20} height={20} />
+            <RightChevronIcon />
           </Pressable>
 
           {/* 계정 관리 */}
           <Text style={styles.sectionLabel}>계정</Text>
           <Pressable style={styles.row} onPress={handleLogout}>
             <Text style={styles.rowText}>로그아웃</Text>
-            <ShortRightArrowIcon width={20} height={20} />
+            <RightChevronIcon />
           </Pressable>
           <Pressable
-            style={({pressed}) => [styles.row, {opacity: busy || pressed ? 0.6 : 1}]}
-            onPress={handleDeleteAccount}
-            disabled={busy}>
+            style={({pressed}) => [styles.row, {opacity: pressed ? 0.6 : 1}]}
+            onPress={handleDeleteAccount}>
             <Text style={styles.dangerText}>회원 탈퇴</Text>
+            <RightChevronIcon />
           </Pressable>
         </ScrollView>
       </SafeAreaView>
@@ -182,11 +149,15 @@ const createStyles = (t: Theme) =>
     },
     accountCard: {
       backgroundColor: t.color.surface.normal.bg1,
-      borderRadius: t.radius.lg,
-      borderWidth: 1,
-      borderColor: t.palette.gray[200],
+      borderRadius: 14,
       paddingVertical: t.spacing[5],
       paddingHorizontal: t.spacing[5],
+      // shadow
+      shadowColor: t.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.02,
+      shadowRadius: 6,
+      elevation: 2,
     },
     accountEmail: {
       fontSize: 16,
@@ -198,11 +169,15 @@ const createStyles = (t: Theme) =>
       alignItems: 'center',
       justifyContent: 'space-between',
       backgroundColor: t.color.surface.normal.bg1,
-      borderRadius: t.radius.lg,
-      borderWidth: 1,
-      borderColor: t.palette.gray[200],
+      borderRadius: 14,
       paddingVertical: t.spacing[4],
       paddingHorizontal: t.spacing[5],
+      // shadow
+      shadowColor: t.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.02,
+      shadowRadius: 6,
+      elevation: 2,
     },
     rowText: {
       fontSize: 16,

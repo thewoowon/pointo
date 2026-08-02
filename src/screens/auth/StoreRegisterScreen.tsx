@@ -1,6 +1,7 @@
 import React, {useMemo, useState} from 'react';
 import {
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -106,15 +107,25 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
     return (
       <View style={styles.container}>
         <SafeAreaView style={styles.safeArea}>
-          <View style={styles.successContainer}>
-            <Text style={styles.successEmoji}>🎉</Text>
-            <Text style={styles.successTitle}>등록 완료</Text>
-            <Text style={styles.successSubtitle}>
-              매장이 개설되었어요.{'\n'}내 매장에서 바로 시작할 수 있어요.
-            </Text>
+          <View style={styles.header}>
+            <Text style={styles.headerText}>등록완료</Text>
+          </View>
 
+          <View style={styles.successContainer}>
+            <Image
+              source={require('../../assets/images/store_register_complete.png')}
+              style={styles.successIllust}
+              resizeMode="contain"
+            />
+            <Text style={styles.successTitle}>등록완료되었습니다.</Text>
+            <Text style={styles.successSubtitle}>
+              내 매장에서 바로 시작할 수 있어요.
+            </Text>
+          </View>
+
+          <View style={styles.footer}>
             <Pressable style={styles.confirmButton} onPress={handleGoHome}>
-              <Text style={styles.confirmButtonText}>바로 시작하기</Text>
+              <Text style={styles.confirmButtonText}>바로 시작</Text>
             </Pressable>
           </View>
         </SafeAreaView>
@@ -137,7 +148,7 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
               <Text style={styles.goBackText}>뒤로</Text>
             </Pressable>
           </View>
-          <Text style={styles.headerText}>새 가게 등록</Text>
+          <Text style={styles.headerText}>새 매장 등록</Text>
         </View>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -148,26 +159,23 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
             keyboardShouldPersistTaps="handled">
             <View style={styles.innerContainer}>
               <View style={styles.formSection}>
-                <Text style={styles.pageTitle}>가게 정보를 입력해주세요</Text>
-                <Text style={styles.pageSubtitle}>
-                  등록 완료 후 스토어 코드가 발급됩니다
-                </Text>
+                <Text style={styles.pageTitle}>매장정보를 입력해주세요</Text>
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>가게 이름</Text>
+                <Text style={styles.fieldLabel}>매장명을 입력해주세요</Text>
                 <TextInput
                   style={styles.input}
                   value={storeName}
                   onChangeText={setStoreName}
-                  placeholder="예) 우리동네 볼링장"
+                  placeholder="예) 커피빈 상봉점"
                   placeholderTextColor={theme.color.texticon.onNormal.lowemp}
                   maxLength={30}
                 />
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={styles.fieldLabel}>점주 연락처</Text>
+                <Text style={styles.fieldLabel}>점주님의 연락처를 입력해주세요</Text>
                 <TextInput
                   style={styles.input}
                   value={ownerPhone}
@@ -212,7 +220,7 @@ const createStyles = (t: Theme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: t.color.surface.normal.container10,
+      backgroundColor: t.color.surface.normal.container0,
     },
     safeArea: {
       flex: 1,
@@ -222,16 +230,14 @@ const createStyles = (t: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
       paddingVertical: t.spacing[3.5],
-      borderBottomWidth: 1,
-      borderColor: t.palette.gray[200],
     },
     backButtonWrapper: {
       position: 'absolute',
       left: t.spacing[4],
     },
     headerText: {
-      fontSize: 18,
-      fontFamily: t.font.semibold,
+      fontSize: 16,
+      fontFamily: t.font.medium,
       color: t.color.texticon.onNormal.highestemp,
     },
     goBackText: {
@@ -246,45 +252,46 @@ const createStyles = (t: Theme) =>
       gap: t.spacing[6],
     },
     formSection: {
-      gap: t.spacing[2],
+      alignItems: 'center',
       marginBottom: t.spacing[2],
     },
     pageTitle: {
-      fontSize: 28,
+      fontSize: 20,
       fontFamily: t.font.semibold,
       color: t.color.texticon.onNormal.highestemp,
-      lineHeight: 36,
-    },
-    pageSubtitle: {
-      fontSize: 16,
-      fontFamily: t.font.regular,
-      color: t.color.texticon.onNormal.midemp,
-      lineHeight: 24,
+      lineHeight: 28,
+      textAlign: 'center',
     },
     fieldGroup: {
       gap: t.spacing[2],
     },
     fieldLabel: {
       fontSize: 16,
-      fontFamily: t.font.semibold,
+      fontFamily: t.font.regular,
       color: t.color.texticon.onNormal.highestemp,
     },
+    // NumberInputScreen의 inputBox와 동일한 브랜드 보더 + 글로우 처리
     input: {
       height: 56,
-      borderColor: t.palette.gray[200],
+      borderColor: t.color.surface.brand.primary,
       borderWidth: 1.5,
-      borderRadius: t.radius.md,
+      borderRadius: 10,
       paddingHorizontal: t.spacing[4],
-      fontSize: 18,
+      fontSize: 16,
       fontFamily: t.font.regular,
       color: t.color.texticon.onNormal.highestemp,
       backgroundColor: t.color.surface.normal.bg1,
+      shadowColor: t.color.surface.brand.primary,
+      shadowOffset: {width: 0, height: 2},
+      shadowOpacity: 0.18,
+      shadowRadius: 12,
+      elevation: 2,
     },
     footer: {
       paddingHorizontal: t.spacing[8],
       paddingTop: t.spacing[3],
       paddingBottom: t.spacing[4],
-      backgroundColor: t.color.surface.normal.container10,
+      backgroundColor: t.color.surface.normal.container0,
     },
     confirmButton: {
       justifyContent: 'center',
@@ -319,22 +326,25 @@ const createStyles = (t: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: t.spacing[10],
-      gap: t.spacing[4],
+      gap: t.spacing[3],
     },
-    successEmoji: {
-      fontSize: 72,
+    successIllust: {
+      width: 200,
+      height: 200,
+      marginBottom: t.spacing[4],
     },
     successTitle: {
-      fontSize: 36,
+      fontSize: 24,
       fontFamily: t.font.semibold,
       color: t.color.texticon.onNormal.highestemp,
+      textAlign: 'center',
     },
     successSubtitle: {
-      fontSize: 18,
+      fontSize: 16,
       fontFamily: t.font.regular,
       color: t.color.texticon.onNormal.midemp,
       textAlign: 'center',
-      lineHeight: 28,
+      lineHeight: 24,
     },
   });
 
