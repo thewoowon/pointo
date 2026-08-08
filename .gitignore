@@ -88,3 +88,6 @@ firebase-debug.log
 /ios/*/GoogleService-Info.plist
 /ios/GoogleService-Info.plist
 /android/*/google-services.json
+
+# 운영 데이터 백업 (개인정보 포함 — 커밋 금지)
+.backup-*.json

@@ -134,12 +134,23 @@ export const onUserDeleted = onDocumentDeleted(
     const phone = separator === -1 ? docId : docId.slice(0, separator);
     const storeCode = event.data?.data()?.store_code as string | undefined;
 
-    const db = getFirestore();
-    let query = db.collection("logs").where("phone_number", "==", phone);
-    // 같은 번호가 여러 매장에 있을 수 있다 — 매장을 알면 반드시 좁힌다.
-    if (storeCode) {
-      query = query.where("store_code", "==", storeCode);
+    // 매장을 모르면 아무것도 지우지 않는다.
+    // 같은 전화번호가 여러 매장에 존재할 수 있어서, 매장으로 좁히지 않으면
+    // 남의 매장 이력까지 지운다. store_code가 없는 레거시/고아 문서가 실제로
+    // 있으므로(2026-08 기준 2건) 가정이 아니라 실재하는 경로다.
+    if (!storeCode) {
+      logger.warn(
+        `onUserDeleted: ${docId} — store_code가 없어 로그 정리를 건너뜁니다. ` +
+          "필요하면 매장을 특정해 수동으로 정리할 것.",
+      );
+      return;
     }
+
+    const db = getFirestore();
+    const query = db
+      .collection("logs")
+      .where("phone_number", "==", phone)
+      .where("store_code", "==", storeCode);
 
     try {
       const snapshot = await query.get();
