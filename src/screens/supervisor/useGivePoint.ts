@@ -17,7 +17,6 @@ import {
 import {confirm} from '../../utils/alert';
 import {
   normalizeUser,
-  flattenCouponsForFirestore,
   makeUserContext,
   totalSelected,
   addCouponTimestamp,
@@ -27,12 +26,26 @@ import {
 
 export type GiveMode = 'earn' | 'use';
 
+export type GivePointOptions = {
+  /**
+   * 관리자가 고객 검색으로 직접 연 흐름인지 여부.
+   * true면 close()가 고객 태블릿 세션을 건드리지 않는다 —
+   * 수동 적립 때문에 대기 중인 고객 화면이 초기화되면 안 되므로.
+   */
+  manual?: boolean;
+};
+
 /**
  * 적립/사용 행위의 순수 비즈니스 로직 (UI 없음).
  * 태블릿 풀모달(DetailView)과 모바일 바텀시트(GivePointSheet)가 공유 —
  * 포인트/스탬프 계산·쿠폰 발급·파이어스토어 기록·애널리틱스를 단일 소스로 유지.
  */
-export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
+export function useGivePoint(
+  phoneNumber: string,
+  updateLogs: () => void,
+  options: GivePointOptions = {},
+) {
+  const {manual = false} = options;
   const {storeCode} = useAuth();
   const storeConfig = useStoreConfig(storeCode);
   const {track} = useAnalytics();
@@ -56,15 +69,15 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
     possibleCoupons: {},
   });
 
-  const handleApprovePoint = async () => {
+  const handleApprovePoint = async (): Promise<boolean> => {
     if (number.length === 0) {
       Alert.alert('적립할 포인트를 입력해주세요', '다시 입력해주세요.');
-      return;
+      return false;
     }
     const pointValue = parseInt(number, 10);
     if (isNaN(pointValue) || pointValue < 1) {
       Alert.alert('적립할 포인트를 1 이상 입력해주세요', '다시 입력해주세요.');
-      return;
+      return false;
     }
 
     const newStamps = user.stamps + pointValue;
@@ -103,17 +116,18 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
 
     setNumber('');
     updateLogs();
+    return true;
   };
 
-  const handleUsingPoint = async () => {
+  const handleUsingPoint = async (): Promise<boolean> => {
     const pointsToUse = parseInt(number, 10);
     if (isNaN(pointsToUse) || pointsToUse < 1) {
       Alert.alert('사용할 포인트를 입력해주세요', '다시 입력해주세요.');
-      return;
+      return false;
     }
     if (pointsToUse > user.stamps) {
       Alert.alert('포인트 부족', '보유 포인트보다 많이 사용할 수 없습니다.');
-      return;
+      return false;
     }
 
     const newStamps = user.stamps - pointsToUse;
@@ -151,19 +165,20 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
 
     setNumber('');
     updateLogs();
+    return true;
   };
 
-  const handleApprove = async () => {
+  const handleApprove = async (): Promise<boolean> => {
     if (number.length === 0) {
       Alert.alert('적립할 스탬프를 입력해주세요', '다시 입력해주세요.');
-      return;
+      return false;
     }
 
     const numberValue = parseInt(number, 10);
 
     if (numberValue < 1) {
       Alert.alert('적립할 스탬프를 1개 이상 입력해주세요', '다시 입력해주세요.');
-      return;
+      return false;
     }
 
     if (numberValue > 100) {
@@ -171,7 +186,7 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
         '적립하는 쿠폰의 수가 많은 것 같아요',
         '한 번 더 확인해주세요.',
       );
-      return;
+      return false;
     }
 
     const spc = storeConfig.stampsPerCoupon;
@@ -206,7 +221,7 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
     const updateContext = {
       stamps: stampsTotal,
       phase,
-      ...flattenCouponsForFirestore(coupons, storeConfig.couponTypes),
+      coupons,
       couponIssuedAt: issuedAt ?? {},
       level,
       last_used: new Date().toISOString().split('T')[0],
@@ -272,13 +287,14 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
 
     setNumber('');
     updateLogs();
+    return true;
   };
 
-  const handleUsing = async () => {
+  const handleUsing = async (): Promise<boolean> => {
     const selected = totalSelected(userContext.selectedCoupon);
     if (selected < 1) {
       Alert.alert('사용할 쿠폰을 선택해주세요', '쿠폰을 눌러 선택해주세요.');
-      return;
+      return false;
     }
 
     // 쿠폰만 차감 (스탬프 카드 모델: 쿠폰 사용 시 스탬프 변동 없음)
@@ -293,7 +309,7 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
       userContext.selectedCoupon,
     );
     await updateUser(phoneNumber, {
-      ...flattenCouponsForFirestore(remainingCoupons, storeConfig.couponTypes),
+      coupons: remainingCoupons,
       couponIssuedAt: remainingIssuedAt,
     });
 
@@ -331,6 +347,7 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
 
     setNumber('');
     updateLogs();
+    return true;
   };
 
   const switchMode = (newMode: GiveMode) => {
@@ -418,6 +435,9 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
     } catch (error) {
       console.log('Error logging session close event:', error);
     }
+    // 수동 모드에선 고객 태블릿 세션이 이 흐름의 주인이 아니다.
+    // 여기서 세션을 리셋하면 대기 중인 고객 화면을 빼앗게 되므로 건너뛴다.
+    if (manual) return;
     await updateSession(`session_${storeCode}`, {
       last_used: new Date().toISOString().split('T')[0],
       phone: '',
@@ -493,12 +513,17 @@ export function useGivePoint(phoneNumber: string, updateLogs: () => void) {
         cancelled = true;
         unsubscribe?.();
       };
-    }, [phoneNumber]),
+      // storeConfig도 의존: config는 비동기 로드되므로, 로드 전 구독이 걸리면
+      // normalizeUser가 DEFAULT couponTypes로 쿠폰 키를 잘못 매핑한다.
+      // config 도착 시 재구독해 올바른 couponTypes로 다시 정규화한다.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [phoneNumber, storeConfig]),
   );
 
   return {
     storeConfig,
     isPointMode,
+    manual,
     mode,
     number,
     user,

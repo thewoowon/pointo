@@ -1,12 +1,17 @@
 /**
- * Firestore 레거시 필드(americanoCoupons, beverageCoupons)를
- * 동적 coupons Record로 정규화하는 유틸리티.
+ * Firestore raw data ↔ User 변환 및 쿠폰 계산 유틸리티.
  */
 
 import dayjs from 'dayjs';
 
-/** Firestore에서 읽은 raw data → User 객체 변환.
- *  couponTypes를 전달하면 레거시 필드를 해당 매장의 쿠폰 ID로 매핑합니다. */
+/**
+ * Firestore에서 읽은 raw data → User 객체 변환.
+ *
+ * 쿠폰 id 체계는 매장 설정(couponTypes)이 정한다. 스탬프 모드에서 쿠폰을
+ * 1종/2종으로 쓸 수 있도록 `coupon_a`/`coupon_b`로 고정하는 것이 표준이고,
+ * 설정을 저장한 적 없는 오래된 매장만 폴백으로 `americano`/`beverage`를 쓴다.
+ * 그래서 문서에 남아 있는 옛 키를 현재 매장의 id로 옮겨준다.
+ */
 export function normalizeUser(
   data: Record<string, any>,
   couponTypes?: CouponType[],
@@ -28,13 +33,6 @@ export function normalizeUser(
     }
   }
 
-  if (data.americanoCoupons != null && coupons[firstId] == null) {
-    coupons[firstId] = data.americanoCoupons;
-  }
-  if (data.beverageCoupons != null && coupons[secondId] == null) {
-    coupons[secondId] = data.beverageCoupons;
-  }
-
   const couponIssuedAt: Record<string, string[]> | undefined =
     data.couponIssuedAt ?? undefined;
 
@@ -49,25 +47,6 @@ export function normalizeUser(
     created_at: data.created_at,
     store_code: data.store_code,
   };
-}
-
-/** User.coupons → Firestore에 쓸 flat 필드로 변환 (레거시 호환).
- *  couponTypes를 전달하면 첫 번째/두 번째 쿠폰을 americanoCoupons/beverageCoupons로 매핑합니다. */
-export function flattenCouponsForFirestore(
-  coupons: Record<string, number>,
-  couponTypes?: CouponType[],
-): Record<string, any> {
-  const result: Record<string, any> = {coupons};
-  // 레거시 필드도 동시에 기록 (구버전 앱 하위 호환)
-  if (couponTypes && couponTypes.length > 0) {
-    result.americanoCoupons = coupons[couponTypes[0].id] ?? 0;
-    result.beverageCoupons =
-      couponTypes.length >= 2 ? (coupons[couponTypes[1].id] ?? 0) : 0;
-  } else {
-    result.americanoCoupons = coupons.americano ?? 0;
-    result.beverageCoupons = coupons.beverage ?? 0;
-  }
-  return result;
 }
 
 /** couponTypes 배열에서 각 타입별 초기값 0으로 빈 맵 생성 */

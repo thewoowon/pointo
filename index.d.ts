@@ -26,9 +26,6 @@ interface User {
   coupons: Record<string, number>;
   /** 쿠폰별 발급 시점 (coupon type id → ISO 날짜 배열, 오래된 순) */
   couponIssuedAt?: Record<string, string[]>;
-  // Firestore 레거시 필드 (하위 호환)
-  americanoCoupons?: number;
-  beverageCoupons?: number;
   // 별점을 위해 추가된 속성
   hasRated?: boolean | null | undefined;
   // 코호트/리텐션 분석을 위한 가입일

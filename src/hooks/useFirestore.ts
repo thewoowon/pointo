@@ -128,9 +128,6 @@ const useFirestore = (storeCode?: string | null) => {
         stamps: 0,
         phase: 'americano',
         coupons: {},
-        // 레거시 호환
-        americanoCoupons: 0,
-        beverageCoupons: 0,
         hasRated: false,
         ...(storeCode ? {store_code: storeCode} : {}),
       });
