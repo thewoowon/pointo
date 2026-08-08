@@ -1,28 +1,169 @@
 rules_version = '2';
 
+// 포인토 Firestore 보안 규칙
+//
+// 위협 모델 — 무엇을 막는가:
+//   1) [최우선] 고객 전화번호 대량 유출. users 문서 ID가 전화번호이고 logs에도
+//      phone_number가 들어있다. 이전 규칙(allow read, write: if true)에서는
+//      누구든 컬렉션 전체를 덤프할 수 있었다. 웹으로 확장하면 브라우저 콘솔
+//      한 줄이면 되는 수준이라 여기부터 닫는다.
+//   2) 남의 매장 데이터 접근. 점주는 자기 계정에 연결된 매장만 다룰 수 있다.
+//   3) 서버 전용 컬렉션(ownerTokens) 노출.
+//
+// 무엇을 아직 못 막는가 (다음 단계):
+//   - 키오스크는 익명 세션이라 "누구나 받을 수 있는" 신원이다. 즉 전화번호를
+//     이미 아는 공격자가 그 사람의 스탬프를 단건 조회·조작하는 것은 아직 가능하다.
+//     대량 열거는 막았지만 위조는 못 막는다. → App Check(기기 증명) 도입,
+//     이후 적립/사용 쓰기를 Callable Function으로 이전하면 닫힌다.
+//
+// ⚠️ 배포 전 필독: 이 규칙은 Firebase Auth 세션을 전제로 한다. Firebase Auth가
+//    없는 구버전 앱은 이 규칙이 켜지는 즉시 전부 동작을 멈춘다.
+//    반드시 모든 매장 기기를 신버전으로 올린 뒤 배포할 것. (SECURITY_PASS.md 참고)
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ⚠️ 임시 규칙 — 이 앱은 아직 Firebase Auth를 도입하지 않아 클라이언트 요청을
-    //    인증으로 게이팅할 수 없다. 그래서 클라이언트가 실제로 쓰는 컬렉션만
-    //    명시적으로 개방(기존 test-mode 동작 유지, 무회귀)하고 나머지는 기본 거부한다.
-    //    이렇게 하면 (1) 서버 전용 컬렉션(ownerTokens) 노출 차단 (2) 2026-12-31
-    //    만료 폭탄 제거. 단, 개방 컬렉션은 여전히 무인증 접근이므로 추후 Firebase
-    //    Auth 도입 후 컬렉션별로 제대로 게이팅하는 보안 패스가 필요하다.
+    // ─── 헬퍼 ──────────────────────────────────────────────────────────
 
-    match /users/{doc=**}    { allow read, write: if true; }
-    match /terms/{doc=**}    { allow read, write: if true; }
-    match /stores/{doc=**}   { allow read, write: if true; }
-    match /sessions/{doc=**} { allow read, write: if true; }
-    match /logs/{doc=**}     { allow read, write: if true; }
-    match /owners/{doc=**}   { allow read, write: if true; }
-    // 점수 기능용 (현재 클라이언트 미사용, 향후 대비로 개방 유지)
-    match /ratings/{doc=**}  { allow read, write: if true; }
+    function isSignedIn() {
+      return request.auth != null;
+    }
 
-    // 서버 전용 — Apple refresh token 저장소. 클라이언트 접근 전면 차단.
-    // (Functions는 Admin SDK로 규칙을 우회하므로 정상 동작)
-    match /ownerTokens/{uid} { allow read, write: if false; }
+    /** 익명(키오스크) 세션이 아닌 실제 소셜 로그인 점주 */
+    function isOwner() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
+    }
 
-    // 그 외 모든 경로: 기본 거부 (명시하지 않은 컬렉션은 클라이언트 접근 불가)
+    /**
+     * 주어진 값이 내 토큰에 실린 소셜 제공자 id인지.
+     *
+     * Firebase Auth 도입 전에는 owners 문서와 stores.ownerId를 구글/애플 제공자
+     * id로 키잉했다. 그 문서들을 새 Firebase uid로 이전하려면 레거시 id에 한 번은
+     * 접근해야 하는데, ID 토큰의 identities에 그 id가 실제로 들어있을 때만 허용하면
+     * 남의 계정을 건드릴 수는 없다. 마이그레이션이 끝나면 이 함수는 제거해도 된다.
+     */
+    function ownsProviderId(id) {
+      let identities = request.auth.token.firebase.identities;
+      return isOwner() && id is string && (
+        ('google.com' in identities && identities['google.com'].hasAny([id]))
+        || ('apple.com' in identities && identities['apple.com'].hasAny([id]))
+      );
+    }
+
+    function ownerPath() {
+      return /databases/$(database)/documents/owners/$(request.auth.uid);
+    }
+
+    /** 내 계정에 연결된 매장인지 */
+    function ownsStore(code) {
+      return isOwner()
+        && code is string
+        && exists(ownerPath())
+        && get(ownerPath()).data.storeCodes.hasAny([code]);
+    }
+
+    /** 쓰기 후 문서의 매장 코드 (생성·수정 공통) */
+    function incomingStore() {
+      return request.resource.data.store_code;
+    }
+
+    // ─── owners — 점주 계정 ────────────────────────────────────────────
+    // 본인 문서만. 계정 열거(list)는 전면 금지.
+    match /owners/{uid} {
+      allow get: if isOwner()
+        && (request.auth.uid == uid || ownsProviderId(uid));
+      allow create: if isOwner() && request.auth.uid == uid;
+      allow update: if isOwner()
+        && (request.auth.uid == uid || ownsProviderId(uid));
+      allow delete: if false;   // 탈퇴는 soft delete만 — 실삭제는 서버 스케줄러
+      allow list: if false;
+    }
+
+    // ─── stores — 매장 ────────────────────────────────────────────────
+    match /stores/{code} {
+      // 키오스크가 매장 설정(config, 이름)을 읽어야 하므로 단건 조회는 인증만 요구.
+      allow get: if isSignedIn();
+
+      // 목록 조회는 점주 온보딩 흐름(전화번호로 기존 매장 찾기)에서만 쓴다.
+      // 익명 세션에 열어주면 전체 매장·점주 연락처가 새므로 점주로 한정.
+      allow list: if isOwner();
+
+      allow create: if isOwner();
+
+      // 소유권 이전이 가능한 경우:
+      //   - 이미 내 매장
+      //   - 아직 주인이 없는 매장 (레거시 claim)
+      //   - 주인이 내 레거시 제공자 id인 매장 (uid 마이그레이션)
+      allow update: if isOwner() && (
+        resource.data.get('ownerId', null) == null
+        || resource.data.ownerId == request.auth.uid
+        || ownsProviderId(resource.data.ownerId)
+      );
+
+      allow delete: if false;
+    }
+
+    // ─── users — 고객 (문서 ID = 전화번호[_매장코드]) ──────────────────
+    match /users/{docId} {
+      // 키오스크가 방금 입력한 번호 한 건을 조회한다. 익명 세션 허용.
+      allow get: if isSignedIn();
+
+      // ⭐ 핵심 방어선: 목록 조회는 자기 매장을 가진 점주만.
+      // 쿼리가 반환하는 문서 하나하나에 대해 평가되므로, store_code 필터가 없는
+      // 전체 스캔은 여기서 반드시 실패한다.
+      allow list: if ownsStore(resource.data.get('store_code', null));
+
+      allow create: if isSignedIn() && incomingStore() is string;
+
+      allow update: if isSignedIn() && (
+        // 매장 코드는 바꿀 수 없다 (다른 매장으로 문서를 옮기는 것 방지)
+        !('store_code' in request.resource.data)
+        || incomingStore() == resource.data.get('store_code', incomingStore())
+      );
+
+      // 고객 탈퇴(키오스크) 또는 점주의 고객 삭제
+      allow delete: if isSignedIn();
+    }
+
+    // ─── terms — 약관 동의 (users와 같은 문서 ID) ─────────────────────
+    match /terms/{docId} {
+      allow get, create, update, delete: if isSignedIn();
+      allow list: if false;
+    }
+
+    // ─── logs — 적립/사용 이력 (phone_number 포함) ────────────────────
+    match /logs/{logId} {
+      // ⭐ 조회는 전부 점주 한정. 익명에 열면 매장 전체 전화번호가 새어나간다.
+      // 고객 탈퇴 시의 이력 정리는 클라이언트가 아니라 서버(onUserDeleted)가 한다.
+      allow get, list: if ownsStore(resource.data.get('store_code', null));
+
+      // 키오스크가 적립/사용 로그를 남긴다. 매장 코드는 필수.
+      allow create: if isSignedIn() && incomingStore() is string;
+
+      allow update: if false;   // 이력은 불변
+      allow delete: if ownsStore(resource.data.get('store_code', null));
+    }
+
+    // ─── sessions — 키오스크↔점주 실시간 페어링 (session_{매장코드}) ──
+    // PII가 없고 수명이 짧다. 목록 조회만 막아 매장 열거를 차단한다.
+    match /sessions/{sessionId} {
+      allow get, create, update: if isSignedIn();
+      allow list, delete: if false;
+    }
+
+    // ─── ratings — 현재 미사용. 향후 대비로 인증 사용자에게만 개방 ────
+    match /ratings/{docId} {
+      allow get, create, update: if isSignedIn();
+      allow list, delete: if false;
+    }
+
+    // ─── ownerTokens — 서버 전용 (Apple refresh token) ────────────────
+    // Functions는 Admin SDK라 규칙을 우회한다. 클라이언트는 전면 차단.
+    match /ownerTokens/{uid} {
+      allow read, write: if false;
+    }
+
+    // 그 외 모든 경로: 기본 거부
   }
 }

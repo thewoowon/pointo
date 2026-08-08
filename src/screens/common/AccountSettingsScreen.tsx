@@ -10,7 +10,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {signOutGoogle} from '../../services/auth';
+import {signOutOwner} from '../../services/auth';
 import {RightChevronIcon} from '../../components/Icons';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 
@@ -29,7 +29,7 @@ const AccountSettingsScreen = ({navigation}: any) => {
   const [privacyVisible, setPrivacyVisible] = useState(false);
 
   const handleLogout = async () => {
-    await signOutGoogle();
+    await signOutOwner();
     setOwnerUid(null);
     setOwnerEmail(null);
     navigation.reset({index: 0, routes: [{name: 'Login'}]});

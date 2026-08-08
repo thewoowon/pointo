@@ -16,7 +16,7 @@ import {useFocusEffect} from '@react-navigation/native';
 import type {BottomSheetModal} from '@gorhom/bottom-sheet';
 import {useAuth, useFirestore, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {signOutGoogle} from '../../services/auth';
+import {signOutOwner} from '../../services/auth';
 import {
   SettingIcon,
   GoogleIcon,
@@ -154,7 +154,7 @@ const SwitcherScreen = ({navigation}: any) => {
   };
 
   const handleLogout = async () => {
-    await signOutGoogle();
+    await signOutOwner();
     setOwnerUid(null);
     setOwnerEmail(null);
     setOwnerProvider(null);

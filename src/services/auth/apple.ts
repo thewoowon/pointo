@@ -2,6 +2,7 @@ import {Platform} from 'react-native';
 import appleAuth, {
   AppleRequestResponse,
 } from '@invertase/react-native-apple-authentication';
+import {getIdTokenForServer} from './firebase';
 
 /**
  * Sign in with Apple 래퍼.
@@ -32,6 +33,14 @@ export type AppleAccount = {
    * 수명이 짧으므로(약 5분) 로그인 직후 즉시 서버로 보낸다.
    */
   authorizationCode?: string;
+  /**
+   * Firebase 자격증명 교환에 필요한 raw nonce.
+   *
+   * 네이티브 모듈이 nonce를 자동 생성해 **SHA-256 해시본을 애플에 보내고**
+   * 원본을 response.nonce로 돌려준다. Firebase는 원본을 요구하므로 그대로 전달한다.
+   * (해시 대조로 identityToken 재사용 공격을 막는 구조)
+   */
+  rawNonce?: string;
 };
 
 /* eslint-disable no-bitwise -- base64 디코딩은 비트 연산이 본질적으로 필요 */
@@ -93,12 +102,23 @@ export const registerAppleRefreshToken = async (
   account: AppleAccount,
 ): Promise<void> => {
   if (!account.authorizationCode || !account.idToken) return;
+
+  // 서버는 이 토큰으로 호출자가 그 계정 주인임을 확인하고, ownerTokens를
+  // **Firebase uid** 키로 저장한다. Firebase 로그인 이후에 호출되어야 한다.
+  const firebaseIdToken = await getIdTokenForServer();
+  if (!firebaseIdToken) {
+    console.warn('[apple] Firebase 세션이 없어 refresh token 등록을 건너뜁니다.');
+    return;
+  }
+
   try {
     await fetch(APPLE_TOKEN_ENDPOINT, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${firebaseIdToken}`,
+      },
       body: JSON.stringify({
-        uid: account.uid,
         authorizationCode: account.authorizationCode,
         identityToken: account.idToken,
       }),
@@ -140,6 +160,7 @@ export const signInWithApple = async (): Promise<AppleAccount | null> => {
       name: fullName(response.fullName),
       idToken: response.identityToken ?? undefined,
       authorizationCode: response.authorizationCode ?? undefined,
+      rawNonce: response.nonce ?? undefined,
     };
   } catch (error) {
     const code =

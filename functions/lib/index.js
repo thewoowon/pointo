@@ -36,12 +36,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeDeletedOwners = exports.registerAppleToken = exports.onStoreCreated = void 0;
+exports.purgeDeletedOwners = exports.registerAppleToken = exports.onUserDeleted = exports.onStoreCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
 const firebase_functions_1 = require("firebase-functions");
 const app_1 = require("firebase-admin/app");
+const auth_1 = require("firebase-admin/auth");
 const firestore_2 = require("firebase-admin/firestore");
 const nodemailer = __importStar(require("nodemailer"));
 const apple_signin_auth_1 = __importDefault(require("apple-signin-auth"));
@@ -140,34 +141,99 @@ exports.onStoreCreated = (0, firestore_1.onDocumentCreated)({ document: "stores/
         firebase_functions_1.logger.error("Failed to send email:", error);
     }
 });
+// ─── 고객 탈퇴 후처리 ──────────────────────────────────────────────────────
+/**
+ * 고객 문서가 삭제되면 그 사람의 적립 이력(logs)을 정리한다.
+ *
+ * 원래 키오스크가 직접 지웠지만, 그러려면 클라이언트에 logs 목록 조회 권한이
+ * 필요하다. 보안 규칙은 쿼리의 where 조건을 검사할 수 없어서 "내 로그만"으로
+ * 좁힐 방법이 없고, 결국 매장 전체 로그(= 전화번호 전량)가 열린다.
+ * 그래서 삭제 트리거로 서버가 대신 처리한다.
+ *
+ * 문서 ID는 `{전화번호}_{매장코드}` 또는 레거시 `{전화번호}` 형태다.
+ */
+exports.onUserDeleted = (0, firestore_1.onDocumentDeleted)({ document: "users/{docId}", region: REGION }, async (event) => {
+    var _a, _b;
+    const docId = event.params.docId;
+    const separator = docId.indexOf("_");
+    const phone = separator === -1 ? docId : docId.slice(0, separator);
+    const storeCode = (_b = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data()) === null || _b === void 0 ? void 0 : _b.store_code;
+    const db = (0, firestore_2.getFirestore)();
+    let query = db.collection("logs").where("phone_number", "==", phone);
+    // 같은 번호가 여러 매장에 있을 수 있다 — 매장을 알면 반드시 좁힌다.
+    if (storeCode) {
+        query = query.where("store_code", "==", storeCode);
+    }
+    try {
+        const snapshot = await query.get();
+        if (snapshot.empty) {
+            firebase_functions_1.logger.info(`onUserDeleted: ${docId} — 정리할 로그 없음`);
+            return;
+        }
+        const BATCH_SIZE = 500;
+        for (let i = 0; i < snapshot.docs.length; i += BATCH_SIZE) {
+            const batch = db.batch();
+            snapshot.docs.slice(i, i + BATCH_SIZE).forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+        }
+        firebase_functions_1.logger.info(`onUserDeleted: ${docId} — 로그 ${snapshot.size}건 삭제`);
+    }
+    catch (e) {
+        firebase_functions_1.logger.error(`onUserDeleted failed for ${docId}:`, e);
+    }
+});
 // ─── 점주 계정 삭제 (Apple 토큰 저장 + 30일 유예 후 실삭제) ─────────────────
 /**
  * Apple 로그인 직후 클라이언트가 호출. authorizationCode를 refresh token으로
  * 교환해 ownerTokens/{uid}에 저장한다. (탈퇴 시점에 이 토큰으로 revoke)
- * identityToken의 sub == uid 검증으로 계정 소유 확인.
+ *
+ * uid는 요청 본문이 아니라 **Firebase ID 토큰**에서 뽑는다. 본문으로 받으면
+ * 호출자가 임의의 uid를 주장할 수 있고, 실제로 Firestore가 이제 Firebase uid로
+ * 소유권을 판정하므로 키도 Firebase uid여야 한다.
+ * 추가로 identityToken이 그 계정의 애플 신원과 일치하는지도 확인한다.
  */
 exports.registerAppleToken = (0, https_1.onRequest)({
     region: REGION,
     secrets: [APPLE_TEAM_ID, APPLE_KEY_ID, APPLE_PRIVATE_KEY],
     cors: true,
 }, async (req, res) => {
-    var _a;
+    var _a, _b, _c, _d, _e;
     try {
         if (req.method !== "POST") {
             res.status(405).send("Method Not Allowed");
             return;
         }
-        const { uid, authorizationCode, identityToken } = (_a = req.body) !== null && _a !== void 0 ? _a : {};
-        if (!uid || !authorizationCode || !identityToken) {
+        const authHeader = (_a = req.get("Authorization")) !== null && _a !== void 0 ? _a : "";
+        const bearer = authHeader.startsWith("Bearer ") ?
+            authHeader.slice(7) :
+            "";
+        if (!bearer) {
+            res.status(401).json({ error: "missing firebase id token" });
+            return;
+        }
+        let uid;
+        let appleSubFromFirebase;
+        try {
+            const decoded = await (0, auth_1.getAuth)().verifyIdToken(bearer);
+            uid = decoded.uid;
+            appleSubFromFirebase = (_d = (_c = (_b = decoded.firebase) === null || _b === void 0 ? void 0 : _b.identities) === null || _c === void 0 ? void 0 : _c["apple.com"]) === null || _d === void 0 ? void 0 : _d[0];
+        }
+        catch (_f) {
+            res.status(401).json({ error: "invalid firebase id token" });
+            return;
+        }
+        const { authorizationCode, identityToken } = (_e = req.body) !== null && _e !== void 0 ? _e : {};
+        if (!authorizationCode || !identityToken) {
             res.status(400).json({ error: "missing params" });
             return;
         }
-        // 신원 검증 — identityToken의 sub가 uid와 일치해야 함
+        // 애플 신원 검증 — identityToken의 sub가 이 Firebase 계정에 연결된
+        // 애플 계정과 같아야 한다. (남의 authorizationCode를 자기 uid로 저장 방지)
         const claims = await apple_signin_auth_1.default.verifyIdToken(identityToken, {
             audience: APPLE_CLIENT_ID.value(),
         });
-        if (claims.sub !== uid) {
-            res.status(403).json({ error: "uid mismatch" });
+        if (appleSubFromFirebase && claims.sub !== appleSubFromFirebase) {
+            res.status(403).json({ error: "apple identity mismatch" });
             return;
         }
         const tokens = await apple_signin_auth_1.default.getAuthorizationToken(authorizationCode, {

@@ -12,7 +12,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import {useAuth, useFirestore, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
-import {signOutGoogle} from '../../services/auth';
+import {signOutOwner} from '../../services/auth';
 import {ClockIcon} from '../../components/Icons';
 
 const GRACE_DAYS = 30;
@@ -78,7 +78,7 @@ const DeletionPendingScreen = ({navigation}: any) => {
   };
 
   const handleLogout = async () => {
-    await signOutGoogle();
+    await signOutOwner();
     setOwnerUid(null);
     setOwnerEmail(null);
     navigation.reset({index: 0, routes: [{name: 'Login'}]});

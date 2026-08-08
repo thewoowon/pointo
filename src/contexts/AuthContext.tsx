@@ -1,5 +1,9 @@
 import React, {createContext, useCallback, useEffect, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  ensureAnonymousSession,
+  waitForAuthReady,
+} from '../services/auth/firebase';
 
 const AUTH_STORAGE_KEY = '@pointo_auth';
 const DEVICE_STORAGE_KEY = '@pointo_device';
@@ -97,9 +101,12 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
 
   const initializeAuth = useCallback(async () => {
     try {
-      const [storedSession, storedDevice] = await Promise.all([
+      const [storedSession, storedDevice, firebaseUser] = await Promise.all([
         AsyncStorage.getItem(AUTH_STORAGE_KEY),
         AsyncStorage.getItem(DEVICE_STORAGE_KEY),
+        // Firestore 요청 전에 Firebase가 세션 복원을 끝내야 한다.
+        // 안 기다리면 첫 요청이 무인증으로 판정돼 permission-denied가 난다.
+        waitForAuthReady(),
       ]);
 
       // 기기 잠금 먼저 복원
@@ -110,6 +117,8 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
 
       // 마찰완화 #2: 기기가 고객 모드로 잠겨 있으면 세션과 무관하게 고객 모드로 강제 복귀
       if (device.lockedStoreCode) {
+        // 고객 전용 기기는 점주 로그인이 없으므로 익명 세션으로 규칙을 통과시킨다.
+        if (!firebaseUser) await ensureAnonymousSession();
         initStoreCode(device.lockedStoreCode);
         setStoreName(device.lockedStoreName);
         setMode('client');
@@ -120,10 +129,26 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
       // 마찰완화 #1: 마지막 세션(스토어+모드) 자동 복원
       if (storedSession) {
         const session: AuthSession = JSON.parse(storedSession);
+
+        // 점주 세션인데 Firebase 세션이 없거나 익명이면 신뢰할 수 없다.
+        // (Firebase Auth 도입 전 버전에서 업데이트된 기기가 여기 해당 —
+        //  저장된 ownerUid는 제공자 id라 규칙을 통과하지 못한다)
+        const ownerSessionValid =
+          !!firebaseUser && !firebaseUser.isAnonymous;
+        if (session.mode === 'supervisor' && !ownerSessionValid) {
+          await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
+          return; // 로그인 화면으로 떨어뜨린다
+        }
+
+        if (session.mode === 'client' && !firebaseUser) {
+          await ensureAnonymousSession();
+        }
+
         initStoreCode(session.storeCode);
         setStoreName(session.storeName);
         setMode(session.mode);
-        setOwnerUid(session.ownerUid ?? null);
+        // 저장값보다 실제 Firebase 세션을 우선한다 (레거시 uid가 남아있을 수 있다)
+        setOwnerUid(firebaseUser?.uid ?? session.ownerUid ?? null);
         setOwnerEmail(session.ownerEmail ?? null);
         setOwnerProvider(session.ownerProvider ?? null);
         setIsAuthenticated(true);

@@ -96,10 +96,22 @@ interface Store {
   ownerId?: string;
 }
 
-/** 구글 계정으로 로그인하는 점주. Firestore `owners/{uid}` (uid = 구글 계정 고유 id) */
+/**
+ * 소셜 로그인으로 접속하는 점주. Firestore `owners/{uid}`.
+ *
+ * uid = **Firebase Auth uid**. (보안 규칙이 request.auth.uid로 소유권을 검증하므로
+ * 반드시 Firebase uid여야 한다. Firebase Auth 도입 전에는 구글/애플 제공자 id를
+ * 썼고, 그 문서들은 재로그인 시 migrateLegacyOwner가 새 uid로 옮긴다.)
+ */
 interface Owner {
   email: string;
   createdAt: string;
+  /** 이전 전 제공자 id. 마이그레이션된 계정에만 존재 — 추적/롤백용 */
+  legacyUid?: string;
+  /** 계정 이전 시각(ISO) */
+  migratedAt?: string;
+  /** 레거시 문서에만 남는 표식. 이 문서는 폐기됐고 값이 새 uid를 가리킨다. */
+  migratedTo?: string;
   /** 소유 스토어 코드 목록 */
   storeCodes: string[];
   /** 개설 가능한 최대 스토어 수 (기본 3, 구독 시 10) */

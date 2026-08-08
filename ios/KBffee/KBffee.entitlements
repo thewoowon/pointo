@@ -6,5 +6,10 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<!-- App Check(App Attest)용. TestFlight·App Store 빌드는 production 환경을
+	     쓴다. Xcode에서 직접 기기로 돌리는 개발 빌드는 __DEV__라 debug 제공자를
+	     타므로 이 값의 영향을 받지 않는다. -->
+	<key>com.apple.developer.devicecheck.appattest-environment</key>
+	<string>production</string>
 </dict>
 </plist>

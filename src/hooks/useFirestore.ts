@@ -28,6 +28,15 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[^0-9]/g, '');
 }
 
+/**
+ * 복합 문서 ID(`{phone}_{storeCode}`)에서 전화번호만 뽑는다.
+ * 레거시 문서(전화번호 단독 ID)는 그대로 통과한다.
+ */
+export function stripStoreSuffix(docId: string): string {
+  const idx = docId.indexOf('_');
+  return idx === -1 ? docId : docId.slice(0, idx);
+}
+
 function generateStoreCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -420,7 +429,9 @@ const useFirestore = (storeCode?: string | null) => {
         snapshot = await getDocs(collection(db, 'users'));
       }
       return snapshot.docs.map(d => ({
-        phone: d.id,
+        // 문서 ID는 `{phone}_{storeCode}` 복합 형태라 접미사를 떼야 한다.
+        // 떼지 않으면 updateUser/logs의 phone_number와 키가 어긋난다.
+        phone: stripStoreSuffix(d.id),
         ...(d.data() as User),
       }));
     } catch (error) {
@@ -505,37 +516,25 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
+  /**
+   * 고객 탈퇴 — 키오스크(익명 세션)에서 호출된다.
+   *
+   * 본인 문서만 단건 삭제하고, 적립 이력(logs) 정리는 서버(onUserDeleted)에 맡긴다.
+   * 클라이언트가 logs를 직접 지우려면 `where(phone_number == ...)` 쿼리가 필요한데,
+   * 보안 규칙은 쿼리의 필터 조건을 검사할 수 없어서 "logs 목록 조회"를 열어줘야 한다.
+   * 그러면 익명 세션 아무나 매장 전체 로그(= 전화번호 전량)를 덤프할 수 있다.
+   * 그래서 이 경로만 서버로 넘긴다.
+   */
   async function deleteUserAccount(phoneNumber: string): Promise<boolean> {
     try {
       const db = getFirestore();
       const resolved = await _resolveUserDoc(phoneNumber);
       const docId = resolved ? resolved.id : _docId(phoneNumber);
 
-      // 1. users 문서 삭제
       await deleteDoc(doc(db, 'users', docId));
-
-      // 2. terms 문서 삭제
       await deleteDoc(doc(db, 'terms', docId));
 
-      // 3. 해당 유저의 logs 전부 삭제
-      const logsRef = collection(db, 'logs');
-      const logsQuery = query(
-        logsRef,
-        ...storeFilter,
-        where('phone_number', '==', phoneNumber),
-      );
-      const snapshot = await getDocs(logsQuery);
-
-      const batchSize = 500;
-      for (let i = 0; i < snapshot.docs.length; i += batchSize) {
-        const batch = db.batch();
-        snapshot.docs.slice(i, i + batchSize).forEach(d => {
-          batch.delete(d.ref);
-        });
-        await batch.commit();
-      }
-
-      console.log('✅ 회원 탈퇴 완료:', phoneNumber);
+      console.log('✅ 회원 탈퇴 완료(이력 정리는 서버가 이어서 수행):', phoneNumber);
       return true;
     } catch (error) {
       console.error('❌ 회원 탈퇴 실패:', error);
@@ -543,7 +542,13 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
-  /** 기존 유저에 store_code 일괄 추가 (1회용 마이그레이션) */
+  /**
+   * 기존 유저에 store_code 일괄 추가 (1회용 마이그레이션).
+   *
+   * ⚠️ 현재 어디서도 호출하지 않으며, 보안 규칙상 더 이상 동작하지 않는다.
+   * users 컬렉션 전체 조회는 이제 금지다(전화번호 대량 유출 경로). 남은 레거시
+   * 문서를 정리해야 한다면 Admin SDK로 서버에서 돌릴 것.
+   */
   async function migrateUsersStoreCode(): Promise<number> {
     if (!storeCode) return 0;
     try {
@@ -621,6 +626,69 @@ const useFirestore = (storeCode?: string | null) => {
     };
     await setDoc(ref, owner);
     return owner;
+  }
+
+  /**
+   * 레거시 계정(구글/애플 제공자 id 기반)을 Firebase uid 기반으로 이전한다.
+   *
+   * 배경: Firebase Auth 도입 전에는 `owners/{제공자id}`로 계정을 저장했다. 이제
+   * 보안 규칙이 `request.auth.uid`(= Firebase uid)로 소유권을 검증하므로, 기존
+   * 점주가 재로그인하면 문서 키를 새 uid로 옮겨줘야 매장을 잃지 않는다.
+   *
+   * 안전장치:
+   *  - 레거시 문서는 **지우지 않고** `migratedTo`만 남긴다. 문제가 생기면 되돌릴 수 있고,
+   *    규칙상 어차피 아무도 못 읽는다.
+   *  - 이미 `owners/{fbUid}`가 있으면 마이그레이션을 건너뛴다(재실행 안전).
+   *  - stores.ownerId도 같이 새 uid로 옮긴다. 안 옮기면 매장 쓰기 권한이 끊긴다.
+   *
+   * 참고: `ownerTokens/{제공자id}`(애플 refresh token)는 클라이언트가 접근할 수 없어
+   * 여기서 못 옮긴다. 애플 로그인 시 registerAppleToken이 새 uid로 다시 저장하므로
+   * 자연히 대체되고, 남은 레거시 문서는 서버에서 정리한다.
+   *
+   * @returns 이 계정의 최종 프로필
+   */
+  async function migrateLegacyOwner(
+    fbUid: string,
+    legacyUid: string,
+    email: string,
+  ): Promise<Owner> {
+    const db = getFirestore();
+    const newRef = doc(db, 'owners', fbUid);
+
+    const newSnap = await getDoc(newRef);
+    if (newSnap.exists) return newSnap.data() as Owner;
+
+    // 제공자 id와 Firebase uid가 같을 리는 없지만, 같다면 이전할 게 없다.
+    if (legacyUid && legacyUid !== fbUid) {
+      const legacyRef = doc(db, 'owners', legacyUid);
+      const legacySnap = await getDoc(legacyRef);
+
+      if (legacySnap.exists) {
+        const legacy = legacySnap.data() as Owner & {migratedTo?: string};
+        const codes = legacy.storeCodes ?? [];
+
+        const batch = db.batch();
+        batch.set(newRef, {
+          ...legacy,
+          email: legacy.email || email,
+          legacyUid,
+          migratedAt: new Date().toISOString(),
+        });
+        batch.update(legacyRef, {migratedTo: fbUid});
+        codes.forEach(code => {
+          batch.update(doc(db, 'stores', code), {ownerId: fbUid});
+        });
+        await batch.commit();
+
+        console.log(
+          `✅ 계정 이전 완료: ${legacyUid} → ${fbUid} (매장 ${codes.length}개)`,
+        );
+        return {...legacy, email: legacy.email || email};
+      }
+    }
+
+    // 레거시 계정이 없으면 신규 가입
+    return ensureOwnerProfile(fbUid, email);
   }
 
   /**
@@ -795,6 +863,7 @@ const useFirestore = (storeCode?: string | null) => {
     // 이메일 계정(점주)
     getOwnerProfile,
     ensureOwnerProfile,
+    migrateLegacyOwner,
     claimStoresByPhone,
     getOwnerSlotInfo,
     linkStoreToOwner,

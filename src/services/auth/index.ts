@@ -11,3 +11,16 @@ export {
   registerAppleRefreshToken,
 } from './apple';
 export type {AppleAccount} from './apple';
+
+export {signOutOwner} from './session';
+
+export {
+  getFirebaseUid,
+  isAnonymousSession,
+  waitForAuthReady,
+  signInFirebaseWithGoogle,
+  signInFirebaseWithApple,
+  ensureAnonymousSession,
+  signOutFirebase,
+  getIdTokenForServer,
+} from './firebase';

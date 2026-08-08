@@ -16,10 +16,13 @@ import {AppleIcon, GoogleIcon} from '../../components/Icons';
 import {
   isAppleSignInSupported,
   registerAppleRefreshToken,
+  signInFirebaseWithApple,
+  signInFirebaseWithGoogle,
   signInWithApple,
   signInWithGoogle,
 } from '../../services/auth';
 
+/** 소셜 제공자가 돌려준 계정 정보 (uid는 **제공자 id** — Firebase uid가 아니다) */
 type OwnerAccount = {uid: string; email: string};
 
 /** 로그인 제공자 식별 (로딩 스피너를 어느 버튼에 표시할지) */
@@ -30,7 +33,7 @@ const LoginScreen = ({navigation}: any) => {
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   const {ownerUid, setOwnerUid, setOwnerEmail, setOwnerProvider} = useAuth();
-  const {ensureOwnerProfile, getOwnerProfile} = useFirestore();
+  const {migrateLegacyOwner, getOwnerProfile} = useFirestore();
 
   // 진행 중인 제공자(null이면 유휴). 어느 버튼에 스피너를 띄울지 결정한다.
   const [pending, setPending] = useState<Provider | null>(null);
@@ -58,12 +61,19 @@ const LoginScreen = ({navigation}: any) => {
   }, [ownerUid, navigation]);
 
   /**
-   * 구글·애플 공통 후처리: 프로필 보장 → 세션 세팅.
+   * 구글·애플 공통 후처리: 계정 이전/생성 → 세션 세팅.
+   *
+   * 앱 전체가 쓰는 ownerUid는 이제 **Firebase uid**다. 보안 규칙이 request.auth.uid로
+   * 소유권을 판정하므로, 제공자 id를 그대로 쓰면 자기 매장에도 접근하지 못한다.
    * 실제 화면 이동은 ownerUid 변경을 감지하는 위 useEffect가 상태에 맞춰 처리한다.
    */
-  const completeSignIn = async (account: OwnerAccount, provider: Provider) => {
-    await ensureOwnerProfile(account.uid, account.email);
-    setOwnerUid(account.uid);
+  const completeSignIn = async (
+    account: OwnerAccount,
+    provider: Provider,
+    firebaseUid: string,
+  ) => {
+    await migrateLegacyOwner(firebaseUid, account.uid, account.email);
+    setOwnerUid(firebaseUid);
     setOwnerEmail(account.email);
     setOwnerProvider(provider);
   };
@@ -73,7 +83,11 @@ const LoginScreen = ({navigation}: any) => {
     try {
       const account = await signInWithGoogle();
       if (!account) return; // 사용자가 취소
-      await completeSignIn(account, 'google');
+      if (!account.idToken) {
+        throw new Error('구글 idToken을 받지 못했습니다.');
+      }
+      const firebaseUid = await signInFirebaseWithGoogle(account.idToken);
+      await completeSignIn(account, 'google', firebaseUid);
     } catch (error) {
       console.error('[login] google sign-in failed:', error);
       Alert.alert(
@@ -90,9 +104,17 @@ const LoginScreen = ({navigation}: any) => {
     try {
       const account = await signInWithApple();
       if (!account) return; // 사용자가 취소
+      if (!account.idToken || !account.rawNonce) {
+        throw new Error('애플 identityToken 또는 nonce를 받지 못했습니다.');
+      }
+      const firebaseUid = await signInFirebaseWithApple(
+        account.idToken,
+        account.rawNonce,
+      );
       // 탈퇴 시 revoke용 refresh token 저장 (실패해도 로그인은 진행 — 비차단)
+      // Firebase 세션이 선행되어야 한다 — 서버가 ID 토큰으로 호출자를 검증한다.
       void registerAppleRefreshToken(account);
-      await completeSignIn(account, 'apple');
+      await completeSignIn(account, 'apple', firebaseUid);
     } catch (error) {
       console.error('[login] apple sign-in failed:', error);
       Alert.alert(
