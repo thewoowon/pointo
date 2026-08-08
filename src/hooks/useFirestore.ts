@@ -37,6 +37,32 @@ export function stripStoreSuffix(docId: string): string {
   return idx === -1 ? docId : docId.slice(0, idx);
 }
 
+/**
+ * 같은 전화번호의 문서가 둘일 수 있어 하나로 접는다.
+ *
+ *   레거시: `01012345678`         (매장 분리 이전에 만들어진 문서)
+ *   복합:   `01012345678_ABC123`
+ *
+ * 접지 않으면 고객 목록에 같은 사람이 두 번 나오고, 통계의 회원 수·KPI가
+ * 그만큼 부풀려진다. (카페 그랑에서 실제로 10건 확인됐다)
+ *
+ * 복합 문서를 우선한다 — _resolveUserDoc이 복합을 먼저 찾으므로 키오스크가
+ * 실제로 읽고 쓰는 쪽이 복합이다. 레거시를 보여주면 고객 화면과 어긋난다.
+ */
+function dedupeByPhone(
+  docs: Array<{id: string; data: () => any}>,
+): Array<User & {phone: string}> {
+  const byPhone = new Map<string, User & {phone: string}>();
+  for (const d of docs) {
+    const phone = stripStoreSuffix(d.id);
+    const isComposite = d.id.includes('_');
+    if (!byPhone.has(phone) || isComposite) {
+      byPhone.set(phone, {phone, ...(d.data() as User)});
+    }
+  }
+  return Array.from(byPhone.values());
+}
+
 function generateStoreCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -347,19 +373,20 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
+  /** 회원 수. 문서 수가 아니라 **고유 전화번호 수**를 센다. */
   async function getUserCount(): Promise<number> {
     try {
       const db = getFirestore();
-      if (storeCode) {
-        const q = query(
-          collection(db, 'users'),
-          where('store_code', '==', storeCode),
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.size;
-      }
-      const snapshot = await getDocs(collection(db, 'users'));
-      return snapshot.size;
+      const snapshot = storeCode
+        ? await getDocs(
+            query(
+              collection(db, 'users'),
+              where('store_code', '==', storeCode),
+            ),
+          )
+        : await getDocs(collection(db, 'users'));
+      // 레거시/복합 문서가 공존해 문서 수를 그대로 쓰면 실제보다 많이 나온다.
+      return dedupeByPhone(snapshot.docs).length;
     } catch (error) {
       console.error('Error getting user count:', error);
       return 0;
@@ -428,12 +455,7 @@ const useFirestore = (storeCode?: string | null) => {
       } else {
         snapshot = await getDocs(collection(db, 'users'));
       }
-      return snapshot.docs.map(d => ({
-        // 문서 ID는 `{phone}_{storeCode}` 복합 형태라 접미사를 떼야 한다.
-        // 떼지 않으면 updateUser/logs의 phone_number와 키가 어긋난다.
-        phone: stripStoreSuffix(d.id),
-        ...(d.data() as User),
-      }));
+      return dedupeByPhone(snapshot.docs);
     } catch (error) {
       console.error('Error fetching all users:', error);
       return [];
