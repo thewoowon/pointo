@@ -107,8 +107,13 @@ Firebase Auth가 없으므로, 규칙을 먼저 배포하면 모든 매장이 �
 ```
 1. Firebase Console 준비
    ├ Authentication → 로그인 방법에서 Google / Apple / 익명 활성화
+   │   ⚠️ 이 프로젝트는 Authentication을 쓴 적이 없어 설정 자체가 없었다.
+   │      켜기 전에는 모든 로그인이 auth/configuration-not-found로 실패한다.
+   │   ⚠️ 익명 사용자 "30일 자동 정리"는 **끈 채로 둘 것.** 매장 태블릿은 익명
+   │      세션 하나로 몇 달씩 돌아가는데, 정리되면 적립이 조용히 멈춘다.
    ├ Google 제공자의 OAuth 클라이언트 ID가 .env의 GOOGLE_*_CLIENT_ID와 같은지 확인
    └ Apple 제공자에 Services ID / Team ID / Key 등록
+       (앱은 네이티브 설정으로 충분하지만 **웹 Apple 로그인은 Services ID 필수**)
 
 2. Functions 먼저 배포          firebase deploy --only functions
    (onUserDeleted가 살아있어야 신버전 탈퇴에서 로그가 남지 않는다)
@@ -123,6 +128,28 @@ Firebase Auth가 없으므로, 규칙을 먼저 배포하면 모든 매장이 �
 ```
 
 **5번이 끝나기 전에 6번을 하지 말 것.**
+
+### ⛔ 규칙 배포 전 반드시 해결해야 하는 매장 (2026-08-08 실측)
+
+새 규칙에서 `users`/`logs` 조회는 **`owners/{uid}.storeCodes`에 그 매장이 있을 때만**
+통과한다. 아래 두 매장이 지금 그 조건을 만족하지 못한다.
+
+| 매장 | 규모 | 상태 | 조치 |
+|---|---|---|---|
+| **JS 볼링센터** (U7KUF4) | 고객 124 · 로그 756 · **오늘도 적립 중** | `ownerId` 없음 — 어떤 계정에도 연결 안 됨 | 점주가 신버전에서 소셜 로그인 → 전화번호로 매장 클레임. `ownerPhone`이 있어 셀프 클레임 경로가 동작한다 |
+| **카페 그랑** (KB000001) | 고객 1,383 · 로그 7,311 | Apple 계정 소유이나 아직 Firebase uid로 미이전 | 점주가 신버전 앱에서 Apple 로그인 1회 (자동 이전) |
+
+방치하면: 키오스크 적립은 계속 되지만(익명 쓰기 허용) **점주가 적립내역·고객·통계를
+전혀 못 본다.** 특히 JS 볼링센터는 외부 고객사라 영향이 크다.
+
+확인 방법 — 규칙 배포 직전에 다시 돌려서 모든 활성 매장에 `ownerId`가 있는지 볼 것:
+
+```
+node -e "…"  # owners.storeCodes ∪ stores.ownerId 대조
+```
+
+(참고: 활동이 없는 테스트 매장 6CJOTR·F1HVBB·FJPS1Y·IV85XD·KWYCM4·L33F0B은
+소유자가 없어도 실사용 영향이 없다.)
 
 롤백: `git revert` 후 `firebase deploy --only firestore:rules`로 이전 규칙을
 되돌리면 즉시 복구된다. 레거시 `owners` 문서를 지우지 않은 이유가 이것이다.

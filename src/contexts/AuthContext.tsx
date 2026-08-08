@@ -1,5 +1,7 @@
 import React, {createContext, useCallback, useEffect, useState} from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {getAuth, onAuthStateChanged} from '@react-native-firebase/auth';
+import type {FirebaseAuthTypes} from '@react-native-firebase/auth';
 import {
   ensureAnonymousSession,
   waitForAuthReady,
@@ -194,6 +196,32 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   useEffect(() => {
     initializeAuth();
   }, [initializeAuth]);
+
+  /**
+   * 고객 전용 기기(카운터 태블릿)의 익명 세션을 지켜본다.
+   *
+   * 매장 태블릿은 몇 달씩 무인으로 돌아간다. 그 사이 익명 계정이 사라지면
+   * (Console에서 삭제, 토큰 폐기, 앱 데이터 초기화 등) 다시 만들어주는 곳이
+   * 없어서 적립이 조용히 전부 실패한다 — 현장에서 알아채기도 어렵다.
+   * 그래서 세션이 끊기면 즉시 다시 만든다.
+   *
+   * 기기 잠금이 걸린 경우로 한정한 이유: 점주가 로그아웃할 때도 세션이 null이
+   * 되는데, 그 흐름은 signOutOwner가 이미 의도대로 처리한다. 잠금 기기는
+   * 세션이 null일 정당한 이유가 없으므로 여기서만 개입한다.
+   */
+  useEffect(() => {
+    if (!deviceLock.lockedStoreCode) return;
+
+    const unsubscribe = onAuthStateChanged(
+      getAuth(),
+      (user: FirebaseAuthTypes.User | null) => {
+        if (!user) {
+          ensureAnonymousSession().catch(() => {});
+        }
+      },
+    );
+    return unsubscribe;
+  }, [deviceLock.lockedStoreCode]);
 
   useEffect(() => {
     if (isLoading) return;
