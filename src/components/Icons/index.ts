@@ -24,3 +24,5 @@ export {default as SettingIcon} from './SettingIcon';
 export {default as RightChevronIcon} from './RightChevronIcon';
 export {default as AlertCircleIcon} from './AlertCircleIcon';
 export {default as ClockIcon} from './ClockIcon';
+export {default as SummaryIcon} from './SummaryIcon';
+export {default as CouponIcon} from './CouponIcon';

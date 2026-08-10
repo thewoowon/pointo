@@ -1,7 +1,7 @@
 import React from 'react';
 import Svg, {Path} from 'react-native-svg';
 
-const ShortRightArrowIcon = ({width = 20, height = 20, color = 'black'}) => (
+const ShortRightArrowIcon = ({width = 20, height = 20}) => (
   <Svg width={width} height={height} viewBox="0 0 20 20" fill="none">
     <Path
       d="M16 10H4M16 10L10.9474 15M16 10L10.9474 5"
