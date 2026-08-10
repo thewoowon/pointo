@@ -2,6 +2,42 @@
   "migIndex": 1,
   "data": [
     {
+      "path": "src/assets/fonts/MuseoModerno-Black.ttf",
+      "sha1": "f726c4af76834cf9068cfa4f39f88f4ab72c7e60"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-Bold.ttf",
+      "sha1": "06f89e75fb6493092cbb2cfcd42af1e67baeb5eb"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-ExtraBold.ttf",
+      "sha1": "6be66c9a43907024d4b27f648701f729d3ebd137"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-ExtraLight.ttf",
+      "sha1": "6522e4b20628be23387268f5a3b6f6342e6f134a"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-Light.ttf",
+      "sha1": "84ca814bd9ba3d9ffbb6175dd8bbe1808791c29c"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-Medium.ttf",
+      "sha1": "77163bf5ecfc289dec0f172b99b73fee1c8d6a6c"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-Regular.ttf",
+      "sha1": "0ae9167b7b8fa11815ec62ced636a7ef48a787b2"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-SemiBold.ttf",
+      "sha1": "c2aed6f18910b26e48227c8a58d107fcb8e90375"
+    },
+    {
+      "path": "src/assets/fonts/MuseoModerno-Thin.ttf",
+      "sha1": "3f26e41f0d204716e2b92e242a84587649076c01"
+    },
+    {
       "path": "src/assets/fonts/Pretendard-Black.otf",
       "sha1": "b9162985d25a21b393185c6139d283fba46fd739"
     },

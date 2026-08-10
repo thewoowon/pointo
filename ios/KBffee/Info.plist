@@ -21,7 +21,6 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<!-- 구글 OAuth 콜백 (iOS 클라이언트 reversed client id) -->
 				<string>com.googleusercontent.apps.836272362687-5ci0vt9g4a24lv5jiiehe33c80sok80o</string>
 			</array>
 		</dict>
@@ -64,6 +63,15 @@
 		<string>sf-ui-display-semibold.otf</string>
 		<string>sf-ui-display-thin.otf</string>
 		<string>sf-ui-display-ultralight.otf</string>
+		<string>MuseoModerno-Medium.ttf</string>
+		<string>MuseoModerno-Black.ttf</string>
+		<string>MuseoModerno-SemiBold.ttf</string>
+		<string>MuseoModerno-Regular.ttf</string>
+		<string>MuseoModerno-Thin.ttf</string>
+		<string>MuseoModerno-Light.ttf</string>
+		<string>MuseoModerno-ExtraBold.ttf</string>
+		<string>MuseoModerno-Bold.ttf</string>
+		<string>MuseoModerno-ExtraLight.ttf</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen.storyboard</string>
