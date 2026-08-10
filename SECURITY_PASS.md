@@ -295,9 +295,13 @@ App Check 적용을 켜야 실제로 막힌다. 그리고 켜는 순간 App Chec
 7. App Check 모니터링 → 100% 근처에서 enforce
 ```
 
-**5번을 건너뛰고 7번을 하면 웹이 통째로 죽는다.** enforce는 App Check 토큰이
-없는 클라이언트를 전부 차단하는데, 현재 웹에는 App Check 코드가 **한 줄도 없다**
-(`grep -r appCheck` 0건). 앱과 사이트 키가 다르므로 웹 제공자를 따로 등록해야 한다.
+**5번을 건너뛰고 7번을 하면 웹이 통째로 죽는다.** enforce는 App Check 토큰이 없는
+클라이언트를 전부 차단한다.
+
+**5번 코드는 완료** (pointo-web `b34327e`) — `lib/app-check.ts`가 `getFirebaseApp()`에서
+reCAPTCHA v3를 시작한다. 사이트 키가 없으면 조용히 건너뛰므로 지금 배포해도 안 깨진다.
+**남은 건 Console 작업뿐**: App Check → 웹 앱 등록 → 사이트 키를
+`NEXT_PUBLIC_RECAPTCHA_SITE_KEY`에 넣기. 절차는 pointo-web `docs/app-check-web.md`.
 
 ### 앱 쪽 연동 상태
 
@@ -305,9 +309,7 @@ App Check 적용을 켜야 실제로 막힌다. 그리고 켜는 순간 App Chec
 `hellopointo.com/s/{매장코드}`가 6번 전까지 404라서 진입 버튼을 감춰뒀다.
 **웹 배포 후 이 상수를 true로 되돌릴 것** — 모달과 버튼은 그대로 살아 있다.
 
-### 웹(pointo-web)에 남은 정리 대상
+### 웹(pointo-web) 정리 완료
 
-`lib/firestore/owners.ts`의 `claimStoresByPhone`이 아직 살아 있다. `stores`
-컬렉션을 `where("ownerPhone", ...)`로 쿼리하는데, 새 규칙에서는 목록 조회가
-막혀 `permission-denied`가 난다. **현재 호출하는 곳이 없어 당장은 무해**하지만,
-규칙 배포 전에 지우는 게 맞다. 앱에서는 이미 제거했다.
+`lib/firestore/owners.ts`의 `claimStoresByPhone`(stores 목록 조회 → 새 규칙에서
+`permission-denied`)을 제거했다. `b34327e`.
