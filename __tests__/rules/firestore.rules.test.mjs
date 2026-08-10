@@ -181,14 +181,28 @@ await check('키오스크: 세션 모드 전환', ALLOW, () =>
   }));
 await check('키오스크: 세션 목록 열거(매장 코드 수집)', DENY, () =>
   getDocs(collection(kiosk, 'sessions')));
+// 생성 시점에 주인을 못 박는다. "주인 없는 매장"이라는 상태를 만들지 않는 것이
+// 아래 claim 차단의 전제다.
 await check('점주: 신규 매장 등록', ALLOW, () =>
-  setDoc(doc(ownerA, 'stores/STORE_NEW'), {name: '새매장', ownerPhone: '01000000000'}));
+  setDoc(doc(ownerA, 'stores/STORE_NEW'), {
+    name: '새매장', ownerPhone: '01000000000', ownerId: 'uidA',
+  }));
+await check('점주: 주인 없는 매장 생성', DENY, () =>
+  setDoc(doc(ownerA, 'stores/STORE_ORPHAN'), {name: '주인없음', ownerPhone: '01000000000'}));
+await check('점주: 남을 주인으로 박은 매장 생성', DENY, () =>
+  setDoc(doc(ownerA, 'stores/STORE_FRAUD'), {
+    name: '남의것', ownerPhone: '01000000000', ownerId: 'uidB',
+  }));
 await check('점주: 매장 등록 시 세션 생성', ALLOW, () =>
   setDoc(doc(ownerA, 'sessions/session_STORE_NEW'), {
     is_confirmed: false, last_used: '2026-08-08', phone: '', mode: 'waiting',
   }));
-await check('점주: 전화번호로 내 매장 찾기', ALLOW, () =>
+// 규칙은 쿼리의 where를 검사할 수 없다. "내 번호로 한 건"과 "전 매장 덤프"를
+// 구별할 방법이 없으므로 목록 조회 자체를 닫았다. 계정에 연결된 매장은
+// owners.storeCodes로 단건 조회한다(getOwnerStores).
+await check('점주: 전화번호로 내 매장 찾기', DENY, () =>
   getDocs(query(collection(ownerA, 'stores'), where('ownerPhone', '==', '01000000000'))));
+await check('점주: 전체 매장 덤프', DENY, () => getDocs(collection(ownerA, 'stores')));
 
 console.log('\n[3] 점주 — 자기 매장만 ⭐');
 await check('점주A: 자기 매장 고객 목록', ALLOW, () =>
@@ -218,7 +232,10 @@ await check('점주A: 자기 매장 설정 변경', ALLOW, () =>
   updateDoc(doc(ownerA, 'stores/STORE_A'), {name: 'A2'}));
 await check('점주A: 남의 매장 탈취', DENY, () =>
   updateDoc(doc(ownerA, 'stores/STORE_B'), {ownerId: 'uidA'}));
-await check('점주A: 주인 없는 매장 claim', ALLOW, () =>
+// 예전에는 "주인이 없으면 누구나" 가져갈 수 있었다. 점주 연락처만 알면 남의
+// 매장을 통째로 탈취하고, 매장을 쥐면 그 매장 고객 전화번호 전량까지 열렸다.
+// 주인 없는 레거시 매장은 이제 서버(Admin SDK)에서만 연결한다.
+await check('점주A: 주인 없는 매장 claim', DENY, () =>
   updateDoc(doc(ownerA, 'stores/STORE_FREE'), {ownerId: 'uidA'}));
 
 console.log('\n[5] 레거시 uid 마이그레이션 ⭐');

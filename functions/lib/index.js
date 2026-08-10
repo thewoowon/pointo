@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeDeletedOwners = exports.registerAppleToken = exports.onUserDeleted = exports.onStoreCreated = void 0;
+exports.purgeDeletedOwners = exports.registerAppleToken = exports.onUserDeleted = exports.onOwnerCreated = exports.onStoreCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
@@ -51,7 +51,8 @@ const params_1 = require("firebase-functions/params");
 const REGION = "asia-northeast3";
 /** 탈퇴 유예 기간(일). 이 기간이 지나면 스케줄러가 실삭제한다. */
 const GRACE_DAYS = 30;
-const ADMIN_EMAIL = "thewoowon@gmail.com";
+/** 내부 알림 수신자. 여기에 주소를 추가하면 모든 관리 알림이 함께 나간다. */
+const NOTIFY_EMAILS = ["thewoowon@gmail.com", "yebbi58@gmail.com"];
 const gmailEmail = (0, params_1.defineString)("GMAIL_EMAIL");
 const gmailPassword = (0, params_1.defineString)("GMAIL_PASSWORD");
 // ─── Sign in with Apple 자격증명 (계정 삭제 시 토큰 revoke용) ──────────────
@@ -80,6 +81,60 @@ function getTransporter() {
         },
     });
 }
+/**
+ * 내부 알림 메일 발송. 실패해도 트리거를 실패시키지 않는다(알림은 부가 기능).
+ *
+ * 발신 주소는 반드시 인증 계정과 같아야 한다. Gmail SMTP는 별칭으로 등록되지
+ * 않은 from을 인증 계정 주소로 조용히 바꿔 쓰기 때문에, 상수로 박아두면
+ * 계정을 옮겼을 때 실제 발신자와 어긋난다.
+ */
+async function sendNotice(subject, html, tag) {
+    try {
+        const transporter = getTransporter();
+        await transporter.sendMail({
+            from: `"포인토 알림" <${gmailEmail.value()}>`,
+            to: NOTIFY_EMAILS.join(", "),
+            subject,
+            html,
+        });
+        firebase_functions_1.logger.info(`Notice email sent: ${tag} → ${NOTIFY_EMAILS.length}명`);
+    }
+    catch (error) {
+        firebase_functions_1.logger.error(`Failed to send notice email (${tag}):`, error);
+    }
+}
+/** 알림 메일 공통 레이아웃 */
+function noticeHtml(opts) {
+    const rows = opts.rows
+        .map((r) => `
+            <tr>
+              <td style="padding: 8px 0; color: #73777B; font-size: 14px;">${r.label}</td>
+              <td style="padding: 8px 0; color: ${r.accent ? "#D4845A" : "#191D2B"}; font-weight: 600;${r.accent ? " font-family: monospace;" : ""}">${r.value}</td>
+            </tr>`)
+        .join("");
+    return `
+      <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+        <h2 style="color: #D4845A; margin-bottom: 4px;">${opts.title}</h2>
+        <p style="color: #73777B; font-size: 14px; margin-top: 0;">${opts.lead}</p>
+
+        <div style="background: #F6F6F8; border-radius: 12px; padding: 20px; margin: 20px 0;">
+          <table style="width: 100%; border-collapse: collapse;">${rows}
+          </table>
+        </div>
+${opts.footer ? `
+        <p style="color: #73777B; font-size: 13px;">${opts.footer}</p>
+` : ""}${opts.cta ? `
+        <a href="${opts.cta.href}"
+           style="display: inline-block; background: #D4845A; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 8px;">
+          ${opts.cta.label}
+        </a>
+` : ""}      </div>
+    `;
+}
+/** ISO 문자열을 한국 시간 표기로 */
+function formatKst(iso) {
+    return new Date(iso).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
+}
 // 신규 스토어 등록 시 이메일 알림
 exports.onStoreCreated = (0, firestore_1.onDocumentCreated)({ document: "stores/{storeCode}", region: "asia-northeast3" }, async (event) => {
     var _a;
@@ -90,56 +145,66 @@ exports.onStoreCreated = (0, firestore_1.onDocumentCreated)({ document: "stores/
     const storeName = data.name || "(이름 없음)";
     const ownerPhone = data.ownerPhone || "(번호 없음)";
     const createdAt = data.createdAt || new Date().toISOString();
-    const subject = `[포인토] 새 카페 등록 신청: ${storeName}`;
-    const html = `
-      <div style="font-family: -apple-system, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
-        <h2 style="color: #D4845A; margin-bottom: 4px;">새 카페가 등록되었습니다</h2>
-        <p style="color: #73777B; font-size: 14px; margin-top: 0;">승인 대기 중인 스토어가 있습니다.</p>
-
-        <div style="background: #F6F6F8; border-radius: 12px; padding: 20px; margin: 20px 0;">
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr>
-              <td style="padding: 8px 0; color: #73777B; font-size: 14px;">카페 이름</td>
-              <td style="padding: 8px 0; color: #191D2B; font-weight: 600;">${storeName}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #73777B; font-size: 14px;">스토어 코드</td>
-              <td style="padding: 8px 0; color: #D4845A; font-weight: 600; font-family: monospace;">${storeCode}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #73777B; font-size: 14px;">점주 연락처</td>
-              <td style="padding: 8px 0; color: #191D2B;">${ownerPhone}</td>
-            </tr>
-            <tr>
-              <td style="padding: 8px 0; color: #73777B; font-size: 14px;">등록 시간</td>
-              <td style="padding: 8px 0; color: #191D2B;">${new Date(createdAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })}</td>
-            </tr>
-          </table>
-        </div>
-
-        <p style="color: #73777B; font-size: 13px;">
-          Firebase Console에서 해당 스토어의 status를 'approved'로 변경하여 승인하세요.
-        </p>
-
-        <a href="https://console.firebase.google.com/project/kbffee-a365e/firestore/databases/-default-/data/~2Fstores~2F${storeCode}"
-           style="display: inline-block; background: #D4845A; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 8px;">
-          Firebase Console에서 확인
-        </a>
-      </div>
-    `;
+    const html = noticeHtml({
+        title: "새 매장이 등록되었습니다",
+        lead: "점주가 앱에서 매장을 만들었습니다.",
+        rows: [
+            { label: "매장 이름", value: storeName },
+            { label: "매장 코드", value: storeCode, accent: true },
+            { label: "점주 연락처", value: ownerPhone },
+            { label: "등록 시간", value: formatKst(createdAt) },
+        ],
+        cta: {
+            label: "Firebase Console에서 확인",
+            href: `https://console.firebase.google.com/project/kbffee-a365e/firestore/databases/-default-/data/~2Fstores~2F${storeCode}`,
+        },
+    });
+    await sendNotice(`[포인토] 새 매장 등록: ${storeName}`, html, `store:${storeCode}`);
+});
+// ─── 점주 계정 가입 알림 ───────────────────────────────────────────────────
+/**
+ * owners/{uid} 문서가 생기면(= 구글/애플로 새 점주 계정이 만들어지면) 알린다.
+ *
+ * 주의: 레거시 계정을 Firebase uid로 옮기는 마이그레이션도 owners 문서를 새로
+ * 만든다(migrateLegacyOwner). 그건 신규 가입이 아니므로 legacyUid가 실려 있으면
+ * 건너뛴다. 안 그러면 구버전 점주가 재로그인할 때마다 가입 알림이 온다.
+ */
+exports.onOwnerCreated = (0, firestore_1.onDocumentCreated)({ document: "owners/{uid}", region: REGION }, async (event) => {
+    var _a;
+    const uid = event.params.uid;
+    const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
+    if (!data)
+        return;
+    if (data.legacyUid) {
+        firebase_functions_1.logger.info(`onOwnerCreated: ${uid} — 레거시 계정 이전이라 알림 생략`);
+        return;
+    }
+    const email = data.email || "(이메일 없음)";
+    const createdAt = data.createdAt || new Date().toISOString();
+    // 로그인 수단은 owners 문서에 없다. Auth 쪽이 원본이라 거기서 읽는다.
+    let provider = "(확인 불가)";
     try {
-        const transporter = getTransporter();
-        await transporter.sendMail({
-            from: `"포인토 알림" <${ADMIN_EMAIL}>`,
-            to: ADMIN_EMAIL,
-            subject,
-            html,
-        });
-        firebase_functions_1.logger.info(`Store registration email sent for ${storeCode}`);
+        const user = await (0, auth_1.getAuth)().getUser(uid);
+        const ids = user.providerData.map((p) => p.providerId);
+        provider = ids
+            .map((id) => id === "google.com" ? "구글" : id === "apple.com" ? "Apple" : id)
+            .join(", ") || "(없음)";
     }
-    catch (error) {
-        firebase_functions_1.logger.error("Failed to send email:", error);
+    catch (e) {
+        firebase_functions_1.logger.warn(`onOwnerCreated: ${uid} 제공자 조회 실패`, e);
     }
+    const html = noticeHtml({
+        title: "새 점주 계정이 생겼습니다",
+        lead: "이메일로 가입한 점주입니다. 아직 매장은 없을 수 있어요.",
+        rows: [
+            { label: "이메일", value: email },
+            { label: "로그인", value: provider },
+            { label: "가입 시간", value: formatKst(createdAt) },
+            { label: "계정 uid", value: uid, accent: true },
+        ],
+        footer: "매장을 만들면 '새 매장 등록' 알림이 따로 옵니다.",
+    });
+    await sendNotice(`[포인토] 새 점주 가입: ${email}`, html, `owner:${uid}`);
 });
 // ─── 고객 탈퇴 후처리 ──────────────────────────────────────────────────────
 /**
