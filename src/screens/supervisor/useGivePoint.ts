@@ -1,4 +1,4 @@
-import {useCallback, useState} from 'react';
+import {useCallback, useMemo, useState} from 'react';
 import {Alert} from 'react-native';
 import {useAuth, useFirestore, useAnalytics, useStoreConfig} from '../../hooks';
 import {
@@ -14,15 +14,14 @@ import {
   hashPhone,
   getTierFromLevel,
 } from '../../analytics/events';
-import {confirm} from '../../utils/alert';
 import {
   normalizeUser,
-  makeUserContext,
-  totalSelected,
   addCouponTimestamp,
-  removeCouponTimestamps,
+  buildCouponEntries,
+  removeCouponEntries,
   filterExpiredCoupons,
 } from '../../utils/coupons';
+import {pushRecentLog} from '../../utils/recentLogs';
 
 export type GiveMode = 'earn' | 'use';
 
@@ -53,6 +52,7 @@ export function useGivePoint(
     useFirestore(storeCode);
 
   const isPointMode = storeConfig.mode === 'point';
+  const couponExpiryDays = storeConfig.couponExpiryDays;
 
   const [mode, setMode] = useState<GiveMode>('earn');
   const [number, setNumber] = useState('');
@@ -64,10 +64,12 @@ export function useGivePoint(
     coupons: {},
     hasRated: false,
   });
-  const [userContext, setUserContext] = useState<UserContext>({
-    selectedCoupon: {},
-    possibleCoupons: {},
-  });
+  /**
+   * 사용하려고 고른 쿠폰 **장**들의 key (CouponEntry.key).
+   * 타입별 개수가 아니라 장을 직접 들고 있어야, 체크한 줄과 실제로 차감되는
+   * 장의 만료일이 어긋나지 않는다.
+   */
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
 
   const handleApprovePoint = async (): Promise<boolean> => {
     if (number.length === 0) {
@@ -84,6 +86,11 @@ export function useGivePoint(
     await updateUser(phoneNumber, {
       stamps: newStamps,
       last_used: new Date().toISOString().split('T')[0],
+      // 고객 화면 최근내역용. logs는 점주만 읽을 수 있어서 별도로 남긴다.
+      recentLogs: pushRecentLog(user.recentLogs, {
+        action: 'stamp_saved',
+        amount: pointValue,
+      }),
     });
 
     addLog({
@@ -134,6 +141,10 @@ export function useGivePoint(
     await updateUser(phoneNumber, {
       stamps: newStamps,
       last_used: new Date().toISOString().split('T')[0],
+      recentLogs: pushRecentLog(user.recentLogs, {
+        action: 'stamp_used',
+        amount: pointsToUse,
+      }),
     });
 
     addLog({
@@ -225,6 +236,11 @@ export function useGivePoint(
       couponIssuedAt: issuedAt ?? {},
       level,
       last_used: new Date().toISOString().split('T')[0],
+      recentLogs: pushRecentLog(user.recentLogs, {
+        action: 'stamp_saved',
+        amount: numberValue,
+        ...(difference > 0 ? {note: `쿠폰 ${difference}장 획득`} : {}),
+      }),
     };
 
     await updateUser(phoneNumber, updateContext);
@@ -291,32 +307,34 @@ export function useGivePoint(
   };
 
   const handleUsing = async (): Promise<boolean> => {
-    const selected = totalSelected(userContext.selectedCoupon);
+    const selected = selectedKeys.length;
     if (selected < 1) {
       Alert.alert('사용할 쿠폰을 선택해주세요', '쿠폰을 눌러 선택해주세요.');
       return false;
     }
 
-    // 쿠폰만 차감 (스탬프 카드 모델: 쿠폰 사용 시 스탬프 변동 없음)
-    const remainingCoupons: Record<string, number> = {};
-    for (const ct of storeConfig.couponTypes) {
-      remainingCoupons[ct.id] =
-        (userContext.possibleCoupons[ct.id] ?? 0) -
-        (userContext.selectedCoupon[ct.id] ?? 0);
-    }
-    const remainingIssuedAt = removeCouponTimestamps(
-      user.couponIssuedAt,
-      userContext.selectedCoupon,
-    );
+    // 쿠폰만 차감 (스탬프 카드 모델: 쿠폰 사용 시 스탬프 변동 없음).
+    // 고른 장을 그대로 뺀다 — 오래된 순이 아니라 체크된 장.
+    const {
+      coupons: remainingCoupons,
+      issuedAt: remainingIssuedAt,
+      usedByType,
+    } = removeCouponEntries(user.coupons, user.couponIssuedAt, selectedKeys);
+
+    const noteString = storeConfig.couponTypes
+      .filter(ct => (usedByType[ct.id] ?? 0) > 0)
+      .map(ct => `${ct.name} ${usedByType[ct.id]}장`)
+      .join(' ');
+
     await updateUser(phoneNumber, {
       coupons: remainingCoupons,
       couponIssuedAt: remainingIssuedAt,
+      recentLogs: pushRecentLog(user.recentLogs, {
+        action: 'stamp_used',
+        amount: selected,
+        note: noteString,
+      }),
     });
-
-    const noteString = storeConfig.couponTypes
-      .filter(ct => (userContext.selectedCoupon[ct.id] ?? 0) > 0)
-      .map(ct => `${ct.name} ${userContext.selectedCoupon[ct.id]}장`)
-      .join(' ');
 
     addLog({
       action: 'stamp_used',
@@ -339,13 +357,14 @@ export function useGivePoint(
         user_level: user.level,
         stamps_total: user.stamps,
         days_since_signup: daysSinceSignup,
-        coupons_redeemed: userContext.selectedCoupon,
+        coupons_redeemed: usedByType,
       });
     } catch (error) {
       console.log('Error logging coupon redeemed event:', error);
     }
 
     setNumber('');
+    setSelectedKeys([]);
     updateLogs();
     return true;
   };
@@ -353,10 +372,11 @@ export function useGivePoint(
   const switchMode = (newMode: GiveMode) => {
     setMode(newMode);
     setNumber('');
-    setUserContext(makeUserContext(user.coupons, storeConfig.couponTypes));
+    setSelectedKeys([]);
   };
 
-  const refresh = async () => {
+  /** 쿠폰 선택 초기화. 되돌리기 쉬운 조작이라 확인 대화상자는 두지 않는다. */
+  const clearSelection = () => {
     try {
       track(AnalyticsEvent.STAMP_RESET, {
         store_code: storeCode,
@@ -365,13 +385,8 @@ export function useGivePoint(
     } catch (error) {
       console.log('Error logging stamp reset event:', error);
     }
-    const result = await confirm('쿠폰 입력 확인', '쿠폰을 초기화하시겠어요?');
-    if (!result) {
-      return;
-    }
-
     setNumber('');
-    setUserContext(makeUserContext(user.coupons, storeConfig.couponTypes));
+    setSelectedKeys([]);
   };
 
   const onNumberPress = (value: number | string) => {
@@ -445,28 +460,22 @@ export function useGivePoint(
     });
   };
 
-  const onClickCoupon = (typeId: string) => () => {
-    const newSelected = {
-      ...userContext.selectedCoupon,
-      [typeId]: (userContext.selectedCoupon[typeId] ?? 0) + 1,
-    };
-    const total = Object.values(newSelected).reduce((s, v) => s + v, 0);
-    setNumber(total.toString());
-    setUserContext({
-      ...userContext,
-      selectedCoupon: newSelected,
-    });
-  };
+  /** 보유 쿠폰을 장 단위로 (사용 화면의 목록 소스) */
+  const couponEntries = useMemo(
+    () =>
+      buildCouponEntries(
+        user.coupons,
+        user.couponIssuedAt,
+        storeConfig.couponTypes ?? [],
+        couponExpiryDays,
+      ),
+    [user.coupons, user.couponIssuedAt, storeConfig.couponTypes, couponExpiryDays],
+  );
 
-  // 바텀시트 쿠폰 스테퍼(+/−). 보유 개수 내에서 클램프.
-  const adjustCoupon = (typeId: string, delta: number) => {
-    const max = userContext.possibleCoupons[typeId] ?? 0;
-    const cur = userContext.selectedCoupon[typeId] ?? 0;
-    const next = Math.min(Math.max(cur + delta, 0), max);
-    const newSelected = {...userContext.selectedCoupon, [typeId]: next};
-    const total = Object.values(newSelected).reduce((s, v) => s + v, 0);
-    setNumber(total.toString());
-    setUserContext({...userContext, selectedCoupon: newSelected});
+  const toggleCoupon = (key: string) => {
+    setSelectedKeys(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key],
+    );
   };
 
   useFocusEffect(
@@ -500,9 +509,6 @@ export function useGivePoint(
               couponIssuedAt: validIssuedAt,
             };
             setUser(filtered);
-            setUserContext(
-              makeUserContext(filtered.coupons, storeConfig.couponTypes),
-            );
           }
         });
       };
@@ -527,13 +533,14 @@ export function useGivePoint(
     mode,
     number,
     user,
-    userContext,
+    couponEntries,
+    selectedKeys,
+    selectedCount: selectedKeys.length,
+    toggleCoupon,
+    clearSelection,
     setNumber,
     switchMode,
-    refresh,
     onNumberPress,
-    onClickCoupon,
-    adjustCoupon,
     phoneNumberLabel,
     close,
     handleApprove,

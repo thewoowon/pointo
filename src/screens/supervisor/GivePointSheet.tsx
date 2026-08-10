@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Modal,
   Pressable,
@@ -7,433 +7,203 @@ import {
   Text,
   View,
 } from 'react-native';
-import {useTheme} from '../../hooks';
-import type {Theme} from '../../theme';
-import {
-  CircleMinusIcon,
-  CirclePlusIcon,
-  LeftArrowIcon,
-  NewXIcon,
-} from '../../components/Icons';
-import {totalSelected} from '../../utils/coupons';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {primitives as p, fontFamily as f} from '../../theme';
+import {NewXIcon, RightChevronIcon} from '../../components/Icons';
 import {useGivePoint} from './useGivePoint';
 import {maskPhone} from './logDisplay';
+import {
+  SegmentedToggle,
+  GiveBody,
+  ConfirmButton,
+  CustomerDetailPanel,
+  canConfirm,
+} from './givepoint';
 
-const KEYS: (number | string)[][] = [
-  [1, 2, 3],
-  [4, 5, 6],
-  [7, 8, 9],
-  ['', 0, 'c'],
-];
+/** 쿠폰 목록에 내주는 높이 (모바일은 화면이 좁아 태블릿보다 짧게) */
+const COUPON_LIST_MAX_HEIGHT = 300;
 
 /**
- * 모바일 적립/사용 2-스텝 바텀시트 (태블릿 DetailView의 모바일 대응).
- * step 'choice' → 사용/적립 선택, step 'input' → 키패드(적립·포인트) 또는 쿠폰 스테퍼(스탬프 사용).
- * 계산 로직은 useGivePoint 단일 소스 공유.
+ * 모바일 적립/사용 풀스크린.
+ *
+ * 이전엔 2스텝 바텀시트(선택 → 입력)였는데, 적립은 카운터에서 몇 초 안에
+ * 끝나야 하는 일이라 단계를 없애고 토글 하나로 합쳤다. 계산 로직과 입력부는
+ * 태블릿 DetailView와 같은 소스(useGivePoint / GiveBody)를 쓴다.
  */
 const GivePointSheet = ({
   visible,
   phoneNumber,
   updateLogs,
+  manual = false,
+  onClose,
 }: {
   visible: boolean;
   phoneNumber: string;
   updateLogs: () => void;
+  /** 관리자가 고객 검색으로 연 흐름 (고객 태블릿 세션과 무관) */
+  manual?: boolean;
+  onClose?: () => void;
 }) => {
-  const theme = useTheme();
-  const s = useMemo(() => createStyles(theme), [theme]);
-  const g = useGivePoint(phoneNumber, updateLogs);
-  const [step, setStep] = useState<'choice' | 'input'>('choice');
+  const g = useGivePoint(phoneNumber, updateLogs, {manual});
+  const [detailVisible, setDetailVisible] = useState(false);
 
-  // 새 세션이 열릴 때마다 선택 단계로 초기화
+  // 새 고객이 열릴 때마다 상세 시트는 닫아둔다
   useEffect(() => {
-    if (visible) setStep('choice');
+    if (visible) setDetailVisible(false);
   }, [visible, phoneNumber]);
 
-  const holding = g.isPointMode
-    ? `${g.user.stamps.toLocaleString()}${g.storeConfig.pointUnit}`
-    : `${g.user.stamps % g.storeConfig.stampsPerCoupon}/${
-        g.storeConfig.stampsPerCoupon
-      }개`;
-
-  const numberUnit = g.isPointMode
-    ? g.storeConfig.pointUnit
-    : g.mode === 'use'
-    ? '장'
-    : '개';
-
-  const inputTitle =
-    g.mode === 'earn'
-      ? g.isPointMode
-        ? '적립할 포인트를\n입력해주세요'
-        : '적립할 스탬프 개수를\n입력해주세요'
-      : g.isPointMode
-      ? '사용할 포인트를\n입력해주세요'
-      : '사용할 쿠폰을\n선택해주세요';
-
-  const onConfirm = () => {
-    if (g.mode === 'earn') {
-      g.isPointMode ? g.handleApprovePoint() : g.handleApprove();
-    } else {
-      g.isPointMode ? g.handleUsingPoint() : g.handleUsing();
-    }
+  // 세션 흐름에선 close()가 세션을 리셋해 부모의 모달이 닫히지만,
+  // 수동 흐름은 세션을 안 건드리므로 부모에게 직접 닫힘을 알려야 한다.
+  const handleClose = async () => {
+    await g.close();
+    onClose?.();
   };
 
-  // 스탬프 사용만 쿠폰 스테퍼, 그 외(적립/포인트)는 숫자 키패드
-  const isCouponUse = g.mode === 'use' && !g.isPointMode;
-
-  const infoCard = (
-    <View style={s.infoCard}>
-      <View style={s.infoRow}>
-        <Text style={s.infoLabel}>고객 번호</Text>
-        <Text style={s.infoValue}>{maskPhone(phoneNumber)}</Text>
-      </View>
-      <View style={s.infoRow}>
-        <Text style={s.infoLabel}>
-          {g.isPointMode ? '보유 포인트' : '보유 스탬프 개수'}
-        </Text>
-        <Text style={s.infoValue}>{holding}</Text>
-      </View>
-    </View>
-  );
+  const onConfirm = async () => {
+    const ok =
+      g.mode === 'earn'
+        ? g.isPointMode
+          ? await g.handleApprovePoint()
+          : await g.handleApprove()
+        : g.isPointMode
+        ? await g.handleUsingPoint()
+        : await g.handleUsing();
+    if (ok && manual) handleClose();
+  };
 
   return (
     <Modal
       visible={visible}
-      transparent
       animationType="slide"
-      presentationStyle="overFullScreen"
+      presentationStyle="fullScreen"
       supportedOrientations={['portrait', 'landscape']}
-      onRequestClose={g.close}>
-      <Pressable style={s.backdrop} onPress={g.close}>
-        <Pressable style={s.sheet} onPress={e => e.stopPropagation()}>
-          <View style={s.topRow}>
-            {step === 'input' ? (
-              <Pressable
-                onPress={() => setStep('choice')}
-                hitSlop={8}
-                style={s.topBtn}>
-                <LeftArrowIcon width={20} height={20} />
-              </Pressable>
-            ) : (
-              <View style={s.topBtn} />
-            )}
-            <Pressable onPress={g.close} hitSlop={8} style={s.topBtn}>
-              <NewXIcon width={20} height={20} />
-            </Pressable>
+      onRequestClose={handleClose}>
+      <SafeAreaView style={s.root}>
+        <View style={s.header}>
+          <Pressable onPress={handleClose} hitSlop={10}>
+            <NewXIcon width={22} height={22} />
+          </Pressable>
+        </View>
+
+        <View style={s.togglePad}>
+          <SegmentedToggle mode={g.mode} onChange={g.switchMode} />
+        </View>
+
+        <Pressable style={s.customerRow} onPress={() => setDetailVisible(true)}>
+          <View style={s.customerText}>
+            <Text style={s.customerLabel}>고객 번호</Text>
+            <Text style={s.customerPhone}>{maskPhone(phoneNumber)}</Text>
           </View>
-
-          {step === 'choice' ? (
-            <>
-              <Text style={s.title}>
-                고객님의 {g.isPointMode ? '포인트' : '스탬프'} 사용 또는{'\n'}
-                적립하기를 선택해주세요
-              </Text>
-              {infoCard}
-              <View style={s.choiceRow}>
-                <Pressable
-                  style={[s.choiceBtn, {backgroundColor: theme.palette.blue[50]}]}
-                  onPress={() => {
-                    g.switchMode('use');
-                    setStep('input');
-                  }}>
-                  <CircleMinusIcon
-                    color={theme.color.texticon.onNormal.primary}
-                  />
-                  <Text
-                    style={[
-                      s.choiceText,
-                      {color: theme.color.texticon.onNormal.primary},
-                    ]}>
-                    사용하기
-                  </Text>
-                </Pressable>
-                <Pressable
-                  style={[
-                    s.choiceBtn,
-                    {backgroundColor: theme.palette.orange[100]},
-                  ]}
-                  onPress={() => {
-                    g.switchMode('earn');
-                    setStep('input');
-                  }}>
-                  <CirclePlusIcon color={theme.palette.orange[600]} />
-                  <Text
-                    style={[s.choiceText, {color: theme.palette.orange[600]}]}>
-                    적립하기
-                  </Text>
-                </Pressable>
-              </View>
-            </>
-          ) : (
-            <>
-              <Text style={s.title}>{inputTitle}</Text>
-              {infoCard}
-
-              {isCouponUse ? (
-                <ScrollView style={s.stepperScroll}>
-                  <Text style={s.sectionLabel}>사용가능쿠폰</Text>
-                  {g.storeConfig.couponTypes.map(ct => {
-                    const owned = g.userContext.possibleCoupons[ct.id] ?? 0;
-                    if (owned <= 0) return null;
-                    const selected = g.userContext.selectedCoupon[ct.id] ?? 0;
-                    return (
-                      <View key={ct.id} style={s.stepperRow}>
-                        <Text style={s.stepperName}>
-                          {owned}개{'  '}
-                          <Text style={s.stepperSub}>({ct.name})</Text>
-                        </Text>
-                        <View style={s.stepperCtrl}>
-                          <Pressable
-                            onPress={() => g.adjustCoupon(ct.id, -1)}
-                            hitSlop={6}>
-                            <CircleMinusIcon
-                              color={
-                                selected > 0
-                                  ? theme.color.texticon.onNormal.primary
-                                  : theme.palette.gray[300]
-                              }
-                            />
-                          </Pressable>
-                          <Text style={s.stepperCount}>{selected}</Text>
-                          <Pressable
-                            onPress={() => g.adjustCoupon(ct.id, 1)}
-                            hitSlop={6}>
-                            <CirclePlusIcon
-                              color={
-                                selected < owned
-                                  ? theme.color.texticon.onNormal.primary
-                                  : theme.palette.gray[300]
-                              }
-                            />
-                          </Pressable>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              ) : (
-                <>
-                  <View style={s.numberRow}>
-                    <Text
-                      style={[
-                        s.numberText,
-                        {
-                          color:
-                            g.number.length > 0
-                              ? theme.color.texticon.onNormal.highestemp
-                              : theme.palette.gray[300],
-                        },
-                      ]}>
-                      {g.number || '0'}
-                    </Text>
-                    <Text style={s.numberUnit}>{numberUnit}</Text>
-                  </View>
-                  <View style={s.keypad}>
-                    {KEYS.map((row, ri) => (
-                      <View key={ri} style={s.keyRow}>
-                        {row.map((key, ki) => (
-                          <Pressable
-                            key={ki}
-                            style={({pressed}) => [
-                              s.key,
-                              key !== '' &&
-                                pressed && {
-                                  backgroundColor:
-                                    theme.color.surface.normal.container10,
-                                },
-                            ]}
-                            onPress={() =>
-                              key !== '' && g.onNumberPress(key)
-                            }>
-                            {key === 'c' ? (
-                              <LeftArrowIcon />
-                            ) : (
-                              <Text style={s.keyText}>{key}</Text>
-                            )}
-                          </Pressable>
-                        ))}
-                      </View>
-                    ))}
-                  </View>
-                </>
-              )}
-
-              <Pressable
-                style={({pressed}) => [
-                  s.confirmBtn,
-                  {
-                    backgroundColor: pressed
-                      ? theme.palette.blue[700]
-                      : theme.color.surface.brand.primary,
-                  },
-                ]}
-                onPress={onConfirm}>
-                <Text style={s.confirmText}>
-                  {isCouponUse && totalSelected(g.userContext.selectedCoupon) > 0
-                    ? `쿠폰 ${totalSelected(
-                        g.userContext.selectedCoupon,
-                      )}장 사용하기`
-                    : '확인'}
-                </Text>
-              </Pressable>
-            </>
-          )}
+          <View style={s.moreBtn}>
+            <Text style={s.moreText}>자세히</Text>
+            <RightChevronIcon width={16} height={16} color={p.gray[400]} />
+          </View>
         </Pressable>
-      </Pressable>
+
+        <ScrollView
+          style={s.scroll}
+          contentContainerStyle={s.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
+          <GiveBody g={g} couponListMaxHeight={COUPON_LIST_MAX_HEIGHT} />
+        </ScrollView>
+
+        <View style={s.footer}>
+          <ConfirmButton enabled={canConfirm(g)} onPress={onConfirm} />
+        </View>
+      </SafeAreaView>
+
+      <Modal
+        visible={detailVisible}
+        transparent
+        animationType="slide"
+        supportedOrientations={['portrait', 'landscape']}
+        onRequestClose={() => setDetailVisible(false)}>
+        <Pressable style={s.backdrop} onPress={() => setDetailVisible(false)}>
+          <Pressable style={s.detailSheet} onPress={e => e.stopPropagation()}>
+            <View style={s.detailHeader}>
+              <Text style={s.detailTitle}>고객정보 상세</Text>
+              <Pressable onPress={() => setDetailVisible(false)} hitSlop={10}>
+                <NewXIcon width={20} height={20} />
+              </Pressable>
+            </View>
+            <CustomerDetailPanel
+              phoneNumber={phoneNumber}
+              user={g.user}
+              isPointMode={g.isPointMode}
+              pointUnit={g.storeConfig.pointUnit}
+              stampsPerCoupon={g.storeConfig.stampsPerCoupon}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Modal>
   );
 };
 
-const createStyles = (theme: Theme) =>
-  StyleSheet.create({
-    backdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'flex-end',
-    },
-    sheet: {
-      backgroundColor: theme.color.surface.normal.bg1,
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
-      paddingHorizontal: 24,
-      paddingTop: 16,
-      paddingBottom: 40,
-      gap: 20,
-    },
-    topRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    topBtn: {width: 24, height: 24, justifyContent: 'center', alignItems: 'center'},
-    title: {
-      textAlign: 'center',
-      fontFamily: theme.font.semibold,
-      fontSize: 20,
-      lineHeight: 30,
-      letterSpacing: -0.5,
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    infoCard: {
-      backgroundColor: theme.color.surface.normal.container10,
-      borderRadius: 16,
-      paddingHorizontal: 20,
-      paddingVertical: 18,
-      gap: 12,
-    },
-    infoRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    infoLabel: {
-      fontFamily: theme.font.regular,
-      fontSize: 15,
-      letterSpacing: -0.3,
-      color: theme.color.texticon.onNormal.midemp,
-    },
-    infoValue: {
-      fontFamily: theme.font.semibold,
-      fontSize: 16,
-      letterSpacing: -0.3,
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    choiceRow: {flexDirection: 'row', gap: 12},
-    choiceBtn: {
-      flex: 1,
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 8,
-      height: 60,
-      borderRadius: 16,
-    },
-    choiceText: {
-      fontFamily: theme.font.semibold,
-      fontSize: 18,
-      letterSpacing: -0.5,
-    },
-    sectionLabel: {
-      fontFamily: theme.font.semibold,
-      fontSize: 15,
-      letterSpacing: -0.3,
-      color: theme.color.texticon.onNormal.highemp,
-      marginBottom: 12,
-    },
-    stepperScroll: {maxHeight: 260},
-    stepperRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      backgroundColor: theme.color.surface.normal.container10,
-      borderRadius: 14,
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      marginBottom: 12,
-    },
-    stepperName: {
-      fontFamily: theme.font.bold,
-      fontSize: 17,
-      letterSpacing: -0.5,
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    stepperSub: {
-      fontFamily: theme.font.regular,
-      fontSize: 14,
-      color: theme.color.texticon.onNormal.midemp,
-    },
-    stepperCtrl: {flexDirection: 'row', alignItems: 'center', gap: 16},
-    stepperCount: {
-      fontFamily: 'SFUIDisplay-Semibold',
-      fontSize: 18,
-      minWidth: 20,
-      textAlign: 'center',
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    numberRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'baseline',
-      gap: 8,
-      paddingVertical: 8,
-    },
-    numberText: {
-      fontFamily: 'SFUIDisplay-Semibold',
-      fontSize: 44,
-      letterSpacing: -1,
-    },
-    numberUnit: {
-      fontFamily: theme.font.semibold,
-      fontSize: 22,
-      color: theme.color.texticon.onNormal.highemp,
-    },
-    keypad: {gap: 8},
-    keyRow: {flexDirection: 'row', justifyContent: 'center', gap: 8},
-    key: {
-      flex: 1,
-      height: 52,
-      borderRadius: 12,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    keyText: {
-      fontFamily: 'SFUIDisplay-Semibold',
-      fontSize: 26,
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    confirmBtn: {
-      height: 56,
-      borderRadius: 16,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    confirmText: {
-      fontFamily: theme.font.semibold,
-      fontSize: 18,
-      letterSpacing: -0.5,
-      color: theme.color.etc.absolute.white,
-    },
-  });
+const s = StyleSheet.create({
+  root: {flex: 1, backgroundColor: p.base.white},
+  header: {height: 44, justifyContent: 'center', paddingHorizontal: 20},
+  togglePad: {paddingHorizontal: 16, paddingBottom: 12},
+
+  customerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: p.slate[100],
+    gap: 12,
+  },
+  customerText: {gap: 2},
+  customerLabel: {
+    fontSize: 12,
+    fontFamily: f.regular,
+    color: p.gray[400],
+    letterSpacing: -0.3,
+  },
+  customerPhone: {
+    fontSize: 17,
+    fontFamily: f.semibold,
+    color: p.gray[900],
+    letterSpacing: -0.4,
+  },
+  moreBtn: {flexDirection: 'row', alignItems: 'center', gap: 2},
+  moreText: {
+    fontSize: 14,
+    fontFamily: f.regular,
+    color: p.gray[400],
+    letterSpacing: -0.3,
+  },
+
+  scroll: {flex: 1},
+  scrollContent: {paddingHorizontal: 20, paddingTop: 24, paddingBottom: 16},
+  footer: {paddingHorizontal: 20, paddingTop: 8, paddingBottom: 16},
+
+  backdrop: {flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'flex-end'},
+  detailSheet: {
+    // maxHeight가 아니라 확정 높이여야 한다 — 안의 패널이 flex:1 ScrollView라
+    // 부모 높이가 콘텐츠로 정해지면 서로를 기다리다 0으로 접힌다.
+    height: '72%',
+    backgroundColor: p.base.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 8,
+  },
+  detailHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+  },
+  detailTitle: {
+    fontSize: 17,
+    fontFamily: f.semibold,
+    color: p.gray[900],
+    letterSpacing: -0.4,
+  },
+});
 
 export default GivePointSheet;

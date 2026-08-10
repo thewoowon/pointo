@@ -679,7 +679,6 @@ const createSubComponents = (styles: Styles) => {
 
 const createStyles = (theme: Theme) => {
   const c = theme.color;
-  const pal = theme.palette;
   const f = theme.font;
   const ACCENT = c.surface.brand.primary;
   const TEXT_PRIMARY = c.texticon.onNormal.highestemp;

@@ -1,6 +1,5 @@
 import React, {useCallback, useMemo, useState} from 'react';
 import {
-  Alert,
   Modal,
   Pressable,
   ScrollView,
@@ -10,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {SafeAreaView, useSafeAreaInsets} from 'react-native-safe-area-context';
 import {
   useAuth,
   useFirestore,
@@ -25,7 +24,6 @@ import {useFocusEffect} from '@react-navigation/native';
 import {
   DownTriangleIcon,
   ExitIcon,
-  LeftArrowIcon,
   MagnifierIcon,
   RefreshIcon,
   ShortLeftArrowIcon,
@@ -33,59 +31,47 @@ import {
   StatisticIcon,
   GearIcon,
   QrIcon,
+  SummaryIcon,
+  RightChevronIcon,
 } from '../../components/Icons';
 import dayjs from 'dayjs';
 // import {BackgroundDeco} from '../../components/background';
-import QRCode from 'react-native-qrcode-svg';
 import DetailView from './DetailView';
 import GivePointSheet from './GivePointSheet';
+import CustomerSearchSheet from './CustomerSearchSheet';
+import LogDetailPanel, {type SelectedLogContext} from './LogDetailPanel';
+import LogFilterSheet, {FILTER_MAP, type LogFilter} from './LogFilterSheet';
+import QrShareModal from './QrShareModal';
 import {useMasterDetail} from '../../components';
 import {LoadingOverlay} from '../../components/overlay';
-import {maskPhone, phoneLast4, logActionStyle} from './logDisplay';
+import {maskPhone, logActionStyle, logPillText} from './logDisplay';
 
-// 고객 셀프 적립용 포인토 웹. 스토어 코드를 붙여 해당 매장으로 진입시킴.
-const POINTO_WEB_URL = 'https://pointo-web-chi.vercel.app';
-
-const FILTER_LIST: {
-  label: string;
-  value: 'all' | 'used' | 'saved';
-}[] = [
-  {label: '전체', value: 'all'},
-  {label: '사용내역', value: 'used'},
-  {label: '적립내역', value: 'saved'},
-];
-
-const FILTER_MAP: {
-  [key: string]: string;
-} = {
-  all: '전체',
-  used: '사용내역',
-  saved: '적립내역',
-};
-
-const MainScreen = ({navigation, route}: any) => {
+const MainScreen = ({navigation}: any) => {
   const {isCompact} = useLayoutMode();
   const theme = useTheme();
-  const styles = useMemo(() => createStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(
+    () => createStyles(theme, isCompact),
+    [theme, isCompact],
+  );
   const [showDetail, setShowDetail] = useState(false);
   // Master-detail panel visibility (centralized — see SplitLayout primitive).
   const {showList, showDetailPanel} = useMasterDetail(showDetail);
-  const {storeCode, storeName, setIsAuthenticated, initStoreCode} = useAuth();
-  const {enterNumber, getLogs, getLogsAfter, getLogsByPhoneNumber} =
-    useFirestore(storeCode);
+  const {storeCode, setIsAuthenticated, initStoreCode} = useAuth();
+  const {getLogs, getLogsByPhoneNumber} = useFirestore(storeCode);
   const {track} = useAnalytics();
-  const [modalVisible, setModalVisible] = useState(false);
+  // 적립/사용 시트를 여는 두 경로 —
+  // (1) 세션: 고객이 태블릿에 번호를 입력해 시작한 흐름
+  // (2) 수동: 관리자가 고객 검색으로 직접 고른 흐름
+  // 수동이 열려 있는 동안엔 세션이 화면을 빼앗지 않고, 수동을 닫을 때 세션 상태가 재평가된다.
+  const [sessionPhone, setSessionPhone] = useState('');
+  const [sessionActive, setSessionActive] = useState(false);
+  const [manualPhone, setManualPhone] = useState<string | null>(null);
   const [date, setDate] = useState(dayjs());
   const [logs, setLogs] = useState<Log[]>([]);
   const [displayLogs, setDisplayLogs] = useState<Log[]>([]);
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [lastTimestamp, setLastTimestamp] = useState<Date | null>(null);
-  const [selectedContext, setSelectedContext] = useState<{
-    selectedLog: Log | null;
-    viewMode: 'detail' | 'list';
-    logList: Log[];
-  }>({
+  const [selectedContext, setSelectedContext] = useState<SelectedLogContext>({
     selectedLog: null,
     viewMode: 'detail',
     logList: [],
@@ -94,16 +80,39 @@ const MainScreen = ({navigation, route}: any) => {
     searchText: string;
     // 활성화  // 비활성화
     status: 'active' | 'inactive';
-    filter: 'all' | 'used' | 'saved';
+    filter: LogFilter;
   }>({
     searchText: '',
     status: 'inactive',
     filter: 'all',
   });
-  const [customerSearchVisible, setCustomerSearchVisible] = useState(false);
-  const [customerSearchInput, setCustomerSearchInput] = useState('');
+  const [searchVisible, setSearchVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [qrVisible, setQrVisible] = useState(false);
+  // 모바일 헤더는 QR만 남기고, 통계·매장설정은 요약(⋮) 메뉴 안으로 접었다.
+  const [menuVisible, setMenuVisible] = useState(false);
+
+  const givePhone = manualPhone ?? sessionPhone;
+  const giveVisible = manualPhone !== null || sessionActive;
+
+  // 화면에 실제로 그려지는 목록. 타입 필터(displayLogs) 위에 번호 검색까지 걸린 결과다.
+  // 요약 숫자와 목록이 같은 배열에서 나와야 둘이 어긋나지 않는다.
+  const visibleLogs = useMemo(
+    () =>
+      displayLogs.filter(log =>
+        log.phone_number.startsWith(searchContext.searchText),
+      ),
+    [displayLogs, searchContext.searchText],
+  );
+
+  const counts = useMemo(
+    () => ({
+      total: visibleLogs.length,
+      saved: visibleLogs.filter(log => log.action === 'stamp_saved').length,
+      used: visibleLogs.filter(log => log.action === 'stamp_used').length,
+    }),
+    [visibleLogs],
+  );
 
   const handleLogout = async () => {
     try {
@@ -118,16 +127,7 @@ const MainScreen = ({navigation, route}: any) => {
     initStoreCode(null);
   };
 
-  const handleSearch = () => {
-    setCustomerSearchInput('');
-    setCustomerSearchVisible(true);
-  };
-
-  const handleCustomerSearch = async () => {
-    if (customerSearchInput.length < 10) {
-      Alert.alert('전화번호를 입력해주세요', '10자리 번호를 입력해주세요.');
-      return;
-    }
+  const handleOpenSearch = () => {
     try {
       track(AnalyticsEvent.CUSTOMER_LOOKUP, {
         store_code: storeCode,
@@ -135,32 +135,39 @@ const MainScreen = ({navigation, route}: any) => {
     } catch (error) {
       console.error('Error logging customer lookup:', error);
     }
-    setCustomerSearchVisible(false);
-    setIsLoading(true);
-    const result = await getLogsByPhoneNumber(customerSearchInput);
-    setIsLoading(false);
-    if (result.length === 0) {
-      Alert.alert('조회 결과 없음', '해당 번호의 적립내역이 없습니다.');
-      return;
-    }
-    setSelectedContext({
-      selectedLog: result[0],
-      viewMode: 'list',
-      logList: result,
-    });
+    setSearchVisible(true);
   };
 
-  const onCustomerSearchKeyPress = (val: number | string) => {
-    if (typeof val === 'number') {
-      if (customerSearchInput.length >= 11) return;
-      setCustomerSearchInput(prev => prev + val);
-    } else if (val === 'del') {
-      setCustomerSearchInput(prev => prev.slice(0, -1));
-    }
+  /** 검색에서 고객을 고르면 그대로 적립/사용 시트로 넘긴다. */
+  const handleSelectCustomer = (phone: string) => {
+    setSearchVisible(false);
+    // iOS는 모달이 닫히는 도중 새 모달을 띄우면 두 번째가 무시된다.
+    // 검색 시트가 사라진 뒤에 적립 시트를 올린다.
+    setTimeout(() => setManualPhone(phone), 300);
   };
 
   const handleStatistics = () => {
     navigation.navigate('Statistics');
+  };
+
+  /**
+   * 요약 메뉴에서 화면을 열 때는 메뉴를 먼저 닫는다.
+   * 모달이 떠 있는 채로 navigate하면 새 화면 위에 메뉴가 남는다.
+   */
+  const handleMenuNavigate = (run: () => void) => {
+    setMenuVisible(false);
+    setTimeout(run, 200);
+  };
+
+  /** 필터 시트 선택 — 목록은 이미 받아온 logs에서 걸러낸다 (재조회 없음). */
+  const applyFilter = (filter: LogFilter) => {
+    setSearchContext({...searchContext, filter});
+    setDisplayLogs(
+      filter === 'all'
+        ? logs
+        : logs.filter(log => log.action === `stamp_${filter}`),
+    );
+    setFilterModalVisible(false);
   };
 
   const handleDateMinusChange = (value: number) => {
@@ -192,21 +199,6 @@ const MainScreen = ({navigation, route}: any) => {
     if (logs) {
       setLogs(logs);
       setDisplayLogs(logs);
-      setLastTimestamp(logs[0].timestamp); // 가장 최신 로그의 timestamp로 갱신
-    }
-    setIsLoading(false);
-  };
-
-  const updateLogsAfter = async () => {
-    const dateString = date.format('YYYY-MM-DD');
-
-    // 마지막 로그 시간 이후의 로그만 가져오기
-    setIsLoading(true);
-    const newLogs = await getLogsAfter(dateString, lastTimestamp || undefined);
-    console.log('newLogs', newLogs);
-    if (newLogs && newLogs.length > 0) {
-      setLogs(prev => [...newLogs, ...prev]); // 시간순으로 정렬되어 있다면 prepend
-      setLastTimestamp(newLogs[0].timestamp); // 가장 최신 로그의 timestamp로 갱신
     }
     setIsLoading(false);
   };
@@ -242,13 +234,11 @@ const MainScreen = ({navigation, route}: any) => {
             return;
           }
 
-          setPhoneNumber(data.phone);
-          if (data.phone !== '' && data.mode === 'onboarding') {
-            setModalVisible(true);
-          } else {
-            //
-            setModalVisible(false);
-          }
+          // 세션 상태는 수동 시트가 열려 있어도 계속 추적한다.
+          // 화면을 누가 차지할지는 givePhone/giveVisible이 판단하므로,
+          // 수동 작업 중엔 가려져 있다가 닫는 순간 대기 중인 고객으로 이어진다.
+          setSessionPhone(data.phone);
+          setSessionActive(data.phone !== '' && data.mode === 'onboarding');
         }
       });
 
@@ -275,15 +265,17 @@ const MainScreen = ({navigation, route}: any) => {
               },
             ]}>
             {/* 좌: 나가기 = 로그아웃 (기존 "내 매장") */}
-            <Pressable style={styles.headerExit} onPress={handleLogout} hitSlop={8}>
-              <ExitIcon
-                width={isCompact ? 18 : 22}
-                height={isCompact ? 18 : 22}
-                color={theme.color.texticon.onNormal.highestemp}
-              />
-              <Text style={[styles.headerExitText, isCompact && {fontSize: 15}]}>
-                나가기
-              </Text>
+            <Pressable
+              style={styles.headerExit}
+              onPress={handleLogout}
+              hitSlop={8}>
+              <ExitIcon />
+              {!isCompact && (
+                <Text
+                  style={[styles.headerExitText, isCompact && {fontSize: 15}]}>
+                  나가기
+                </Text>
+              )}
             </Pressable>
 
             {/* 중앙: 화면 타이틀 */}
@@ -293,8 +285,22 @@ const MainScreen = ({navigation, route}: any) => {
               적립내역
             </Text>
 
-            {/* 우: QR(기능) · 통계 · 설정 — 진입점 3개 보존 */}
+            {/* 우: (태블릿)고객검색 · QR · 통계 · 설정 / (모바일)QR · 요약 메뉴 */}
             <View style={[styles.headerSide, {gap: isCompact ? 6 : 12}]}>
+              {/* 모바일은 아래 하단 CTA가 같은 역할을 하므로 헤더에 중복하지 않는다. */}
+              {!isCompact && (
+                <Pressable
+                  style={styles.headerIconBtn}
+                  onPress={handleOpenSearch}
+                  hitSlop={8}>
+                  <MagnifierIcon
+                    width={24}
+                    height={24}
+                    color={theme.color.texticon.onNormal.highestemp}
+                  />
+                </Pressable>
+              )}
+              {/* QR은 매장에서 가장 자주 쓰는 동작이라 모바일에서도 헤더에 남긴다. */}
               <Pressable
                 style={styles.headerIconBtn}
                 onPress={() => setQrVisible(true)}
@@ -305,26 +311,41 @@ const MainScreen = ({navigation, route}: any) => {
                   color={theme.color.texticon.onNormal.highestemp}
                 />
               </Pressable>
-              <Pressable
-                style={styles.headerIconBtn}
-                onPress={handleStatistics}
-                hitSlop={8}>
-                <StatisticIcon
-                  width={isCompact ? 19 : 23}
-                  height={isCompact ? 19 : 23}
-                  color={theme.color.texticon.onNormal.highestemp}
-                />
-              </Pressable>
-              <Pressable
-                style={styles.headerIconBtn}
-                onPress={() => navigation.navigate('StoreSettings')}
-                hitSlop={8}>
-                <GearIcon
-                  width={isCompact ? 20 : 24}
-                  height={isCompact ? 20 : 24}
-                  color={theme.color.texticon.onNormal.highestemp}
-                />
-              </Pressable>
+              {isCompact ? (
+                <Pressable
+                  style={styles.headerIconBtn}
+                  onPress={() => setMenuVisible(true)}
+                  hitSlop={8}>
+                  <SummaryIcon
+                    width={20}
+                    height={20}
+                    color={theme.color.texticon.onNormal.highestemp}
+                  />
+                </Pressable>
+              ) : (
+                <>
+                  <Pressable
+                    style={styles.headerIconBtn}
+                    onPress={handleStatistics}
+                    hitSlop={8}>
+                    <StatisticIcon
+                      width={23}
+                      height={23}
+                      color={theme.color.texticon.onNormal.highestemp}
+                    />
+                  </Pressable>
+                  <Pressable
+                    style={styles.headerIconBtn}
+                    onPress={() => navigation.navigate('StoreSettings')}
+                    hitSlop={8}>
+                    <GearIcon
+                      width={24}
+                      height={24}
+                      color={theme.color.texticon.onNormal.highestemp}
+                    />
+                  </Pressable>
+                </>
+              )}
             </View>
           </View>
           <View
@@ -334,1137 +355,418 @@ const MainScreen = ({navigation, route}: any) => {
                 flex: 1,
               },
             ]}>
-            {showList && <View
-              style={[
-                styles.innerContainer,
-                {
-                  backgroundColor: theme.color.surface.normal.bg1,
-                  paddingHorizontal: 24,
-                  paddingTop: 32,
-                },
-              ]}>
-              {searchContext.status === 'active' ? (
-                <View
-                  style={[
-                    styles.flexRowBox,
-                    {
-                      justifyContent: 'space-between',
-                      paddingHorizontal: 16,
-                      marginBottom: 32,
-                      gap: 16,
-                    },
-                  ]}>
-                  <Pressable
-                    style={styles.filterBox}
-                    onPress={() => {
-                      setFilterModalVisible(true);
-                    }}>
-                    <Text style={styles.filterBoxText}>
-                      {FILTER_MAP[searchContext.filter]}
-                    </Text>
-                    <DownTriangleIcon />
-                  </Pressable>
-                  <TextInput
-                    value={searchContext.searchText}
-                    onChangeText={text => {
-                      setSearchContext({
-                        ...searchContext,
-                        searchText: text,
-                      });
-                    }}
+            {showList && (
+              <View
+                style={[
+                  styles.innerContainer,
+                  {
+                    backgroundColor: theme.color.surface.normal.bg1,
+                    paddingHorizontal: 24,
+                    paddingTop: 32,
+                  },
+                ]}>
+                {searchContext.status === 'active' ? (
+                  <View
                     style={[
-                      styles.searchInput,
+                      styles.flexRowBox,
                       {
-                        flex: 1,
+                        justifyContent: 'space-between',
+                        paddingHorizontal: 12,
+                        marginBottom: isCompact ? 8 : 32,
+                        gap: 16,
                       },
-                    ]}
-                  />
-                  <Pressable
-                    onPress={() => {
-                      setSearchContext({
-                        filter: 'all',
-                        searchText: '',
-                        status: 'inactive',
-                      });
-                      setDisplayLogs(logs);
-                    }}
-                    style={{
-                      width: 56,
-                    }}>
-                    <Text style={styles.filterBoxText}>취소</Text>
-                  </Pressable>
-                </View>
-              ) : isCompact ? (
-                <View style={styles.mDateRow}>
-                  <View style={styles.mDateLeft}>
-                    <Text style={styles.mBigDate}>
-                      {date.format('M월 D일')}
-                    </Text>
-                    <Text style={styles.mDateCount}>{logs.length}건</Text>
-                  </View>
-                  <View style={styles.mDateNav}>
+                    ]}>
                     <Pressable
-                      style={styles.mRoundBtn}
-                      onPress={() =>
+                      style={styles.filterBox}
+                      onPress={() => {
+                        setFilterModalVisible(true);
+                      }}>
+                      <Text style={styles.filterBoxText}>
+                        {FILTER_MAP[searchContext.filter]}
+                      </Text>
+                      <DownTriangleIcon />
+                    </Pressable>
+                    <TextInput
+                      value={searchContext.searchText}
+                      onChangeText={text => {
                         setSearchContext({
                           ...searchContext,
-                          status: 'active',
-                        })
-                      }>
-                      <MagnifierIcon />
-                    </Pressable>
+                          searchText: text,
+                        });
+                      }}
+                      style={[
+                        styles.searchInput,
+                        {
+                          flex: 1,
+                        },
+                      ]}
+                    />
                     <Pressable
-                      style={styles.mRoundBtn}
-                      onPress={() => handleDateMinusChange(1)}>
-                      <ShortLeftArrowIcon width={20} height={20} />
+                      onPress={() => {
+                        setSearchContext({
+                          filter: 'all',
+                          searchText: '',
+                          status: 'inactive',
+                        });
+                        setDisplayLogs(logs);
+                      }}
+                      style={{
+                        width: 56,
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                      }}>
+                      <Text style={styles.filterBoxText}>취소</Text>
                     </Pressable>
-                    <Pressable
-                      style={styles.mRoundBtn}
-                      onPress={() => handleDatePlusChange(1)}>
-                      <ShortRightArrowIcon width={20} height={20} />
-                    </Pressable>
                   </View>
-                </View>
-              ) : (
-                <View
-                  style={[
-                    styles.flexRowBox,
-                    {
-                      justifyContent: 'space-between',
-                      marginBottom: isCompact ? 16 : 32,
-                      gap:
-                        date.format('YYYY-MM-DD') !==
-                        dayjs().format('YYYY-MM-DD')
-                          ? 10
-                          : 0,
-                      flexWrap: isCompact ? 'wrap' : undefined,
-                    },
-                  ]}>
-                  <View
-                    style={[
-                      styles.flexRowBox,
-                      {
-                        gap: isCompact ? 8 : 12,
-                      },
-                    ]}>
-                    <View
-                      style={[
-                        styles.flexRowBox,
-                        {
-                          gap: isCompact ? 6 : 12,
-                        },
-                      ]}>
-                      <Text style={[styles.titleText, isCompact && {fontSize: 18}]}>적립내역</Text>
-                      <Text style={[styles.titleSideText, isCompact && {fontSize: 12}]}>{logs.length}건</Text>
-                    </View>
-                    <View
-                      style={[
-                        styles.flexRowBox,
-                        {
-                          gap: isCompact ? 8 : 18,
-                        },
-                      ]}>
-                      {date.format('YYYY-MM-DD') !==
-                        dayjs().format('YYYY-MM-DD') && (
-                        <Pressable
-                          onPress={handleSetToday}
-                          style={[
-                            styles.flexRowBox,
-                            {
-                              backgroundColor: theme.color.surface.normal.container10,
-                              width: isCompact ? 56 : 70,
-                              height: isCompact ? 28 : 32,
-                              borderRadius: 6,
-                              gap: 4,
-                            },
-                          ]}>
-                          <RefreshIcon width={isCompact ? 12 : 16} height={isCompact ? 12 : 16} />
-                          <Text
-                            style={{
-                              fontSize: isCompact ? 12 : 16,
-                              lineHeight: isCompact ? 18 : 26,
-                              letterSpacing: -1,
-                              fontFamily: theme.font.medium,
-                              color: theme.color.texticon.onNormal.highemp,
-                            }}>
-                            오늘
-                          </Text>
-                        </Pressable>
-                      )}
-                      <View
-                        style={[
-                          styles.flexRowBox,
-                          {
-                            gap: isCompact ? 6 : 12,
-                          },
-                        ]}>
-                        <Pressable onPress={() => handleDateMinusChange(1)}>
-                          <ShortLeftArrowIcon width={isCompact ? 18 : 24} height={isCompact ? 18 : 24} />
-                        </Pressable>
-                        <Text
-                          style={{
-                            fontFamily: theme.font.medium,
-                            fontSize: isCompact ? 13 : 16,
-                            lineHeight: isCompact ? 20 : 26,
-                            letterSpacing: -1,
-                          }}>
-                          {date.format('MM월 DD일')}
-                        </Text>
-                        <Pressable onPress={() => handleDatePlusChange(1)}>
-                          <ShortRightArrowIcon width={isCompact ? 18 : 24} height={isCompact ? 18 : 24} />
-                        </Pressable>
-                      </View>
-                    </View>
-                  </View>
-                  <Pressable
-                    style={[
-                      styles.searchInput,
-                      {flex: 1, maxWidth: 200, gap: 4},
-                    ]}
-                    onPress={() => {
-                      setSearchContext({
-                        ...searchContext,
-                        status: 'active',
-                      });
-                    }}>
-                    <Text
-                      style={[
-                        styles.searchInputText,
-                        {
-                          color: theme.palette.gray[200],
-                        },
-                      ]}>
-                      고객번호로 내역검색
-                    </Text>
-                    <MagnifierIcon />
-                  </Pressable>
-                </View>
-              )}
-              <View
-                style={{
-                  flex: 1,
-                  paddingHorizontal: 12,
-                }}>
-                {/* 테이블 헤더 — tablet only */}
-                {!isCompact && (
-                <View
-                  style={[
-                    styles.flexRowBox,
-                    {
-                      justifyContent: 'space-between',
-                      height: 30,
-                      borderBottomWidth: 1,
-                      borderBottomColor: theme.palette.gray[200],
-                      gap: 16,
-                      marginBottom: 16,
-                    },
-                  ]}>
-                  <View
-                    style={[
-                      styles.flexRowBox,
-                      {justifyContent: 'flex-start', gap: 16, flex: 1},
-                    ]}>
-                    <Text
-                      style={{
-                        fontFamily: theme.font.medium,
-                        fontSize: 14,
-                        lineHeight: 24,
-                        letterSpacing: -1,
-                        width: 62,
-                        color: theme.color.texticon.onNormal.midemp,
-                      }}>
-                      적립정보
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: theme.font.medium,
-                        fontSize: 14,
-                        lineHeight: 24,
-                        letterSpacing: -1,
-                        width: 100,
-                        color: theme.color.texticon.onNormal.midemp,
-                      }}>
-                      회원정보
-                    </Text>
-                    <Text
-                      style={{
-                        fontFamily: theme.font.medium,
-                        fontSize: 14,
-                        lineHeight: 24,
-                        letterSpacing: -1,
-                        flex: 1,
-                        color: theme.color.texticon.onNormal.midemp,
-                      }}>
-                      비고
-                    </Text>
-                  </View>
-                  <Text
-                    style={{
-                      fontFamily: theme.font.medium,
-                      fontSize: 14,
-                      lineHeight: 24,
-                      letterSpacing: -1,
-                      width: 120,
-                      color: theme.color.texticon.onNormal.midemp,
-                    }}>
-                    일시
-                  </Text>
-                </View>
-                )}
-                <ScrollView style={styles.scrollView}>
-                  <View
-                    style={{display: 'flex', flexDirection: 'column', gap: isCompact ? 8 : 16}}>
-                    {displayLogs.length > 0 ? (
-                      displayLogs
-                        .filter(log =>
-                          log.phone_number.startsWith(searchContext.searchText),
-                        )
-                        .map((statistic, index) =>
-                          isCompact ? (
-                          (() => {
-                            const st = logActionStyle(statistic.action, theme);
-                            return (
-                          <Pressable
-                            key={index}
-                            style={styles.mCard}
-                            onPress={() => handleClickLog(statistic)}>
-                            <View style={{flex: 1}}>
-                              <Text style={styles.mCardTime}>
-                                {dayjs(statistic.timestamp).format(
-                                  'YY.MM.DD  HH:mm',
-                                )}
-                              </Text>
-                              <Text style={styles.mCardPhone}>
-                                {phoneLast4(statistic.phone_number)}
-                              </Text>
-                            </View>
-                            <View style={[styles.mPill, {backgroundColor: st.bg}]}>
-                              <Text style={[styles.mPillText, {color: st.fg}]}>
-                                {st.label} {statistic.stamp}
-                              </Text>
-                            </View>
-                          </Pressable>
-                            );
-                          })()
-                          ) : (
-                          (() => {
-                            const st = logActionStyle(statistic.action, theme);
-                            return (
-                          <Pressable
-                            key={index}
-                            style={styles.listBox}
-                            onPress={() => {
-                              handleClickLog(statistic);
-                            }}>
-                            <View
-                              style={[
-                                styles.flexRowBox,
-                                {
-                                  justifyContent: 'flex-start',
-                                  gap: 16,
-                                  flex: 1,
-                                },
-                              ]}>
-                              <View
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'center',
-                                  alignItems: 'center',
-                                  borderRadius: 8,
-                                  width: 62,
-                                  height: 32,
-                                  backgroundColor: st.bg,
-                                }}>
-                                <Text
-                                  style={{
-                                    fontSize: 14,
-                                    lineHeight: 24,
-                                    letterSpacing: -0.5,
-                                    fontFamily: theme.font.semibold,
-                                    color: st.fg,
-                                  }}>
-                                  {st.label} {statistic.stamp}
-                                </Text>
-                              </View>
-                              <Text
-                                style={{
-                                  width: 100,
-                                  color: theme.color.texticon.onNormal.highestemp,
-                                  fontSize: 14,
-                                  lineHeight: 24,
-                                  letterSpacing: -1,
-                                  fontFamily: theme.font.medium,
-                                }}>
-                                {maskPhone(statistic.phone_number)}
-                              </Text>
-                              <Text
-                                style={{
-                                  color: theme.color.texticon.onNormal.highestemp,
-                                  fontSize: 14,
-                                  lineHeight: 24,
-                                  letterSpacing: -1,
-                                  fontFamily: theme.font.light,
-                                }}>
-                                {statistic.note}
-                              </Text>
-                            </View>
-                            <Text
-                              style={{
-                                width: 120,
-                                color: theme.color.texticon.onNormal.midemp,
-                                fontSize: 14,
-                                lineHeight: 24,
-                                letterSpacing: -1,
-                              }}>
-                              {dayjs(statistic.timestamp).format(
-                                'YYYY-MM-DD HH:mm',
-                              )}
-                            </Text>
-                          </Pressable>
-                            );
-                          })()
-                          ),
-                        )
-                    ) : (
-                      <View
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'center',
-                          alignItems: 'center',
-                          height: 250,
-                        }}>
-                        <Text style={styles.emptyText}>
-                          적립내역이 없습니다.
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                </ScrollView>
-              </View>
-              {isCompact &&
-                date.format('YYYY-MM-DD') !==
-                  dayjs().format('YYYY-MM-DD') && (
-                  <Pressable style={styles.mTodayFab} onPress={handleSetToday}>
-                    <RefreshIcon width={16} height={16} />
-                    <Text style={styles.mTodayFabText}>오늘로 돌아가기</Text>
-                  </Pressable>
-                )}
-            </View>}
-            {showDetailPanel && <View
-              style={[
-                styles.flexColumnBox,
-                {
-                  flex: 1,
-                  maxWidth: isCompact ? undefined : 536,
-                  height: '100%',
-                  backgroundColor: theme.color.surface.normal.container10,
-                  paddingHorizontal: 24,
-                  paddingVertical: 32,
-                },
-              ]}>
-              {isCompact && (
-                <Pressable
-                  style={[styles.flexRowBox, {gap: 6, marginBottom: 16}]}
-                  onPress={() => setShowDetail(false)}>
-                  <LeftArrowIcon width={16} height={16} />
-                  <Text style={{fontFamily: theme.font.medium, fontSize: 15, color: theme.color.texticon.onNormal.highemp}}>목록으로</Text>
-                </Pressable>
-              )}
-              {selectedContext.selectedLog ? (
-                selectedContext.viewMode === 'detail' ? (
-                  <View
-                    style={{
-                      flex: 1,
-                    }}>
-                    <View
-                      style={[
-                        styles.flexRowBox,
-                        {
-                          width: '100%',
-                          justifyContent: 'space-between',
-                          marginBottom: 36,
-                        },
-                      ]}>
-                      <Text
-                        style={{
-                          color: theme.color.texticon.onNormal.highestemp,
-                          fontFamily: theme.font.regular,
-                          fontSize: 16,
-                          lineHeight: 26,
-                          letterSpacing: -1,
-                        }}>
-                        적립내역 상세
+                ) : isCompact ? (
+                  <View style={styles.mDateRow}>
+                    <View style={styles.mDateLeft}>
+                      <Text style={styles.mBigDate}>
+                        {date.format('M월 D일')}
                       </Text>
+                    </View>
+                    <View style={styles.mDateNav}>
                       <Pressable
-                        onPress={() => {
-                          setSelectedContext({
-                            selectedLog: null,
-                            viewMode: 'detail',
-                            logList: [],
-                          });
-                        }}
-                        style={[
-                          styles.flexRowBox,
-                          {
-                            gap: 6,
-                          },
-                        ]}>
-                        <Text>나가기</Text>
-                        <ExitIcon />
+                        style={styles.mRoundBtn}
+                        onPress={() =>
+                          setSearchContext({
+                            ...searchContext,
+                            status: 'active',
+                          })
+                        }>
+                        <MagnifierIcon />
                       </Pressable>
-                    </View>
-                    <View
-                      style={[
-                        styles.flexRowBox,
-                        {
-                          marginBottom: 24,
-                          justifyContent: 'flex-start',
-                          alignItems: 'center',
-                          gap: 10,
-                        },
-                      ]}>
-                      <Text
-                        style={{
-                          color: theme.color.texticon.onNormal.highestemp,
-                          fontFamily: theme.font.regular,
-                          fontSize: 16,
-                          lineHeight: 26,
-                          letterSpacing: -1,
-                        }}>
-                        고객 번호
-                      </Text>
-                      <Text
-                        style={{
-                          color: theme.color.texticon.onNormal.primary,
-                          fontFamily: theme.font.medium,
-                          fontSize: 24,
-                          lineHeight: 32,
-                          letterSpacing: -1,
-                        }}>
-                        {selectedContext.selectedLog.phone_number.replace(
-                          /(\d{3})(\d{4})(\d{4})/,
-                          '$1-$2-$3',
-                        )}
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        paddingVertical: 24,
-                        paddingHorizontal: 20,
-                        backgroundColor: theme.color.surface.normal.bg1,
-                        borderRadius: 24,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 20,
-                      }}>
-                      <View
-                        style={[
-                          styles.flexRowBox,
-                          {
-                            justifyContent: 'space-between',
-                          },
-                        ]}>
-                        <View
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                            borderRadius: 6,
-                            width: 62,
-                            height: 32,
-                            backgroundColor:
-                              selectedContext.selectedLog.action ===
-                              'stamp_saved'
-                                ? theme.palette.green[100]
-                                : theme.palette.blue[50],
-                          }}>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              lineHeight: 24,
-                              letterSpacing: -1,
-                              fontFamily: theme.font.medium,
-                              color:
-                                selectedContext.selectedLog.action ===
-                                'stamp_saved'
-                                  ? theme.color.texticon.onNormal.success
-                                  : theme.color.texticon.onNormal.primary,
-                            }}>
-                            {selectedContext.selectedLog.action ===
-                            'stamp_saved'
-                              ? '적립'
-                              : '사용'}{' '}
-                            {selectedContext.selectedLog.stamp}
-                          </Text>
-                        </View>
-                        <Text
-                          style={{
-                            color: theme.color.texticon.onNormal.midemp,
-                            fontFamily: theme.font.regular,
-                            fontSize: 16,
-                            lineHeight: 26,
-                            letterSpacing: -1,
-                          }}>
-                          {dayjs(selectedContext.selectedLog.timestamp).format(
-                            `M월 D일 HH:mm`,
-                          )}
-                        </Text>
-                      </View>
-                      <View
-                        style={[
-                          styles.flexRowBox,
-                          {
-                            justifyContent: 'space-between',
-                            paddingHorizontal: 12,
-                          },
-                        ]}>
-                        <Text
-                          style={{
-                            color: theme.color.texticon.onNormal.highestemp,
-                            fontFamily: theme.font.medium,
-                            fontSize: 16,
-                            lineHeight: 24,
-                            letterSpacing: -1,
-                          }}>
-                          {selectedContext.selectedLog.action === 'stamp_saved'
-                            ? '스탬프 적립'
-                            : selectedContext.selectedLog.note}
-                        </Text>
-                        <Text
-                          style={{
-                            color: theme.color.texticon.onNormal.highestemp,
-                            fontFamily: theme.font.medium,
-                            fontSize: 20,
-                            lineHeight: 24,
-                            letterSpacing: -1,
-                          }}>
-                          {selectedContext.selectedLog.action === 'stamp_saved'
-                            ? `+${selectedContext.selectedLog.stamp}`
-                            : `-${selectedContext.selectedLog.stamp}`}
-                        </Text>
-                      </View>
                       <Pressable
-                        onPress={() => {
-                          setSelectedContext({
-                            ...selectedContext,
-                            viewMode: 'list',
-                          });
-                        }}
-                        style={[
-                          styles.flexRowBox,
-                          {
-                            borderRadius: 6,
-                            paddingVertical: 15,
-                            backgroundColor: theme.color.surface.normal.container10,
-                            marginTop: 12,
-                            cursor: 'pointer',
-                          },
-                        ]}>
-                        <Text>모든내역보기</Text>
+                        style={styles.mRoundBtn}
+                        onPress={() => handleDateMinusChange(1)}>
+                        <ShortLeftArrowIcon width={20} height={20} />
+                      </Pressable>
+                      <Pressable
+                        style={styles.mRoundBtn}
+                        onPress={() => handleDatePlusChange(1)}>
+                        <ShortRightArrowIcon width={20} height={20} />
                       </Pressable>
                     </View>
                   </View>
                 ) : (
                   <View
-                    style={{
-                      flex: 1,
-                    }}>
-                    <View
-                      style={[
-                        styles.flexRowBox,
-                        {
-                          width: '100%',
-                          justifyContent: 'space-between',
-                          marginBottom: 36,
-                        },
-                      ]}>
-                      <Text
-                        style={{
-                          color: theme.color.texticon.onNormal.highestemp,
-                          fontFamily: theme.font.regular,
-                          fontSize: 16,
-                          lineHeight: 26,
-                          letterSpacing: -1,
-                        }}>
-                        적립내역 상세
-                      </Text>
-                      <Pressable
-                        onPress={() => {
-                          setSelectedContext({
-                            selectedLog: null,
-                            viewMode: 'detail',
-                            logList: [],
-                          });
-                        }}
-                        style={[
-                          styles.flexRowBox,
-                          {
-                            gap: 6,
-                          },
-                        ]}>
-                        <Text>나가기</Text>
-                        <ExitIcon />
-                      </Pressable>
-                    </View>
-                    <View
-                      style={[
-                        styles.flexRowBox,
-                        {
-                          marginBottom: 24,
-                          justifyContent: 'flex-start',
-                          alignItems: 'center',
-                          gap: 10,
-                        },
-                      ]}>
-                      <Text
-                        style={{
-                          color: theme.color.texticon.onNormal.highestemp,
-                          fontFamily: theme.font.regular,
-                          fontSize: 16,
-                          lineHeight: 26,
-                          letterSpacing: -1,
-                        }}>
-                        고객 번호
-                      </Text>
-                      <Text
-                        style={{
-                          color: theme.color.texticon.onNormal.primary,
-                          fontFamily: theme.font.medium,
-                          fontSize: 24,
-                          lineHeight: 32,
-                          letterSpacing: -1,
-                        }}>
-                        {selectedContext.selectedLog.phone_number.replace(
-                          /(\d{3})(\d{4})(\d{4})/,
-                          '$1-$2-$3',
-                        )}
-                      </Text>
-                    </View>
-                    <View
-                      style={{
-                        flex: 1,
-                        paddingVertical: 24,
-                        paddingHorizontal: 20,
-                        backgroundColor: theme.color.surface.normal.bg1,
-                        borderRadius: 24,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 20,
-                      }}>
-                      <Pressable
-                        style={[
-                          styles.flexRowBox,
-                          {gap: 7, justifyContent: 'flex-start'},
-                        ]}
-                        onPress={() => {
-                          setSelectedContext({
-                            ...selectedContext,
-                            viewMode: 'detail',
-                          });
-                        }}>
-                        <LeftArrowIcon />
-                        <Text
-                          style={{
-                            fontSize: 16,
-                            fontFamily: theme.font.regular,
-                            color: theme.color.texticon.onNormal.highestemp,
-                            lineHeight: 26,
-                            letterSpacing: -1,
-                          }}>
-                          뒤로가기
-                        </Text>
-                      </Pressable>
-                      <ScrollView>
-                        {selectedContext.logList.map((log, index) => (
-                          <View
-                            key={index}
+                    style={[
+                      styles.flexRowBox,
+                      {
+                        justifyContent: 'space-between',
+                        marginBottom: 32,
+                        gap:
+                          date.format('YYYY-MM-DD') !==
+                          dayjs().format('YYYY-MM-DD')
+                            ? 10
+                            : 0,
+                      },
+                    ]}>
+                    <View style={[styles.flexRowBox, {gap: 12}]}>
+                      <View style={[styles.flexRowBox, {gap: 18}]}>
+                        {date.format('YYYY-MM-DD') !==
+                          dayjs().format('YYYY-MM-DD') && (
+                          <Pressable
+                            onPress={handleSetToday}
                             style={[
-                              styles.listBox,
+                              styles.flexRowBox,
                               {
-                                borderBottomWidth: 1,
-                                borderBottomColor: theme.palette.gray[200],
-                                paddingVertical: 16,
+                                backgroundColor:
+                                  theme.color.surface.normal.container10,
+                                width: 70,
+                                height: 32,
+                                borderRadius: 6,
+                                gap: 4,
                               },
                             ]}>
-                            <View
-                              style={[
-                                styles.flexRowBox,
-                                {
-                                  justifyContent: 'flex-start',
-                                  gap: 16,
-                                  flex: 1,
-                                },
-                              ]}>
-                              <View
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'center',
-                                  alignItems: 'center',
-                                  borderRadius: 6,
-                                  width: 62,
-                                  height: 32,
-                                  backgroundColor:
-                                    log.action === 'stamp_saved'
-                                      ? theme.palette.green[100]
-                                      : theme.palette.blue[50],
-                                }}>
-                                <Text
-                                  style={{
-                                    fontSize: 14,
-                                    lineHeight: 24,
-                                    letterSpacing: -1,
-                                    fontFamily: theme.font.medium,
-                                    color:
-                                      log.action === 'stamp_saved'
-                                        ? theme.color.texticon.onNormal.success
-                                        : theme.color.texticon.onNormal.primary,
-                                  }}>
-                                  {log.action === 'stamp_saved'
-                                    ? '적립'
-                                    : '사용'}{' '}
-                                  {log.stamp}
-                                </Text>
-                              </View>
-                              <Text
-                                style={{
-                                  color: theme.color.texticon.onNormal.highestemp,
-                                  fontSize: 14,
-                                  lineHeight: 24,
-                                  letterSpacing: -1,
-                                  fontFamily: theme.font.light,
-                                }}>
-                                {log.note}
-                              </Text>
-                            </View>
+                            <RefreshIcon width={16} height={16} />
                             <Text
                               style={{
-                                width: 120,
-                                color: theme.color.texticon.onNormal.midemp,
-                                fontSize: 14,
-                                lineHeight: 24,
+                                fontSize: 16,
+                                lineHeight: 26,
                                 letterSpacing: -1,
+                                fontFamily: theme.font.medium,
+                                color: theme.color.texticon.onNormal.highemp,
                               }}>
-                              {dayjs(log.timestamp).format('YYYY-MM-DD HH:mm')}
+                              오늘
                             </Text>
-                          </View>
-                        ))}
-                      </ScrollView>
+                          </Pressable>
+                        )}
+                        <View style={[styles.flexRowBox, {gap: 32}]}>
+                          <Pressable
+                            style={styles.mRoundBtn}
+                            onPress={() => handleDateMinusChange(1)}>
+                            <ShortLeftArrowIcon width={20} height={20} />
+                          </Pressable>
+                          <Text
+                            style={{
+                              fontFamily: theme.font.bold,
+                              fontSize: 20,
+                              lineHeight: 28,
+                              letterSpacing: -1,
+                            }}>
+                            {date.format('M월 D일')}
+                          </Text>
+                          <Pressable
+                            style={styles.mRoundBtn}
+                            onPress={() => handleDatePlusChange(1)}>
+                            <ShortRightArrowIcon width={20} height={20} />
+                          </Pressable>
+                        </View>
+                      </View>
                     </View>
-                  </View>
-                )
-              ) : (
-                <>
-                  <Text
-                    style={{
-                      color: theme.palette.gray[200],
-                      fontFamily: theme.font.medium,
-                      fontSize: 20,
-                      lineHeight: 28,
-                      letterSpacing: -1,
-                    }}>
-                    내역을 선택하여
-                  </Text>
-                  <Text
-                    style={{
-                      color: theme.palette.gray[200],
-                      fontFamily: theme.font.medium,
-                      fontSize: 20,
-                      lineHeight: 28,
-                      letterSpacing: -1,
-                    }}>
-                    상세 적립내역을 확인할 수 있습니다
-                  </Text>
-                </>
-              )}
-            </View>}
-          </View>
-        </View>
-        {/* QR 셀프 적립 — 포인토 웹 링크(구현 대기: 웹 URL + QR 라이브러리) */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={qrVisible}
-          presentationStyle="overFullScreen"
-          supportedOrientations={['portrait', 'landscape']}
-          onRequestClose={() => setQrVisible(false)}>
-          <Pressable
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.45)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={() => setQrVisible(false)}>
-            <Pressable
-              style={{
-                backgroundColor: theme.color.surface.normal.bg1,
-                borderRadius: 24,
-                padding: 32,
-                width: '90%',
-                maxWidth: 380,
-                alignItems: 'center',
-                gap: 16,
-              }}
-              onPress={e => e.stopPropagation()}>
-              <Text
-                style={{
-                  fontFamily: theme.font.semibold,
-                  fontSize: 20,
-                  letterSpacing: -0.5,
-                  color: theme.color.texticon.onNormal.highestemp,
-                }}>
-                고객 셀프 적립
-              </Text>
-              <View
-                style={{
-                  width: 232,
-                  height: 232,
-                  borderRadius: 20,
-                  backgroundColor: theme.color.etc.absolute.white,
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}>
-                <QRCode
-                  value={
-                    storeCode
-                      ? `${POINTO_WEB_URL}?store=${storeCode}`
-                      : POINTO_WEB_URL
-                  }
-                  size={200}
-                  backgroundColor="white"
-                  color={theme.color.texticon.onNormal.highestemp}
-                />
-              </View>
-              <Text
-                style={{
-                  fontFamily: theme.font.regular,
-                  fontSize: 14,
-                  lineHeight: 22,
-                  letterSpacing: -0.3,
-                  textAlign: 'center',
-                  color: theme.color.texticon.onNormal.midemp,
-                }}>
-                손님이 이 QR을 스캔하면 웹에서 전화번호로 로그인해 직접
-                적립할 수 있어요.
-              </Text>
-            </Pressable>
-          </Pressable>
-        </Modal>
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={filterModalVisible}
-          onRequestClose={() => setFilterModalVisible(false)}>
-          <Pressable
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.5)',
-              justifyContent: 'flex-end',
-            }}
-            onPress={() => setFilterModalVisible(false)}>
-            <Pressable
-              style={{
-                backgroundColor: theme.color.surface.normal.bg1,
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
-                paddingHorizontal: 32,
-                paddingTop: 24,
-                paddingBottom: 44,
-                gap: 24,
-              }}
-              onPress={e => e.stopPropagation()}>
-              <Text
-                style={{
-                  fontFamily: theme.font.semibold,
-                  fontSize: 24,
-                  lineHeight: 32,
-                  letterSpacing: -1,
-                  color: theme.color.texticon.onNormal.highestemp,
-                }}>
-                내역 타입
-              </Text>
-              <View
-                style={{
-                  flexDirection: 'column',
-                  gap: 20,
-                }}>
-                {FILTER_LIST.map((item, index) => {
-                  return (
                     <Pressable
-                      key={index}
+                      style={[styles.searchInput, {flex: 1, maxWidth: 180}]}
                       onPress={() => {
                         setSearchContext({
                           ...searchContext,
-                          filter: item.value,
+                          status: 'active',
                         });
-                        if (item.value === 'all') {
-                          setDisplayLogs(logs);
-                        } else {
-                          setDisplayLogs(
-                            logs.filter(
-                              log => log.action === `stamp_${item.value}`,
-                            ),
-                          );
-                        }
-                        setFilterModalVisible(false);
                       }}>
+                      <MagnifierIcon width={16} height={16} />
                       <Text
-                        style={{
-                          fontSize: 20,
-                          lineHeight: 28,
-                          fontFamily: theme.font.regular,
-                          color:
-                            searchContext.filter === item.value
-                              ? theme.color.texticon.onNormal.primary
-                              : theme.color.texticon.onNormal.highestemp,
-                        }}>
-                        {item.label}
+                        style={[
+                          styles.searchInputText,
+                          {
+                            color: theme.palette.gray[400],
+                          },
+                        ]}>
+                        고객번호 뒤 4자리 검색
                       </Text>
                     </Pressable>
-                  );
-                })}
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
-        {/* 고객 조회 모달 */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={customerSearchVisible}
-          presentationStyle="overFullScreen"
-          supportedOrientations={['portrait', 'landscape']}
-          onRequestClose={() => setCustomerSearchVisible(false)}>
-          <Pressable
-            style={{
-              flex: 1,
-              backgroundColor: 'rgba(0,0,0,0.45)',
-              justifyContent: 'center',
-              alignItems: 'center',
-            }}
-            onPress={() => setCustomerSearchVisible(false)}>
-            <Pressable
-              style={{
-                backgroundColor: theme.color.surface.normal.bg1,
-                borderRadius: 24,
-                padding: 36,
-                width: '90%',
-                maxWidth: 400,
-                gap: 20,
-              }}
-              onPress={() => {}}>
-              <Text
-                style={{
-                  fontFamily: theme.font.semibold,
-                  fontSize: 22,
-                  color: theme.color.texticon.onNormal.highestemp,
-                  letterSpacing: -0.5,
-                }}>
-                고객 번호 조회
-              </Text>
-              {/* 번호 표시 */}
-              <View
-                style={{
-                  backgroundColor: theme.color.surface.normal.container10,
-                  borderRadius: 12,
-                  paddingVertical: 16,
-                  paddingHorizontal: 20,
-                  alignItems: 'flex-end',
-                }}>
-                <Text
-                  style={{
-                    fontFamily: 'SFUIDisplay-Medium',
-                    fontSize: 28,
-                    color:
-                      customerSearchInput.length > 0 ? theme.color.texticon.onNormal.highestemp : theme.palette.gray[200],
-                    letterSpacing: 2,
-                  }}>
-                  {customerSearchInput.length > 0
-                    ? customerSearchInput.replace(
-                        /(\d{3})(\d{0,4})(\d{0,4})/,
-                        (_, a, b, c) =>
-                          [a, b, c].filter(Boolean).join('-'),
-                      )
-                    : '010-0000-0000'}
-                </Text>
-              </View>
-              {/* 숫자 키패드 */}
-              <View style={{gap: 10}}>
-                {[[1, 2, 3], [4, 5, 6], [7, 8, 9], ['', 0, 'del']].map(
-                  (row, ri) => (
-                    <View
-                      key={ri}
-                      style={{flexDirection: 'row', gap: 10, justifyContent: 'center'}}>
-                      {row.map((key, ki) => (
-                        <Pressable
-                          key={ki}
-                          style={({pressed}) => ({
-                            width: 90,
-                            height: 56,
-                            backgroundColor:
-                              key === '' ? 'transparent' : pressed ? theme.palette.gray[200] : theme.color.surface.normal.container10,
-                            borderRadius: 10,
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                          })}
-                          onPress={() =>
-                            key !== '' && onCustomerSearchKeyPress(key as number | string)
-                          }>
-                          <Text
-                            style={{
-                              fontSize: key === 'del' ? 18 : 26,
-                              fontFamily: 'SFUIDisplay-Medium',
-                              color: theme.color.texticon.onNormal.highestemp,
-                            }}>
-                            {key === 'del' ? '⌫' : key}
-                          </Text>
-                        </Pressable>
-                      ))}
-                    </View>
-                  ),
+                  </View>
                 )}
-              </View>
-              {/* 조회 버튼 */}
-              <Pressable
-                style={({pressed}) => ({
-                  backgroundColor: pressed ? theme.palette.blue[600] : theme.color.surface.brand.primary,
-                  borderRadius: 14,
-                  paddingVertical: 16,
-                  alignItems: 'center',
-                })}
-                onPress={handleCustomerSearch}>
-                <Text
+                <View
+                  style={[
+                    styles.flexRowBox,
+                    {
+                      justifyContent: 'flex-end',
+                      gap: isCompact ? 6 : 12,
+                    },
+                  ]}>
+                  <View style={[styles.flexRowBox, {gap: 4}]}>
+                    <Text style={[styles.titleSideText]}>총</Text>
+                    <Text
+                      style={[
+                        styles.titleText,
+                        {
+                          color: theme.color.texticon.onNormal.midemp,
+                        },
+                      ]}>
+                      {counts.total}건
+                    </Text>
+                  </View>
+                  <View style={styles.separateLine} />
+                  {/* 색은 pill 체계를 따른다 — 적립=주황 / 사용=블루 (logDisplay.ts) */}
+                  <Text
+                    style={[
+                      styles.titleText,
+                      {color: theme.palette.orange[600]},
+                    ]}>
+                    적립 {counts.saved}건
+                  </Text>
+                  <Text
+                    style={[
+                      styles.titleText,
+                      {color: theme.color.texticon.onNormal.primary},
+                    ]}>
+                    사용 {counts.used}건
+                  </Text>
+                </View>
+                <View
                   style={{
-                    fontFamily: theme.font.semibold,
-                    fontSize: 18,
-                    color: theme.color.surface.normal.bg1,
+                    flex: 1,
+                    paddingHorizontal: 12,
                   }}>
-                  조회하기
-                </Text>
+                  {/* 테이블 헤더 — 폭에 상관없이 같은 3컬럼.
+                      컬럼 폭은 아래 행과 같은 스타일을 공유해서 어긋날 수 없다. */}
+                  <View style={styles.tableHead}>
+                    <Text style={[styles.headCell, styles.colAction]}>
+                      적립정보
+                    </Text>
+                    <Text style={[styles.headCell, styles.colMember]}>
+                      회원정보
+                    </Text>
+                    {/* 목록이 하루치로 고정돼 있어 날짜는 상단 날짜 이동에만 둔다. */}
+                    <Text style={[styles.headCell, styles.colTime]}>시간</Text>
+                  </View>
+                  <ScrollView style={styles.scrollView}>
+                    {visibleLogs.length > 0 ? (
+                      visibleLogs.map((statistic, index) => {
+                        const st = logActionStyle(statistic.action, theme);
+                        return (
+                          <Pressable
+                            key={index}
+                            style={styles.tableRow}
+                            onPress={() => handleClickLog(statistic)}>
+                            <View
+                              style={[
+                                styles.rowPill,
+                                styles.colAction,
+                                {backgroundColor: st.bg},
+                              ]}>
+                              <Text
+                                style={[styles.rowPillText, {color: st.fg}]}>
+                                {logPillText(statistic, st.label)}
+                              </Text>
+                            </View>
+                            <Text
+                              numberOfLines={1}
+                              style={[styles.rowPhone, styles.colMember]}>
+                              {maskPhone(statistic.phone_number)}
+                            </Text>
+                            <Text style={[styles.rowTime, styles.colTime]}>
+                              {dayjs(statistic.timestamp).format('HH:mm')}
+                            </Text>
+                          </Pressable>
+                        );
+                      })
+                    ) : (
+                      <View style={styles.emptyBox}>
+                        <Text style={styles.emptyText}>
+                          적립내역이 없습니다.
+                        </Text>
+                      </View>
+                    )}
+                  </ScrollView>
+                </View>
+                {isCompact &&
+                  date.format('YYYY-MM-DD') !==
+                    dayjs().format('YYYY-MM-DD') && (
+                    <Pressable
+                      style={styles.mTodayFab}
+                      onPress={handleSetToday}>
+                      <RefreshIcon width={16} height={16} />
+                      <Text style={styles.mTodayFabText}>오늘로 돌아가기</Text>
+                    </Pressable>
+                  )}
+              </View>
+            )}
+            {showDetailPanel && (
+              <LogDetailPanel
+                context={selectedContext}
+                onContextChange={setSelectedContext}
+                isCompact={isCompact}
+                onBack={() => setShowDetail(false)}
+              />
+            )}
+          </View>
+
+          {/* 모바일 주 액션 — 태블릿이 없는 매장에선 이 경로가 유일한 적립 수단이다.
+              상세 패널이 떠 있을 땐 감춘다. */}
+          {isCompact && showList && (
+            <View style={styles.bottomCtaWrap}>
+              <Pressable
+                style={({pressed}) => [
+                  styles.bottomCta,
+                  pressed && {opacity: 0.85},
+                ]}
+                onPress={handleOpenSearch}>
+                <MagnifierIcon
+                  width={20}
+                  height={20}
+                  color={theme.color.etc.absolute.white}
+                />
+                <Text style={styles.bottomCtaText}>고객 찾아 적립</Text>
+              </Pressable>
+            </View>
+          )}
+        </View>
+        {/* 모바일 요약 메뉴 — 헤더 ⋮ 아래에 붙는 컨텍스트 박스.
+            헤더 높이(paddingVertical 12 × 2 + 아이콘 36)만큼 내려서 버튼과 이어 보이게 한다. */}
+        <Modal
+          visible={menuVisible}
+          transparent
+          animationType="fade"
+          supportedOrientations={['portrait', 'landscape']}
+          onRequestClose={() => setMenuVisible(false)}>
+          <Pressable
+            style={styles.menuBackdrop}
+            onPress={() => setMenuVisible(false)}>
+            {/* 박스 안쪽 빈 곳을 눌러도 닫히지 않도록 터치를 여기서 흡수한다. */}
+            <Pressable
+              style={[styles.menuBox, {top: insets.top + 60 + 6}]}
+              onPress={() => {}}>
+              <Pressable
+                style={({pressed}) => [
+                  styles.menuItem,
+                  pressed && styles.menuItemPressed,
+                ]}
+                onPress={() => handleMenuNavigate(handleStatistics)}>
+                <StatisticIcon
+                  width={19}
+                  height={19}
+                  color={theme.color.texticon.onNormal.highestemp}
+                />
+                <Text style={styles.menuItemText}>통계</Text>
+                <RightChevronIcon
+                  width={16}
+                  height={16}
+                  color={theme.color.texticon.onNormal.lowemp}
+                />
+              </Pressable>
+              <View style={styles.menuDivider} />
+              <Pressable
+                style={({pressed}) => [
+                  styles.menuItem,
+                  pressed && styles.menuItemPressed,
+                ]}
+                onPress={() =>
+                  handleMenuNavigate(() => navigation.navigate('StoreSettings'))
+                }>
+                <GearIcon
+                  width={20}
+                  height={20}
+                  color={theme.color.texticon.onNormal.highestemp}
+                />
+                <Text style={styles.menuItemText}>매장 설정</Text>
+                <RightChevronIcon
+                  width={16}
+                  height={16}
+                  color={theme.color.texticon.onNormal.lowemp}
+                />
               </Pressable>
             </Pressable>
           </Pressable>
         </Modal>
+        <QrShareModal
+          visible={qrVisible}
+          storeCode={storeCode}
+          onClose={() => setQrVisible(false)}
+        />
+        <LogFilterSheet
+          visible={filterModalVisible}
+          selected={searchContext.filter}
+          onSelect={applyFilter}
+          onClose={() => setFilterModalVisible(false)}
+        />
+
+        <CustomerSearchSheet
+          visible={searchVisible}
+          onClose={() => setSearchVisible(false)}
+          onSelect={handleSelectCustomer}
+        />
 
         {isCompact ? (
           <GivePointSheet
-            visible={modalVisible}
-            phoneNumber={phoneNumber}
+            visible={giveVisible}
+            phoneNumber={givePhone}
             updateLogs={updateLogs}
+            manual={manualPhone !== null}
+            onClose={() => setManualPhone(null)}
           />
         ) : (
           <Modal
             animationType="slide"
             transparent={true}
-            visible={modalVisible}
+            visible={giveVisible}
             presentationStyle="overFullScreen" // or "pageSheet" 등 시도
             supportedOrientations={['portrait', 'landscape']}>
             <DetailView
               navigation={navigation}
-              phoneNumber={phoneNumber}
-              onClose={() => {
-                setModalVisible(false);
-              }}
+              phoneNumber={givePhone}
+              manual={manualPhone !== null}
+              onClose={() => setManualPhone(null)}
               updateLogs={updateLogs}
             />
           </Modal>
@@ -1475,291 +777,310 @@ const MainScreen = ({navigation, route}: any) => {
   );
 };
 
-const createStyles = (theme: Theme) =>
+const createStyles = (theme: Theme, isCompact: boolean) =>
   StyleSheet.create({
-  container: {
-    flex: 1,
-    // backgroundColor: '#FFFAE3',
-  },
-  backgroundStyle: {
-    flex: 1,
-  },
-  innerContainer: {
-    flex: 1,
-  },
-  flexColumnBox: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  flexRowBox: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  listBox: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: 16,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.palette.gray[100],
-  },
-  headerExit: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    zIndex: 1,
-  },
-  headerExitText: {
-    fontFamily: theme.font.medium,
-    fontSize: 17,
-    letterSpacing: -0.5,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  headerTitle: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    textAlign: 'center',
-    fontFamily: theme.font.semibold,
-    fontSize: 19,
-    letterSpacing: -0.5,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  headerSide: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    zIndex: 1,
-  },
-  headerIconBtn: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  // ─── 모바일 적립내역 (신규 시안) ───
-  mDateRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  mDateLeft: {flexDirection: 'row', alignItems: 'baseline', gap: 8},
-  mBigDate: {
-    fontFamily: theme.font.bold,
-    fontSize: 26,
-    letterSpacing: -1,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  mDateCount: {
-    fontFamily: theme.font.regular,
-    fontSize: 13,
-    letterSpacing: -0.5,
-    color: theme.color.texticon.onNormal.midemp,
-  },
-  mDateNav: {flexDirection: 'row', alignItems: 'center', gap: 8},
-  mRoundBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: theme.color.surface.normal.container10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  mCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    gap: 12,
-  },
-  mCardTime: {
-    fontFamily: theme.font.regular,
-    fontSize: 12,
-    letterSpacing: -0.3,
-    color: theme.color.texticon.onNormal.lowemp,
-    marginBottom: 4,
-  },
-  mCardPhone: {
-    fontFamily: 'SFUIDisplay-Semibold',
-    fontSize: 20,
-    letterSpacing: 0.5,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  mPill: {
-    borderRadius: 999,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-  },
-  mPillText: {
-    fontFamily: theme.font.semibold,
-    fontSize: 13,
-    letterSpacing: -0.3,
-  },
-  mTodayFab: {
-    position: 'absolute',
-    bottom: 20,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderRadius: 999,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    shadowColor: theme.color.etc.absolute.black,
-    shadowOffset: {width: 0, height: 4},
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  mTodayFabText: {
-    fontFamily: theme.font.medium,
-    fontSize: 15,
-    letterSpacing: -0.5,
-    color: theme.color.texticon.onNormal.highemp,
-  },
-  button: {
-    width: 112,
-    height: 40,
-    backgroundColor: theme.color.surface.normal.bg1,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    gap: 6,
-    shadowColor: theme.color.etc.absolute.black,
-    shadowOffset: {
-      width: 0,
-      height: 4.5,
+    container: {
+      flex: 1,
+      // backgroundColor: '#FFFAE3',
     },
-    shadowOpacity: 0.07,
-    shadowRadius: 22,
-    elevation: 6,
-  },
-  buttonCompact: {
-    width: 40,
-    height: 34,
-    gap: 0,
-  },
-  buttonText: {
-    color: theme.color.texticon.onNormal.highestemp,
-    fontFamily: theme.font.medium,
-    fontSize: 16,
-    lineHeight: 26,
-    letterSpacing: -1,
-  },
-  centeredView: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalView: {
-    height: 120,
-    width: 'auto',
-    backgroundColor: theme.color.surface.normal.bg1,
-    borderRadius: 10,
-    padding: 20,
-    alignItems: 'center',
-    shadowColor: theme.color.etc.absolute.black,
-    shadowOffset: {
-      width: 0,
-      height: 2,
+    // 리뉴얼 CTA 규격 (NumberInputScreen과 동일: h56 / r16 / brand primary)
+    bottomCtaWrap: {
+      backgroundColor: theme.color.surface.normal.bg1,
+      paddingHorizontal: 24,
+      paddingTop: 12,
+      paddingBottom: 12,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  buttonClose: {
-    backgroundColor: theme.color.surface.brand.primary,
-    height: 50,
-    width: 120,
-    borderRadius: 10,
-    elevation: 2,
-    justifyContent: 'center',
-  },
-  textStyle: {
-    color: theme.color.etc.absolute.white,
-    fontWeight: 'bold',
-    textAlign: 'center',
-  },
-  modalText: {
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  titleText: {
-    fontFamily: theme.font.semibold,
-    fontSize: 24,
-    lineHeight: 32,
-    letterSpacing: -1,
-  },
-  titleSideText: {
-    fontFamily: theme.font.regular,
-    fontSize: 16,
-    lineHeight: 26,
-    letterSpacing: -1,
-    color: theme.color.texticon.onNormal.midemp,
-  },
-  emptyText: {
-    color: theme.color.texticon.onNormal.midemp,
-    fontFamily: theme.font.regular,
-    fontSize: 16,
-    lineHeight: 24,
-    letterSpacing: -1,
-  },
-  searchInput: {
-    width: 200,
-    height: 36,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: theme.color.surface.normal.container10,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  searchInputText: {
-    fontFamily: theme.font.regular,
-    fontSize: 16,
-    lineHeight: 20,
-    letterSpacing: -1,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-  filterBox: {
-    width: 100,
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: theme.palette.gray[200],
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-  },
-  filterBoxText: {
-    fontFamily: theme.font.regular,
-    fontSize: 16,
-    lineHeight: 20,
-    letterSpacing: -1,
-    color: theme.color.texticon.onNormal.highestemp,
-  },
-});
+    bottomCta: {
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+      height: 56,
+      borderRadius: 16,
+      backgroundColor: theme.color.surface.brand.primary,
+    },
+    bottomCtaText: {
+      fontFamily: theme.font.semibold,
+      fontSize: 16,
+      letterSpacing: -0.5,
+      color: theme.color.etc.absolute.white,
+    },
+    backgroundStyle: {
+      flex: 1,
+    },
+    innerContainer: {
+      flex: 1,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    flexRowBox: {
+      display: 'flex',
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.palette.gray[100],
+    },
+    headerExit: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      zIndex: 1,
+    },
+    headerExitText: {
+      fontFamily: theme.font.medium,
+      fontSize: 17,
+      letterSpacing: -0.5,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    headerTitle: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      textAlign: 'center',
+      fontFamily: theme.font.semibold,
+      fontSize: 19,
+      letterSpacing: -0.5,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    headerSide: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      zIndex: 1,
+    },
+    headerIconBtn: {
+      width: 36,
+      height: 36,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // ─── 모바일 요약(⋮) 메뉴 ───
+    menuBackdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.15)',
+    },
+    menuBox: {
+      position: 'absolute',
+      right: 12,
+      minWidth: 200,
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 16,
+      paddingVertical: 6,
+      shadowColor: theme.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 6},
+      shadowOpacity: 0.16,
+      shadowRadius: 20,
+      elevation: 12,
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      height: 52,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+    },
+    menuItemPressed: {
+      backgroundColor: theme.color.surface.normal.container10,
+    },
+    menuItemText: {
+      flex: 1,
+      fontFamily: theme.font.medium,
+      fontSize: 16,
+      letterSpacing: -0.5,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    menuDivider: {
+      height: 1,
+      marginHorizontal: 16,
+      backgroundColor: theme.palette.gray[100],
+    },
+    // ─── 모바일 적립내역 (신규 시안) ───
+    mDateRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    mDateLeft: {flexDirection: 'row', alignItems: 'baseline', gap: 8},
+    mBigDate: {
+      fontFamily: theme.font.bold,
+      fontSize: 26,
+      letterSpacing: -1,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    mDateCount: {
+      fontFamily: theme.font.regular,
+      fontSize: 13,
+      letterSpacing: -0.5,
+      color: theme.color.texticon.onNormal.midemp,
+    },
+    mDateNav: {flexDirection: 'row', alignItems: 'center', gap: 8},
+    mRoundBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.color.surface.normal.container10,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // ─── 적립내역 테이블 (모바일·태블릿 공용) ───
+    // 헤더와 행이 col* 스타일을 같이 쓴다. 한쪽만 고치면 어긋나므로 항상 여기서 바꾼다.
+    tableHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isCompact ? 20 : 28,
+      height: 30,
+      marginBottom: isCompact ? 4 : 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.palette.gray[200],
+    },
+    headCell: {
+      fontFamily: theme.font.regular,
+      fontSize: isCompact ? 13 : 14,
+      lineHeight: 24,
+      letterSpacing: -1,
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: isCompact ? 20 : 28,
+      paddingVertical: isCompact ? 10 : 8,
+    },
+    colAction: {width: isCompact ? 58 : 62},
+    colMember: {flex: 1},
+    // 하루치 목록이라 HH:mm이면 충분하다. tabular-nums로 폭이 흔들리지 않게 고정.
+    colTime: {width: isCompact ? 44 : 56, textAlign: 'right'},
+    rowPill: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderRadius: 999,
+      height: isCompact ? 28 : 32,
+    },
+    rowPillText: {
+      fontFamily: theme.font.semibold,
+      fontSize: isCompact ? 13 : 14,
+      lineHeight: isCompact ? 20 : 24,
+      letterSpacing: -0.5,
+    },
+    rowPhone: {
+      fontFamily: theme.font.medium,
+      fontSize: isCompact ? 15 : 14,
+      lineHeight: 24,
+      letterSpacing: -0.5,
+      fontVariant: ['tabular-nums'],
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    rowTime: {
+      fontFamily: theme.font.regular,
+      fontSize: isCompact ? 13 : 14,
+      lineHeight: 24,
+      letterSpacing: -0.5,
+      fontVariant: ['tabular-nums'],
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    emptyBox: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: 250,
+    },
+    mTodayFab: {
+      position: 'absolute',
+      bottom: 20,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 999,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      shadowColor: theme.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 4},
+      shadowOpacity: 0.12,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    mTodayFabText: {
+      fontFamily: theme.font.medium,
+      fontSize: 15,
+      letterSpacing: -0.5,
+      color: theme.color.texticon.onNormal.highemp,
+    },
+    titleText: {
+      fontFamily: theme.font.semibold,
+      fontSize: 14,
+      lineHeight: 24,
+      letterSpacing: -1,
+    },
+    titleSideText: {
+      fontFamily: theme.font.regular,
+      fontSize: 14,
+      lineHeight: 24,
+      letterSpacing: -1,
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    emptyText: {
+      color: theme.color.texticon.onNormal.midemp,
+      fontFamily: theme.font.regular,
+      fontSize: 16,
+      lineHeight: 24,
+      letterSpacing: -1,
+    },
+    searchInput: {
+      width: 180,
+      height: 40,
+      paddingHorizontal: 16,
+      borderRadius: 6,
+      backgroundColor: theme.color.surface.normal.bg1,
+      display: 'flex',
+      flexDirection: 'row',
+      justifyContent: 'flex-start',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      gap: 8,
+    },
+    searchInputText: {
+      fontFamily: theme.font.regular,
+      fontSize: 14,
+      lineHeight: 24,
+      letterSpacing: -1,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    filterBox: {
+      width: 100,
+      display: 'flex',
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderColor: theme.palette.gray[200],
+      paddingVertical: 8,
+      paddingHorizontal: 12,
+      borderRadius: 8,
+    },
+    filterBoxText: {
+      fontFamily: theme.font.regular,
+      fontSize: 16,
+      lineHeight: 20,
+      letterSpacing: -1,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    separateLine: {
+      width: 1,
+      height: 14,
+      marginVertical: 16,
+      backgroundColor: theme.palette.gray[200],
+    },
+  });
 
 export default MainScreen;
