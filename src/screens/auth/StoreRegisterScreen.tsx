@@ -17,7 +17,7 @@ import type {Theme} from '../../theme';
 
 const StoreRegisterScreen = ({navigation, route}: any) => {
   const ownerUid: string | undefined = route?.params?.ownerUid;
-  const {registerStore, findStoreByPhone, linkStoreToOwner} = useFirestore();
+  const {registerStore, linkStoreToOwner} = useFirestore();
 
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -27,7 +27,7 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
   const [isLoading, setIsLoading] = useState(false);
   const [registeredCode, setRegisteredCode] = useState<string | null>(null);
 
-  /** 등록 완료 처리 — 점주 계정에서 들어온 경우 계정에 연결 */
+  /** 등록 완료 처리 — 계정 슬롯 목록에 추가 */
   const finalizeStore = async (code: string) => {
     if (ownerUid) {
       await linkStoreToOwner(ownerUid, code);
@@ -44,46 +44,20 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
       Alert.alert('점주 연락처를 입력해주세요.');
       return;
     }
-
-    setIsLoading(true);
-
-    const existing = await findStoreByPhone(ownerPhone.trim());
-    if (existing.length > 0) {
-      setIsLoading(false);
-      const storeList = existing
-        .map(s => `${s.name} (${s.storeCode})`)
-        .join('\n');
-      return new Promise<void>(resolve => {
-        Alert.alert(
-          '이미 등록된 스토어가 있습니다',
-          `${storeList}\n\n새 스토어를 추가로 등록하시겠습니까?`,
-          [
-            {text: '취소', style: 'cancel', onPress: () => resolve()},
-            {
-              text: '새로 등록',
-              onPress: async () => {
-                setIsLoading(true);
-                const result = await registerStore({
-                  name: storeName.trim(),
-                  ownerPhone: ownerPhone.trim(),
-                });
-                setIsLoading(false);
-                if (!result) {
-                  Alert.alert('등록 중 오류가 발생했습니다. 다시 시도해주세요.');
-                } else {
-                  await finalizeStore(result.storeCode);
-                }
-                resolve();
-              },
-            },
-          ],
-        );
-      });
+    // 매장은 반드시 주인을 가진 채로 생성돼야 한다(보안 규칙 전제).
+    if (!ownerUid) {
+      Alert.alert(
+        '로그인이 필요해요',
+        '계정에 로그인한 뒤 매장을 등록할 수 있어요.',
+      );
+      return;
     }
 
+    setIsLoading(true);
     const result = await registerStore({
       name: storeName.trim(),
       ownerPhone: ownerPhone.trim(),
+      ownerId: ownerUid,
     });
     setIsLoading(false);
 

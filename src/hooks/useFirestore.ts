@@ -174,9 +174,18 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
+  /**
+   * 새 매장 등록. ownerId는 **생성 시점에** 박는다.
+   *
+   * 예전에는 매장을 먼저 만들고 linkStoreToOwner가 나중에 주인을 채웠다. 그러려면
+   * 보안 규칙이 "주인 없는 매장은 아무나 가져갈 수 있다"를 허용해야 했고, 그게
+   * 전화번호만 알면 남의 매장을 탈취할 수 있는 경로였다. 주인 없는 매장이라는
+   * 상태를 아예 만들지 않는다.
+   */
   async function registerStore(data: {
     name: string;
     ownerPhone: string;
+    ownerId: string;
   }): Promise<{storeCode: string} | null> {
     try {
       const db = getFirestore();
@@ -196,6 +205,7 @@ const useFirestore = (storeCode?: string | null) => {
       await setDoc(doc(storesRef, newStoreCode), {
         name: data.name,
         ownerPhone: normalizePhone(data.ownerPhone),
+        ownerId: data.ownerId,
         createdAt: now,
         last_logged: now.split('T')[0],
         status: 'approved',
@@ -592,22 +602,9 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
-  async function findStoreByPhone(
-    phone: string,
-  ): Promise<{storeCode: string; name: string}[]> {
-    try {
-      const db = getFirestore();
-      const q = query(
-        collection(db, 'stores'),
-        where('ownerPhone', '==', normalizePhone(phone)),
-      );
-      const snapshot = await getDocs(q);
-      return snapshot.docs.map(d => ({storeCode: d.id, name: d.data().name}));
-    } catch (error) {
-      console.error('Error finding store by phone:', error);
-      return [];
-    }
-  }
+  // findStoreByPhone은 제거했다. stores 컬렉션 목록 조회를 규칙에서 닫았기 때문에
+  // 동작하지 않고, 애초에 "번호로 매장 찾기"가 탈취 경로의 입구였다.
+  // 매장 코드로 단건 조회하는 getStores()를 쓸 것.
 
   async function updateStoreConfig(config: StoreConfig) {
     if (!storeCode) throw new Error('storeCode is required');
@@ -710,57 +707,15 @@ const useFirestore = (storeCode?: string | null) => {
     return ensureOwnerProfile(fbUid, email);
   }
 
-  /**
-   * 전화번호로 등록된 기존 스토어를 계정에 흡수(claim).
-   * 아직 주인이 없거나(레거시) 본인 소유인 스토어만 연결한다.
-   * 기존 다점포 점주는 보유 수만큼 슬롯을 grandfather 한다.
-   * @returns 새로 연결된 스토어 코드 목록
-   */
-  async function claimStoresByPhone(
-    uid: string,
-    phone: string,
-  ): Promise<string[]> {
-    try {
-      const db = getFirestore();
-      const normalized = normalizePhone(phone);
-      const snapshot = await getDocs(
-        query(
-          collection(db, 'stores'),
-          where('ownerPhone', '==', normalized),
-        ),
-      );
-      const claimable = snapshot.docs.filter(d => {
-        const owner = d.data().ownerId;
-        return !owner || owner === uid;
-      });
-      if (claimable.length === 0) return [];
-
-      const ownerRef = doc(db, 'owners', uid);
-      const ownerSnap = await getDoc(ownerRef);
-      const existingCodes: string[] = ownerSnap.exists
-        ? ownerSnap.data()?.storeCodes ?? []
-        : [];
-      const merged = Array.from(
-        new Set([...existingCodes, ...claimable.map(d => d.id)]),
-      );
-      const currentLimit: number = ownerSnap.exists
-        ? ownerSnap.data()?.slotLimit ?? DEFAULT_SLOT_LIMIT
-        : DEFAULT_SLOT_LIMIT;
-
-      const batch = db.batch();
-      claimable.forEach(d => batch.update(d.ref, {ownerId: uid}));
-      batch.update(ownerRef, {
-        storeCodes: merged,
-        slotLimit: Math.max(currentLimit, merged.length),
-      });
-      await batch.commit();
-
-      return claimable.map(d => d.id);
-    } catch (error) {
-      console.error('Error claiming stores by phone:', error);
-      return [];
-    }
-  }
+  // claimStoresByPhone(전화번호로 기존 매장 흡수)은 제거했다.
+  //
+  // 번호 소유를 전혀 검증하지 않아서, 점주 연락처만 알면 남의 매장을 자기 계정으로
+  // 가져갈 수 있었다. 매장을 쥐면 그 매장 고객 전화번호 전량까지 열린다(ownsStore).
+  // 게다가 한 번 넘어가면 규칙상 원래 점주도 되찾을 수 없다.
+  //
+  // 신버전에서는 매장이 로그인된 계정에서 생성되므로 이 경로 자체가 필요 없다.
+  // 주인 없는 레거시 매장은 서버(Admin SDK 스크립트)에서 연결한다.
+  // 앞으로 계정 간 이전이 필요해지면 "인증된 계정 → 인증된 계정" 이전으로 만들 것.
 
   /** 슬롯 여유 확인 */
   async function getOwnerSlotInfo(
@@ -772,7 +727,14 @@ const useFirestore = (storeCode?: string | null) => {
     return {current, limit, canAdd: current < limit};
   }
 
-  /** 스토어를 계정에 연결 (슬롯 초과 시 false). 이미 연결돼 있으면 true. */
+  /**
+   * 방금 만든 매장을 계정의 슬롯 목록에 추가 (슬롯 초과 시 false).
+   * 이미 들어 있으면 true.
+   *
+   * stores.ownerId는 registerStore가 생성 시점에 이미 박아둔다. 여기서 매장 문서를
+   * 건드리지 않는 이유가 그것이다 — 나중에 주인을 채우는 방식이면 "주인 없는 매장은
+   * 누구나 쓸 수 있다"는 규칙이 필요해지고, 그게 곧 탈취 경로였다.
+   */
   async function linkStoreToOwner(
     uid: string,
     code: string,
@@ -790,10 +752,7 @@ const useFirestore = (storeCode?: string | null) => {
         : DEFAULT_SLOT_LIMIT;
       if (codes.length >= limit) return false;
 
-      const batch = db.batch();
-      batch.update(doc(db, 'stores', code), {ownerId: uid});
-      batch.update(ownerRef, {storeCodes: [...codes, code]});
-      await batch.commit();
+      await updateDoc(ownerRef, {storeCodes: [...codes, code]});
       return true;
     } catch (error) {
       console.error('Error linking store to owner:', error);
@@ -878,12 +837,10 @@ const useFirestore = (storeCode?: string | null) => {
     resolveUserDocId,
     migrateUsersStoreCode,
     updateStoreConfig,
-    findStoreByPhone,
     // 이메일 계정(점주)
     getOwnerProfile,
     ensureOwnerProfile,
     migrateLegacyOwner,
-    claimStoresByPhone,
     getOwnerSlotInfo,
     linkStoreToOwner,
     getOwnerStores,

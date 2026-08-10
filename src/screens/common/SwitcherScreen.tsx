@@ -2,13 +2,11 @@ import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -42,7 +40,7 @@ const SwitcherScreen = ({navigation}: any) => {
     setIsAuthenticated,
     lockDeviceToClient,
   } = useAuth();
-  const {getOwnerStores, claimStoresByPhone, getOwnerSlotInfo} = useFirestore();
+  const {getOwnerStores, getOwnerSlotInfo} = useFirestore();
 
   const uid = ownerUid;
 
@@ -53,9 +51,6 @@ const SwitcherScreen = ({navigation}: any) => {
     limit: number;
     canAdd: boolean;
   }>({current: 0, limit: 3, canAdd: true});
-  const [claimVisible, setClaimVisible] = useState(false);
-  const [phone, setPhone] = useState('');
-  const [claiming, setClaiming] = useState(false);
 
   // 모드 선택 시트 + 고객모드 고정 PIN 설정
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -128,29 +123,6 @@ const SwitcherScreen = ({navigation}: any) => {
       return;
     }
     navigation.navigate('StoreRegister', {ownerUid: uid});
-  };
-
-  const handleClaim = async () => {
-    if (!uid) return;
-    const trimmed = phone.trim();
-    if (!trimmed) {
-      Alert.alert('전화번호를 입력해주세요.');
-      return;
-    }
-    setClaiming(true);
-    const claimed = await claimStoresByPhone(uid, trimmed);
-    setClaiming(false);
-    setClaimVisible(false);
-    setPhone('');
-    if (claimed.length === 0) {
-      Alert.alert(
-        '연결할 가게가 없어요',
-        '해당 번호로 등록된 가게가 없거나, 이미 다른 계정에 연결돼 있습니다.',
-      );
-      return;
-    }
-    Alert.alert('연결 완료', `${claimed.length}개 가게를 계정에 연결했어요.`);
-    load();
   };
 
   const handleLogout = async () => {
@@ -227,19 +199,14 @@ const SwitcherScreen = ({navigation}: any) => {
               <View style={styles.emptyBox}>
                 <Text style={styles.emptyTitle}>아직 연결된 매장이 없어요</Text>
                 <Text style={styles.emptySubtitle}>
-                  이미 운영 중인 가게가 있다면 전화번호로 연결하고,{'\n'}
-                  처음이라면 새 가게를 등록해보세요.
+                  매장을 등록하면 바로 적립을 시작할 수 있어요.
                 </Text>
-                <Pressable
-                  style={styles.primaryBtn}
-                  onPress={() => setClaimVisible(true)}>
-                  <Text style={styles.primaryBtnText}>
-                    전화번호로 기존 가게 연결
-                  </Text>
+                <Pressable style={styles.primaryBtn} onPress={handleAddStore}>
+                  <Text style={styles.primaryBtnText}>새 매장 등록</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryBtn} onPress={handleAddStore}>
-                  <Text style={styles.secondaryBtnText}>새 매장 등록</Text>
-                </Pressable>
+                <Text style={styles.emptyHelp}>
+                  이미 운영 중인 매장이 있다면 고객센터로 문의해주세요.
+                </Text>
               </View>
             ) : (
               <>
@@ -269,52 +236,12 @@ const SwitcherScreen = ({navigation}: any) => {
                   <Pressable style={styles.addBtn} onPress={handleAddStore}>
                     <Text style={styles.addBtnText}>새 매장 추가하기</Text>
                   </Pressable>
-                  <Pressable onPress={() => setClaimVisible(true)}>
-                    <Text style={styles.claimLink}>기존 매장 불러오기</Text>
-                  </Pressable>
                 </View>
               </>
             )}
           </ScrollView>
         )}
 
-        {/* 기존 가게 연결 모달 */}
-        <Modal
-          animationType="fade"
-          transparent
-          visible={claimVisible}
-          onRequestClose={() => setClaimVisible(false)}>
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setClaimVisible(false)}>
-            <Pressable style={styles.modalCard} onPress={() => {}}>
-              <Text style={styles.modalTitle}>기존 가게 연결</Text>
-              <Text style={styles.modalSubtitle}>
-                가게 등록 시 입력한 점주 연락처를 입력하면{'\n'}해당 가게가
-                계정에 연결돼요.
-              </Text>
-              <TextInput
-                style={styles.modalInput}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="01012345678"
-                placeholderTextColor={theme.color.texticon.onNormal.lowemp}
-                keyboardType="phone-pad"
-              />
-              <Pressable
-                style={({pressed}) => [
-                  styles.primaryBtn,
-                  {opacity: claiming || pressed ? 0.7 : 1, marginTop: 4},
-                ]}
-                onPress={handleClaim}
-                disabled={claiming}>
-                <Text style={styles.primaryBtnText}>
-                  {claiming ? '연결 중...' : '연결하기'}
-                </Text>
-              </Pressable>
-            </Pressable>
-          </Pressable>
-        </Modal>
       </SafeAreaView>
 
       {/* 모드 선택 바텀시트 */}
@@ -475,6 +402,14 @@ const createStyles = (theme: Theme) =>
       lineHeight: 21,
       marginBottom: 8,
     },
+    emptyHelp: {
+      fontSize: 13,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
+      textAlign: 'center',
+      lineHeight: 19,
+      marginTop: 4,
+    },
     slotRow: {
       width: '100%',
       maxWidth: CONTENT_MAX_WIDTH,
@@ -493,11 +428,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 13,
       fontFamily: theme.font.bold,
       color: theme.color.texticon.onNormal.primary,
-    },
-    claimLink: {
-      fontSize: 14,
-      fontFamily: theme.font.semibold,
-      color: theme.color.surface.brand.primary,
     },
     storeList: {
       width: '100%',
@@ -559,55 +489,6 @@ const createStyles = (theme: Theme) =>
       fontSize: 16,
       fontFamily: theme.font.semibold,
       color: theme.color.etc.absolute.white,
-    },
-    secondaryBtn: {
-      height: 52,
-      width: '100%',
-      backgroundColor: theme.color.surface.normal.bg1,
-      borderRadius: 14,
-      borderWidth: 1,
-      borderColor: theme.palette.gray[200],
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    secondaryBtnText: {
-      fontSize: 15,
-      fontFamily: theme.font.medium,
-      color: theme.color.texticon.onNormal.highemp,
-    },
-    modalBackdrop: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      paddingHorizontal: 24,
-    },
-    modalCard: {
-      width: '100%',
-      backgroundColor: theme.color.surface.normal.bg1,
-      borderRadius: 20,
-      padding: 24,
-      gap: 14,
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontFamily: theme.font.semibold,
-      color: theme.color.texticon.onNormal.highestemp,
-    },
-    modalSubtitle: {
-      fontSize: 14,
-      fontFamily: theme.font.regular,
-      color: theme.color.texticon.onNormal.midemp,
-      lineHeight: 21,
-    },
-    modalInput: {
-      height: 54,
-      backgroundColor: theme.color.surface.normal.container10,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      fontSize: 16,
-      fontFamily: theme.font.regular,
-      color: theme.color.texticon.onNormal.highestemp,
     },
   });
 
