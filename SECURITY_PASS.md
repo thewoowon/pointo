@@ -269,8 +269,41 @@ App Check 적용을 켜야 실제로 막힌다. 그리고 켜는 순간 App Chec
 | 1 | 적립·사용 쓰기를 **Callable Function**으로 이전 | 스탬프 위조 원천 차단 + 서버 검증 |
 | 2 | 매장 코드를 커스텀 클레임으로 발급 | 규칙의 `get()` 제거 → 읽기 비용·지연 감소 |
 
-웹 클라이언트를 만들 때는 App Check 웹 제공자(reCAPTCHA v3 / Enterprise)를
-별도로 등록해야 한다. 앱과 사이트 키가 다르다.
+---
+
+# ⚠️ 웹(pointo-web) 배포 순서 — 규칙보다 먼저 올리지 말 것
+
+**2026-08-11 실측:** hellopointo.com에는 마케팅 라우트(`/`·`/privacy`·`/support`)만
+떠 있다. `/login`·`/stores`는 404 — 점주 대시보드는 아직 배포 전이다. 그래서
+**랜딩 번들에 Firebase 설정이 들어있지 않다**(마케팅 페이지는 firebase를 import
+하지 않는다).
+
+즉 웹을 배포하는 순간이 **Firebase 설정이 브라우저에 처음 노출되는 시점**이다.
+운영 규칙이 아직 `allow read, write: if true`인 상태로 그걸 하면, 콘솔 한 줄로
+고객 전화번호 전량이 덤프된다. 이 문서 맨 앞의 위협 모델 그 자체다.
+
+네이티브 앱만 있을 때는 "앱을 리버싱해야 뚫린다"는 약한 방어막이라도 있었다.
+웹은 그 방어막이 없다.
+
+```
+1. 앱 배포 (App Store)
+2. 모든 매장 기기를 신버전으로
+3. node scripts/audit-store-owners.mjs — 주인 없는 매장 정리
+4. firebase deploy --only firestore:rules      ← 여기까지가 1단계
+5. 웹에 App Check(reCAPTCHA v3) 추가 + Console에 웹 앱 등록·사이트 키 발급
+6. 웹 배포                                      ← /s/[storeCode]가 여기서 산다
+7. App Check 모니터링 → 100% 근처에서 enforce
+```
+
+**5번을 건너뛰고 7번을 하면 웹이 통째로 죽는다.** enforce는 App Check 토큰이
+없는 클라이언트를 전부 차단하는데, 현재 웹에는 App Check 코드가 **한 줄도 없다**
+(`grep -r appCheck` 0건). 앱과 사이트 키가 다르므로 웹 제공자를 따로 등록해야 한다.
+
+### 앱 쪽 연동 상태
+
+`MainScreen.tsx`의 `SHOW_SELF_LOOKUP_QR = false`. QR이 가리키는
+`hellopointo.com/s/{매장코드}`가 6번 전까지 404라서 진입 버튼을 감춰뒀다.
+**웹 배포 후 이 상수를 true로 되돌릴 것** — 모달과 버튼은 그대로 살아 있다.
 
 ### 웹(pointo-web)에 남은 정리 대상
 
