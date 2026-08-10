@@ -4,15 +4,9 @@ type MyCustomToastProps = {
   text1: string;
   text2?: string;
   onPress?: () => void;
-  props: any;
 };
 
-const MyCustomToast = ({
-  text1,
-  text2,
-  onPress,
-  ...props
-}: MyCustomToastProps) => (
+const MyCustomToast = ({text1, text2, onPress}: MyCustomToastProps) => (
   <View style={styles.customToastContainer}>
     <View>
       <Text style={styles.customSubtitleText}>

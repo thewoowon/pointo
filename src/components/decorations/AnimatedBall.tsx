@@ -1,6 +1,8 @@
 import React, {useEffect, useRef} from 'react';
 import {Animated, Easing} from 'react-native';
-import {Ball} from '.';
+// 배럴(`.`)이 아니라 파일을 직접 가리킨다 — 배럴은 이 파일을 다시 export하므로
+// `from '.'`이면 순환 참조가 되고, 그 순환은 스택 추적을 엉뚱한 파일로 흘린다.
+import Ball from './Ball';
 
 type BallProps = {
   index: number;

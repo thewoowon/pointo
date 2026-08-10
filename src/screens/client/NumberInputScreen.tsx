@@ -58,14 +58,14 @@ const Keypad = ({
   onPress: (v: number | string) => void;
   expanded: boolean;
 }) => {
-  const btnHeight = expanded ? 64 : 58;
-  const fontSize = expanded ? 30 : 28;
+  const btnHeight = 58;
+  const fontSize = expanded ? 28 : 24;
   const keyStyle = ({pressed}: {pressed: boolean}) => [
     s.keyBtn,
-    {height: btnHeight, backgroundColor: pressed ? p.gray[100] : 'transparent'},
+    {height: btnHeight, backgroundColor: pressed ? p.slate[100] : 'transparent'},
   ];
   return (
-    <View style={{width: '100%', gap: expanded ? 6 : 4}}>
+    <View style={{width: '100%', gap: 20}}>
       {NUMBER_SEQUENCE.map((row, ri) => (
         <View key={ri} style={s.keyRow}>
           {row.map(n => (
@@ -100,48 +100,57 @@ const InputLayout = ({ctx}: {ctx: ReturnType<typeof useNumberInput>}) => {
   const numFontSize = isExpanded ? 32 : 24;
   return (
     <View style={[s.content, isExpanded && s.contentExpanded]}>
-      <View style={s.topBlock}>
-        {ctx.storeName ? (
-          <Text style={s.storeName}>{ctx.storeName}</Text>
-        ) : null}
-        <View style={s.titleWrap}>
-          {ctx.storeConfig.guideLines.map((line, i) => (
-            <Text
-              key={i}
-              style={[
-                s.title,
-                {
-                  fontSize: isExpanded ? 24 : 20,
-                  lineHeight: isExpanded ? 32 : 28,
-                },
-              ]}>
-              {line}
-            </Text>
-          ))}
-        </View>
+      <View
+        style={{
+          flex: 1,
+          width: '100%',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          gap: 50,
+        }}>
+        <View style={s.topBlock}>
+          {ctx.storeName ? (
+            <Text style={s.storeName}>{ctx.storeName}</Text>
+          ) : null}
+          <View style={s.titleWrap}>
+            {ctx.storeConfig.guideLines.map((line, i) => (
+              <Text
+                key={i}
+                style={[
+                  s.title,
+                  {
+                    fontSize: isExpanded ? 24 : 20,
+                    lineHeight: isExpanded ? 32 : 28,
+                  },
+                ]}>
+                {line}
+              </Text>
+            ))}
+          </View>
 
-        <View style={s.inputBox}>
-          <Text style={s.inputLabel}>번호를 입력해주세요</Text>
-          {/* 고스트로 전체 마스크 폭을 고정하고, 실제 값은 그 위에 왼쪽
+          <View style={s.inputBox}>
+            <Text style={s.inputLabel}>번호를 입력해주세요</Text>
+            {/* 고스트로 전체 마스크 폭을 고정하고, 실제 값은 그 위에 왼쪽
               정렬로 얹는다. 각 자리는 픽셀 고정 · 블록 전체는 가운데.
               tabular-nums로 모든 숫자 폭을 동일하게 맞춰 흔들림을 없앤다. */}
-          <View style={s.numberWrap}>
-            <Text
-              style={[s.inputNumber, s.numberGhost, {fontSize: numFontSize}]}>
-              010 - 0000 - 0000
-            </Text>
-            <Text
-              numberOfLines={1}
-              style={[s.inputNumber, s.numberReal, {fontSize: numFontSize}]}>
-              {formatDisplay(ctx.phoneNumberLabel())}
-            </Text>
+            <View style={s.numberWrap}>
+              <Text
+                style={[s.inputNumber, s.numberGhost, {fontSize: numFontSize}]}>
+                010 - 0000 - 0000
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={[s.inputNumber, s.numberReal, {fontSize: numFontSize}]}>
+                {formatDisplay(ctx.phoneNumberLabel())}
+              </Text>
+            </View>
           </View>
         </View>
-      </View>
 
-      <View style={s.keypadZone}>
-        <View style={s.keypadInner}>
-          <Keypad onPress={ctx.onNumberPress} expanded={isExpanded} />
+        <View style={s.keypadZone}>
+          <View style={s.keypadInner}>
+            <Keypad onPress={ctx.onNumberPress} expanded={isExpanded} />
+          </View>
         </View>
       </View>
 
@@ -428,14 +437,14 @@ const s = StyleSheet.create({
   numberReal: {position: 'absolute', left: 0, top: 0},
 
   // Keypad
-  keypadZone: {flex: 1, justifyContent: 'center', alignItems: 'center'},
+  keypadZone: {justifyContent: 'center', alignItems: 'center'},
   keypadInner: {width: '100%', maxWidth: 360},
   keyRow: {flexDirection: 'row', gap: 8},
   keyBtn: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 8,
   },
   keyText: {
     color: c.texticon.onNormal.highestemp,
@@ -447,13 +456,13 @@ const s = StyleSheet.create({
   confirmBtn: {
     width: '100%',
     height: 56,
-    borderRadius: 16,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
   },
   confirmOn: {backgroundColor: c.surface.brand.primary},
-  confirmOff: {backgroundColor: p.gray[100]},
+  confirmOff: {backgroundColor: p.slate[200]},
   confirmGradient: {
     width: '100%',
     height: '100%',
@@ -466,7 +475,7 @@ const s = StyleSheet.create({
     color: c.etc.absolute.white,
     fontFamily: f.semibold,
   },
-  confirmTextOff: {color: c.texticon.onNormal.lowemp},
+  confirmTextOff: {color: c.texticon.onEnv.onDisabled},
 
   // Footer link
   footer: {

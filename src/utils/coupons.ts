@@ -43,6 +43,7 @@ export function normalizeUser(
     phase: data.phase ?? firstId,
     coupons,
     couponIssuedAt,
+    recentLogs: Array.isArray(data.recentLogs) ? data.recentLogs : [],
     hasRated: data.hasRated,
     created_at: data.created_at,
     store_code: data.store_code,
@@ -56,25 +57,6 @@ export function emptyCouponsMap(couponTypes: CouponType[]): Record<string, numbe
     map[ct.id] = 0;
   }
   return map;
-}
-
-/** UserContext 초기화 헬퍼 */
-export function makeUserContext(
-  coupons: Record<string, number>,
-  couponTypes: CouponType[],
-): UserContext {
-  const possibleCoupons: Record<string, number> = {};
-  const selectedCoupon: Record<string, number> = {};
-  for (const ct of couponTypes) {
-    possibleCoupons[ct.id] = coupons[ct.id] ?? 0;
-    selectedCoupon[ct.id] = 0;
-  }
-  return {possibleCoupons, selectedCoupon};
-}
-
-/** 선택된 쿠폰 총 개수 */
-export function totalSelected(selected: Record<string, number>): number {
-  return Object.values(selected).reduce((sum, v) => sum + v, 0);
 }
 
 /** 쿠폰 보유 합계 */
@@ -95,20 +77,6 @@ export function addCouponTimestamp(
     existing.push(now);
   }
   result[typeId] = existing;
-  return result;
-}
-
-/** 쿠폰 사용 시 가장 오래된 발급 시점부터 제거 (FIFO) */
-export function removeCouponTimestamps(
-  issuedAt: Record<string, string[]> | undefined,
-  used: Record<string, number>,
-): Record<string, string[]> {
-  const result = {...(issuedAt ?? {})};
-  for (const [typeId, count] of Object.entries(used)) {
-    if (count > 0 && Array.isArray(result[typeId])) {
-      result[typeId] = result[typeId].slice(count);
-    }
-  }
   return result;
 }
 
@@ -145,13 +113,107 @@ export function filterExpiredCoupons(
   return {coupons: filtered, issuedAt: filteredIssuedAt, expiredCount};
 }
 
-/** 특정 쿠폰 타입의 가장 빠른 만료일 반환 (없으면 null) */
-export function getEarliestExpiry(
+/** 보유 쿠폰 1장 = 1개 항목. 발급 시점이 제각각이라 만료일도 장마다 다르다. */
+export type CouponEntry = {
+  /** 리스트 key. `${typeId}-${index}` */
+  key: string;
+  typeId: string;
+  name: string;
+  /** 발급일(ISO). 발급 시점 기록 전에 나간 레거시 장은 null */
+  issuedAt: string | null;
+  /** 만료일 'YYYY. M. D'. 무기한이거나 발급일 미상이면 null */
+  expiry: string | null;
+};
+
+/**
+ * 보유 쿠폰을 장 단위로 펼친다. 만료 임박한 순, 만료일 없는 장은 뒤로.
+ *
+ * `coupons[typeId]`가 개수의 정답이고 `couponIssuedAt[typeId]`는 그보다 짧을 수
+ * 있다 — 발급 시점을 기록하기 전에 나간 장들이다. 모자란 만큼은 만료일 없이 채운다.
+ */
+export function buildCouponEntries(
+  coupons: Record<string, number>,
   issuedAt: Record<string, string[]> | undefined,
-  typeId: string,
+  couponTypes: CouponType[],
   expiryDays: number,
-): string | null {
-  if (expiryDays <= 0 || !issuedAt?.[typeId]?.length) return null;
-  const earliest = issuedAt[typeId][0];
-  return dayjs(earliest).add(expiryDays, 'day').format('YYYY.MM.DD');
+): CouponEntry[] {
+  const entries: CouponEntry[] = [];
+
+  for (const ct of couponTypes) {
+    const count = coupons[ct.id] ?? 0;
+    const dates = issuedAt?.[ct.id] ?? [];
+    for (let i = 0; i < count; i++) {
+      const issued = dates[i] ?? null;
+      entries.push({
+        key: `${ct.id}-${i}`,
+        typeId: ct.id,
+        name: ct.name,
+        issuedAt: issued,
+        expiry:
+          issued && expiryDays > 0
+            ? dayjs(issued).add(expiryDays, 'day').format('YYYY. M. D')
+            : null,
+      });
+    }
+  }
+
+  return entries.sort((a, b) => {
+    if (a.issuedAt && b.issuedAt) return a.issuedAt.localeCompare(b.issuedAt);
+    if (a.issuedAt) return -1;
+    if (b.issuedAt) return 1;
+    return 0;
+  });
+}
+
+/**
+ * CouponEntry.key → {typeId, index}. index는 `couponIssuedAt[typeId]` 배열의 위치다
+ * (buildCouponEntries가 그 순서로 key를 매기므로 그대로 되짚을 수 있다).
+ * 쿠폰 id에 '-'가 들어갈 수 있어서 마지막 '-'를 기준으로 자른다.
+ */
+export function parseCouponEntryKey(key: string): {
+  typeId: string;
+  index: number;
+} {
+  const at = key.lastIndexOf('-');
+  return {typeId: key.slice(0, at), index: Number(key.slice(at + 1))};
+}
+
+/**
+ * 관리자가 **고른 그 장**을 차감한다.
+ *
+ * 기존 removeCouponTimestamps는 타입별 개수만 받아 오래된 순(FIFO)으로 지웠다.
+ * 화면이 장 단위 선택으로 바뀌면서, 체크한 줄과 실제로 빠지는 장의 만료일이
+ * 어긋나면 안 되므로 인덱스를 지정해 지운다.
+ *
+ * 발급 시점이 기록되기 전에 나간 레거시 장(index >= dates.length)은 지울
+ * 타임스탬프가 없다 — 개수만 줄어든다.
+ */
+export function removeCouponEntries(
+  coupons: Record<string, number>,
+  issuedAt: Record<string, string[]> | undefined,
+  keys: string[],
+): {
+  coupons: Record<string, number>;
+  issuedAt: Record<string, string[]>;
+  usedByType: Record<string, number>;
+} {
+  const indicesByType = new Map<string, Set<number>>();
+  for (const key of keys) {
+    const {typeId, index} = parseCouponEntryKey(key);
+    if (!indicesByType.has(typeId)) indicesByType.set(typeId, new Set());
+    indicesByType.get(typeId)!.add(index);
+  }
+
+  const nextCoupons = {...coupons};
+  const nextIssuedAt = {...(issuedAt ?? {})};
+  const usedByType: Record<string, number> = {};
+
+  for (const [typeId, indices] of indicesByType) {
+    const dates = nextIssuedAt[typeId] ?? [];
+    nextIssuedAt[typeId] = dates.filter((_, i) => !indices.has(i));
+    nextCoupons[typeId] = Math.max(0, (coupons[typeId] ?? 0) - indices.size);
+    usedByType[typeId] = indices.size;
+  }
+
+  return {coupons: nextCoupons, issuedAt: nextIssuedAt, usedByType};
 }

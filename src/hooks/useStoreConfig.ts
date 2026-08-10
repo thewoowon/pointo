@@ -1,5 +1,5 @@
 import {useEffect, useState} from 'react';
-import {doc, getFirestore, getDoc} from '@react-native-firebase/firestore';
+import {doc, getFirestore, onSnapshot} from '@react-native-firebase/firestore';
 
 /** 레거시 매장용 쿠폰 타입 (americano/beverage 키를 그대로 사용) */
 const LEGACY_COUPON_TYPES: CouponType[] = [
@@ -32,46 +32,97 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
   contactEmail: 'thewoowon@gmail.com',
 };
 
+/** 매장 문서의 raw data → 화면이 쓰는 StoreConfig */
+const toConfig = (data: Record<string, any> | undefined): StoreConfig => {
+  if (!data?.config) {
+    // config 필드 자체가 없는 레거시 매장
+    return {
+      ...DEFAULT_STORE_CONFIG,
+      couponTypes: LEGACY_COUPON_TYPES,
+      couponSequence: ['americano', 'beverage'],
+      levelIncrementOn: 'americano',
+    };
+  }
+
+  const merged = {...DEFAULT_STORE_CONFIG, ...data.config};
+  // 레거시 매장 감지: couponTypes 없음 OR default coupon_a 1개만 있는 경우
+  // (매장 설정에서 명시적으로 저장한 적 없는 매장)
+  const ct = data.config.couponTypes;
+  const isLegacy = !ct || (ct.length === 1 && ct[0].id === 'coupon_a');
+  if (isLegacy) {
+    merged.couponTypes = LEGACY_COUPON_TYPES;
+    merged.couponSequence = ['americano', 'beverage'];
+    merged.levelIncrementOn = 'americano';
+  }
+  return merged;
+};
+
+type Entry = {
+  config: StoreConfig;
+  subscribers: Set<(config: StoreConfig) => void>;
+  stop: () => void;
+};
+
+/**
+ * 매장당 리스너 하나를 모든 소비자가 공유한다.
+ *
+ * 예전엔 훅마다 마운트 시 getDoc 한 번이었는데, 그러면 이미 떠 있는 화면은
+ * 매장 설정이 바뀌어도 옛 config를 계속 들고 있다 — 관리자 화면(MainScreen에
+ * 상시 마운트되는 GivePointSheet)이 포인트↔스탬프 전환을 못 따라가던 원인.
+ *
+ * 캐시를 두는 이유는 하나 더 있다. 새로 마운트되는 훅이 DEFAULT_STORE_CONFIG를
+ * 잠깐 반환하면 그 사이 쿠폰 키가 기본값(coupon_a)으로 잘못 매핑된다.
+ * 캐시가 있으면 첫 렌더부터 제대로 된 값을 준다.
+ */
+const cache = new Map<string, Entry>();
+
+const acquire = (storeCode: string): Entry => {
+  const existing = cache.get(storeCode);
+  if (existing) return existing;
+
+  const entry: Entry = {
+    config: DEFAULT_STORE_CONFIG,
+    subscribers: new Set(),
+    stop: () => {},
+  };
+  cache.set(storeCode, entry);
+
+  entry.stop = onSnapshot(
+    doc(getFirestore(), 'stores', storeCode),
+    snap => {
+      if (!snap.exists) return;
+      entry.config = toConfig(snap.data());
+      entry.subscribers.forEach(fn => fn(entry.config));
+    },
+    error => console.error('Error watching store config:', error),
+  );
+
+  return entry;
+};
+
 const useStoreConfig = (storeCode?: string | null): StoreConfig => {
-  const [config, setConfig] = useState<StoreConfig>(DEFAULT_STORE_CONFIG);
+  const [config, setConfig] = useState<StoreConfig>(
+    () => (storeCode && cache.get(storeCode)?.config) || DEFAULT_STORE_CONFIG,
+  );
 
   useEffect(() => {
-    if (!storeCode) return;
+    if (!storeCode) {
+      setConfig(DEFAULT_STORE_CONFIG);
+      return;
+    }
 
-    const fetchConfig = async () => {
-      try {
-        const db = getFirestore();
-        const storeSnap = await getDoc(doc(db, 'stores', storeCode));
-        if (storeSnap.exists) {
-          const data = storeSnap.data();
-          if (data?.config) {
-            const merged = {...DEFAULT_STORE_CONFIG, ...data.config};
-            // 레거시 매장 감지: couponTypes 없음 OR default coupon_a 1개만 있는 경우
-            // (매장 설정에서 명시적으로 저장한 적 없는 매장)
-            const ct = data.config.couponTypes;
-            const isLegacy = !ct || (ct.length === 1 && ct[0].id === 'coupon_a');
-            if (isLegacy) {
-              merged.couponTypes = LEGACY_COUPON_TYPES;
-              merged.couponSequence = ['americano', 'beverage'];
-              merged.levelIncrementOn = 'americano';
-            }
-            setConfig(merged);
-          } else {
-            // config 필드 자체가 없는 레거시 매장
-            setConfig({
-              ...DEFAULT_STORE_CONFIG,
-              couponTypes: LEGACY_COUPON_TYPES,
-              couponSequence: ['americano', 'beverage'],
-              levelIncrementOn: 'americano',
-            });
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching store config:', error);
+    const entry = acquire(storeCode);
+    setConfig(entry.config);
+    entry.subscribers.add(setConfig);
+
+    return () => {
+      entry.subscribers.delete(setConfig);
+      // 마지막 소비자가 떠나면 리스너를 접는다. 다시 필요해지면 acquire가 건다.
+      if (entry.subscribers.size === 0) {
+        entry.stop();
+        cache.delete(storeCode);
       }
     };
-
-    fetchConfig();
   }, [storeCode]);
 
   return config;

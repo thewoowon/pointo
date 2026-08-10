@@ -101,6 +101,7 @@ const PinPad = ({
       animationType="slide"
       transparent
       visible={visible}
+      supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.card}>

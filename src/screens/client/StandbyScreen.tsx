@@ -1,17 +1,11 @@
 import React, {useCallback} from 'react';
-import {
-  Image,
-  StatusBar,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import {Image, StatusBar, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {doc, getFirestore, onSnapshot} from '@react-native-firebase/firestore';
 import {useAuth, useTheme} from '../../hooks';
 import {useFocusEffect} from '@react-navigation/native';
 
-const StandbyScreen = ({navigation, route}: any) => {
+const StandbyScreen = ({navigation}: any) => {
   const {storeCode} = useAuth();
   const theme = useTheme();
 

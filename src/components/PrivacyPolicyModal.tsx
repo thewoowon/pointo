@@ -22,6 +22,7 @@ const PrivacyPolicyModal = ({visible, onClose, companyName = '룰루랄라 컴�
       animationType="slide"
       transparent={false}
       visible={visible}
+      supportedOrientations={['portrait', 'landscape']}
       onRequestClose={onClose}>
       <SafeAreaView style={styles.container}>
         <View style={styles.header}>

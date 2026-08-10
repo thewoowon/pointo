@@ -17,6 +17,21 @@ interface Attendance {
   created_at: string;
 }
 
+/**
+ * 고객 화면 "최근내역"용 이력 한 줄. `logs` 컬렉션과 별개로 users 문서에
+ * 비정규화해 둔다 — logs 읽기는 점주 전용(firestore.rules)이라 익명 세션인
+ * 키오스크가 조회할 수 없기 때문. 최근 RECENT_LOG_LIMIT건만 유지한다.
+ */
+interface RecentLog {
+  action: 'stamp_saved' | 'stamp_used';
+  /** 포인트 모드=포인트 수, 스탬프 모드=스탬프 수(쿠폰 사용이면 장수) */
+  amount: number;
+  /** 발생 시각 (ISO 8601) */
+  at: string;
+  /** 표시용 부가 설명. 쿠폰 사용이면 '아메리카노 쿠폰 1장' 같은 문구 */
+  note?: string;
+}
+
 interface User {
   last_used: string;
   level: number;
@@ -26,16 +41,13 @@ interface User {
   coupons: Record<string, number>;
   /** 쿠폰별 발급 시점 (coupon type id → ISO 날짜 배열, 오래된 순) */
   couponIssuedAt?: Record<string, string[]>;
+  /** 최근 적립/사용 이력 (최신순). 없으면 아직 한 번도 안 쌓인 문서 */
+  recentLogs?: RecentLog[];
   // 별점을 위해 추가된 속성
   hasRated?: boolean | null | undefined;
   // 코호트/리텐션 분석을 위한 가입일
   created_at?: string;
   store_code?: string;
-}
-
-interface UserContext {
-  selectedCoupon: Record<string, number>;
-  possibleCoupons: Record<string, number>;
 }
 
 interface CouponType {
