@@ -49,15 +49,12 @@ import {maskPhone, logActionStyle, logPillText} from './logDisplay';
 /**
  * 고객 셀프 조회 QR 노출 여부.
  *
- * QR은 hellopointo.com/s/{매장코드}를 가리키는데, 그 라우트는 아직 배포 전이라
- * 지금 스캔하면 404다. 웹 배포는 보안 규칙 배포 뒤에 온다 — 규칙이 열려 있는
- * 상태로 웹을 띄우면 Firebase 설정이 브라우저에 노출돼 고객 전화번호가 통째로
- * 덤프된다 (SECURITY_PASS.md 배포 순서).
- *
- * ⚠️ 웹의 /s 라우트가 배포되면 이 값을 true로 되돌릴 것. QrShareModal과
- *    진입 버튼은 그대로 살아 있으므로 한 줄만 바꾸면 된다.
+ * hellopointo.com/s/{매장코드}가 2026-08-13 배포되면서 켰다. 그전에는 라우트가
+ * 404여서 꺼둔 상태였다 — 웹 배포가 보안 규칙 배포 뒤에 와야 했기 때문이다
+ * (규칙이 열린 채로 웹을 띄우면 Firebase 설정이 브라우저에 노출돼 고객
+ * 전화번호가 통째로 덤프된다. SECURITY_PASS.md 배포 순서 참고).
  */
-const SHOW_SELF_LOOKUP_QR = false;
+const SHOW_SELF_LOOKUP_QR = true;
 
 const MainScreen = ({navigation}: any) => {
   const {isCompact} = useLayoutMode();
