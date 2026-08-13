@@ -1,7 +1,7 @@
 import React, {useMemo} from 'react';
 import {Modal, Pressable, StyleSheet, Text, View} from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import {useTheme} from '../../hooks';
+import {useStoreConfig, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 
 // 고객 셀프 조회용 포인토 웹.
@@ -28,6 +28,9 @@ const QrShareModal = ({
 }) => {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
+  // 포인트 매장에서 '스탬프'라고 안내하면 손님이 자기 적립금 화면이 아니라고
+  // 생각한다. 웹은 번호를 받기 전이라 모드를 모르지만, 여기선 매장이 정해져 있다.
+  const isPoint = useStoreConfig(storeCode).mode === 'point';
 
   return (
     <Modal
@@ -39,7 +42,9 @@ const QrShareModal = ({
       onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={e => e.stopPropagation()}>
-          <Text style={styles.title}>내 스탬프 조회</Text>
+          <Text style={styles.title}>
+            {isPoint ? '내 포인트 조회' : '내 스탬프 조회'}
+          </Text>
           <View style={styles.qrFrame}>
             <QRCode
               value={
@@ -53,8 +58,9 @@ const QrShareModal = ({
             />
           </View>
           <Text style={styles.caption}>
-            손님이 이 QR을 스캔하면 전화번호로 스탬프와 쿠폰을 확인할 수 있어요.
-            적립은 이 기기에서 해주세요.
+            {isPoint
+              ? '손님이 이 QR을 스캔하면 전화번호로 보유 포인트를 확인할 수 있어요. 적립·사용은 이 기기에서 해주세요.'
+              : '손님이 이 QR을 스캔하면 전화번호로 스탬프와 쿠폰을 확인할 수 있어요. 적립은 이 기기에서 해주세요.'}
           </Text>
         </Pressable>
       </Pressable>
