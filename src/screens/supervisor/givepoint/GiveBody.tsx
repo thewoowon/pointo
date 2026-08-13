@@ -24,7 +24,7 @@ export const giveTitle = (g: Give): string => {
 export const canConfirm = (g: Give): boolean => {
   const amount = parseInt(g.number, 10) || 0;
   if (g.mode === 'earn') return amount >= 1;
-  if (g.isPointMode) return amount >= 1 && amount <= g.user.stamps;
+  if (g.isPointMode) return amount >= 1 && amount <= g.user.points;
   return g.selectedCount > 0;
 };
 
@@ -35,7 +35,7 @@ const previewText = (g: Give): string => {
 
   if (g.mode === 'earn') {
     if (g.isPointMode) {
-      return `적립 후 포인트 ${(g.user.stamps + amount).toLocaleString()}${unit}`;
+      return `적립 후 포인트 ${(g.user.points + amount).toLocaleString()}${unit}`;
     }
     const spc = g.storeConfig.stampsPerCoupon;
     // handleApprove와 같은 기준을 써야 한다 — 레거시 문서는 stamps가 판을
@@ -49,9 +49,9 @@ const previewText = (g: Give): string => {
   }
 
   if (g.isPointMode) {
-    if (amount > g.user.stamps) return '보유 포인트보다 많이 사용할 수 없어요';
+    if (amount > g.user.points) return '보유 포인트보다 많이 사용할 수 없어요';
     return amount > 0
-      ? `사용 후 포인트 ${(g.user.stamps - amount).toLocaleString()}${unit}`
+      ? `사용 후 포인트 ${(g.user.points - amount).toLocaleString()}${unit}`
       : '사용할 포인트를 입력해주세요';
   }
 

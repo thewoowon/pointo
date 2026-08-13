@@ -110,6 +110,19 @@ const StatisticsScreen = ({navigation}: any) => {
     };
   };
 
+  /**
+   * 이 로그가 지금 보고 있는 모드의 기록인지.
+   *
+   * 모드를 바꾼 매장은 logs.stamp에 스탬프 '개수'와 포인트 '금액'이 섞여 있다.
+   * 둘을 합치면 단위 없는 숫자가 되므로, 적립/사용 수치는 현재 모드의 로그만
+   * 센다. mode 필드가 없는 옛 로그는 그 시점까지 아무도 모드를 바꾼 적이
+   * 없어서 매장의 현재 모드로 본다. (방문자·시간대는 단위가 없어 전부 센다)
+   */
+  const inCurrentMode = useCallback(
+    (l: Log) => (l.mode ?? storeConfig.mode) === storeConfig.mode,
+    [storeConfig.mode],
+  );
+
   const loadData = useCallback(
     async (p: Period) => {
       if (!storeCode) return;
@@ -130,8 +143,12 @@ const StatisticsScreen = ({navigation}: any) => {
         const todayLogs = logs.filter(
           l => dayjs(l.timestamp).format('YYYY-MM-DD') === today,
         );
-        const todaySavedLogs = todayLogs.filter(l => l.action === 'stamp_saved');
-        const todayUsedLogs = todayLogs.filter(l => l.action === 'stamp_used');
+        const todaySavedLogs = todayLogs.filter(
+          l => l.action === 'stamp_saved' && inCurrentMode(l),
+        );
+        const todayUsedLogs = todayLogs.filter(
+          l => l.action === 'stamp_used' && inCurrentMode(l),
+        );
         if (isPoint) {
           setTodaySaved(todaySavedLogs.reduce((s, l) => s + (Number(l.stamp) || 0), 0));
           setTodayUsed(todayUsedLogs.reduce((s, l) => s + (Number(l.stamp) || 0), 0));
@@ -173,8 +190,12 @@ const StatisticsScreen = ({navigation}: any) => {
           const dayLogs = logs.filter(
             l => dayjs(l.timestamp).format('YYYY-MM-DD') === key,
           );
-          const savedLogs = dayLogs.filter(l => l.action === 'stamp_saved');
-          const usedLogs = dayLogs.filter(l => l.action === 'stamp_used');
+          const savedLogs = dayLogs.filter(
+            l => l.action === 'stamp_saved' && inCurrentMode(l),
+          );
+          const usedLogs = dayLogs.filter(
+            l => l.action === 'stamp_used' && inCurrentMode(l),
+          );
           return {
             date: d.format('M/D'),
             saved: isPoint
@@ -190,7 +211,9 @@ const StatisticsScreen = ({navigation}: any) => {
         setIsLoading(false);
       }
     },
-    [storeCode],
+    // 모드가 바뀌면 집계 기준(건수 ↔ 금액)이 통째로 달라진다 — 다시 읽는다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [storeCode, storeConfig.mode, inCurrentMode],
   );
 
   useFocusEffect(
@@ -210,7 +233,9 @@ const StatisticsScreen = ({navigation}: any) => {
       const [users, logs] = await Promise.all([getAllUsers(), getAllLogs()]);
       const sorted = [...storeConfig.levelTiers].sort((a, b) => a.maxLevel - b.maxLevel);
       const loyalLevelThreshold = sorted.length >= 3 ? sorted[1].maxLevel + 1 : 4;
-      setKpis(computePortfolioKpis(users, logs, {
+      // KPI도 같은 이유로 현재 모드의 로그만 본다 — 누적 적립·쿠폰 환산이
+      // 스탬프 개수 기준이라, 포인트 금액이 섞이면 자릿수가 통째로 튄다.
+      setKpis(computePortfolioKpis(users, logs.filter(inCurrentMode), {
         stampsPerCoupon: storeConfig.stampsPerCoupon,
         loyalLevelThreshold,
       }));
@@ -218,7 +243,8 @@ const StatisticsScreen = ({navigation}: any) => {
     } finally {
       setIsLoadingKpis(false);
     }
-  }, [getAllUsers, getAllLogs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [getAllUsers, getAllLogs, inCurrentMode]);
 
   const totalSaved = periodStats.reduce((s, d) => s + d.saved, 0);
   const totalUsed = periodStats.reduce((s, d) => s + d.used, 0);

@@ -60,6 +60,7 @@ export function useGivePoint(
     last_used: '',
     level: 0,
     stamps: 0,
+    points: 0,
     phase: storeConfig.couponSequence[0] ?? 'americano',
     coupons: {},
     hasRated: false,
@@ -82,9 +83,11 @@ export function useGivePoint(
       return false;
     }
 
-    const newStamps = user.stamps + pointValue;
+    // 포인트는 points에만 쌓는다. stamps는 스탬프 모드가 판을 세는 필드라
+    // 여기서 건드리면 모드를 바꿨을 때 서로의 값을 덮어쓴다.
+    const newPoints = user.points + pointValue;
     await updateUser(phoneNumber, {
-      stamps: newStamps,
+      points: newPoints,
       last_used: new Date().toISOString().split('T')[0],
       // 고객 화면 최근내역용. logs는 점주만 읽을 수 있어서 별도로 남긴다.
       recentLogs: pushRecentLog(user.recentLogs, {
@@ -101,6 +104,7 @@ export function useGivePoint(
       note: `${pointValue.toLocaleString()}${storeConfig.pointUnit} 적립`,
       store_code: storeCode ?? undefined,
       user_level: user.level,
+      mode: 'point',
     });
 
     try {
@@ -113,7 +117,7 @@ export function useGivePoint(
         user_id: userId,
         user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
         user_level: user.level,
-        stamps_total: newStamps,
+        stamps_total: newPoints,
         days_since_signup: daysSinceSignup,
         stamp_count: pointValue,
       });
@@ -132,14 +136,14 @@ export function useGivePoint(
       Alert.alert('사용할 포인트를 입력해주세요', '다시 입력해주세요.');
       return false;
     }
-    if (pointsToUse > user.stamps) {
+    if (pointsToUse > user.points) {
       Alert.alert('포인트 부족', '보유 포인트보다 많이 사용할 수 없습니다.');
       return false;
     }
 
-    const newStamps = user.stamps - pointsToUse;
+    const newPoints = user.points - pointsToUse;
     await updateUser(phoneNumber, {
-      stamps: newStamps,
+      points: newPoints,
       last_used: new Date().toISOString().split('T')[0],
       recentLogs: pushRecentLog(user.recentLogs, {
         action: 'stamp_used',
@@ -155,6 +159,7 @@ export function useGivePoint(
       note: `${pointsToUse.toLocaleString()}${storeConfig.pointUnit} 사용`,
       store_code: storeCode ?? undefined,
       user_level: user.level,
+      mode: 'point',
     });
 
     try {
@@ -166,7 +171,7 @@ export function useGivePoint(
         user_id: hashPhone(phoneNumber),
         user_tier: getTierFromLevel(user.level, storeConfig.levelTiers),
         user_level: user.level,
-        stamps_total: newStamps,
+        stamps_total: newPoints,
         days_since_signup: daysSinceSignup,
         points_used: pointsToUse,
       });
@@ -254,6 +259,7 @@ export function useGivePoint(
       store_code: storeCode ?? undefined,
       user_level: level,
       coupons_issued: difference,
+      mode: 'stamp',
     });
 
     try {
@@ -344,6 +350,7 @@ export function useGivePoint(
       note: noteString,
       store_code: storeCode ?? undefined,
       user_level: user.level,
+      mode: 'stamp',
     });
 
     try {
@@ -496,7 +503,11 @@ export function useGivePoint(
             if (!data) {
               return;
             }
-            const userProfile = normalizeUser(data, storeConfig.couponTypes);
+            const userProfile = normalizeUser(
+              data,
+              storeConfig.couponTypes,
+              storeConfig.mode,
+            );
             const {coupons: validCoupons, issuedAt: validIssuedAt} =
               filterExpiredCoupons(
                 userProfile.coupons,

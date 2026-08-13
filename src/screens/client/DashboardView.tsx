@@ -84,7 +84,7 @@ const DashboardView = ({phoneNumber, onClose}: DashboardViewProps) => {
           <View style={s.heroSlot}>
             {d.isPointMode ? (
               <PointHeroCard
-                points={d.user?.stamps ?? 0}
+                points={d.user?.points ?? 0}
                 unit={d.storeConfig.pointUnit}
                 delta={
                   d.changeSummary?.type === 'earn' ? d.changeSummary.amount : 0

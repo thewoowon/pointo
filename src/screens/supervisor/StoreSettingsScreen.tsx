@@ -138,6 +138,41 @@ const StoreSettingsScreen = ({navigation}: any) => {
     setPointPresets(prev => prev.filter(p => p.id !== id));
   };
 
+  /**
+   * 운영 모드 전환 안내. 잔액은 모드별 필드(stamps/points)로 분리돼 있어서
+   * 전환 자체는 되돌릴 수 있지만, 고객이 보던 화면이 통째로 바뀌는 조작이라
+   * 무엇이 멈추고 무엇이 보관되는지 한 번 짚고 넘어간다.
+   */
+  const confirmModeChange = (next: 'stamp' | 'point'): Promise<boolean> =>
+    new Promise(resolve => {
+      const body =
+        next === 'point'
+          ? [
+              '고객 화면이 스탬프 카드에서 포인트 잔액으로 바뀝니다.',
+              '',
+              '• 고객이 가진 쿠폰은 보관되지만 사용 처리할 수 없습니다. 스탬프 모드로 되돌리면 다시 쓸 수 있고, 그동안에도 유효기간은 계속 흐릅니다.',
+              '• 스탬프 적립과 등급 상승이 멈춥니다.',
+              '• 모아둔 스탬프는 그대로 보관됩니다. 포인트와 섞이지 않습니다.',
+            ].join('\n')
+          : [
+              '고객 화면이 포인트 잔액에서 스탬프 카드로 바뀝니다.',
+              '',
+              '• 고객의 포인트 잔액은 그대로 보관되며, 포인트 모드로 되돌리면 복구됩니다.',
+              '• 포인트 적립과 사용을 할 수 없게 됩니다.',
+              '• 스탬프는 이전에 모아둔 값부터 이어서 시작합니다.',
+            ].join('\n');
+
+      Alert.alert(
+        next === 'point' ? '포인트 적립으로 전환할까요?' : '스탬프 카드로 전환할까요?',
+        body,
+        [
+          {text: '취소', style: 'cancel', onPress: () => resolve(false)},
+          {text: '전환', style: 'destructive', onPress: () => resolve(true)},
+        ],
+        {cancelable: true, onDismiss: () => resolve(false)},
+      );
+    });
+
   const handleSave = async () => {
     const st = parseInt(sessionTimeout, 10);
     const it = parseInt(idleTimeout, 10);
@@ -212,6 +247,13 @@ const StoreSettingsScreen = ({navigation}: any) => {
       pointPresets,
       pointUnit,
     };
+
+    // 검증을 전부 통과한 뒤에 묻는다 — 확인을 누르고 나서 입력 오류로 막히면
+    // 방금 한 결정이 무의미해진다.
+    if (storeMode !== storeConfig.mode) {
+      const ok = await confirmModeChange(storeMode);
+      if (!ok) return;
+    }
 
     setIsSaving(true);
     try {

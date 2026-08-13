@@ -53,7 +53,7 @@ const CustomerDetailPanel = ({
           <View style={s.summaryRow}>
             <Text style={s.summaryLabel}>보유 포인트</Text>
             <Text style={s.summaryValue}>
-              {user.stamps.toLocaleString()}
+              {user.points.toLocaleString()}
               {pointUnit}
             </Text>
           </View>

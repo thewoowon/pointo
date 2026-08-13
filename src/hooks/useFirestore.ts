@@ -126,6 +126,7 @@ const useFirestore = (storeCode?: string | null) => {
         created_at: date.split('T')[0],
         level: 0,
         stamps: 0,
+        points: 0,
         phase: 'americano',
         coupons: {},
         hasRated: false,

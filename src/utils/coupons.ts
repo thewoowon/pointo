@@ -11,10 +11,17 @@ import dayjs from 'dayjs';
  * 1종/2종으로 쓸 수 있도록 `coupon_a`/`coupon_b`로 고정하는 것이 표준이고,
  * 설정을 저장한 적 없는 오래된 매장만 폴백으로 `americano`/`beverage`를 쓴다.
  * 그래서 문서에 남아 있는 옛 키를 현재 매장의 id로 옮겨준다.
+ *
+ * `mode`는 포인트 잔액을 어디서 읽을지 정한다. points 필드가 생기기 전
+ * 포인트 매장은 잔액을 stamps에 쌓아뒀기 때문에, 문서에 points가 아직 없으면
+ * **포인트 모드일 때만** stamps를 잔액으로 넘겨받는다. 스탬프 모드에서
+ * 같은 폴백을 걸면 판에 찍힌 스탬프가 그대로 적립금이 돼버린다.
+ * (scripts/migrate-points-field.mjs 백필이 끝나면 이 폴백은 죽은 코드가 된다)
  */
 export function normalizeUser(
   data: Record<string, any>,
   couponTypes?: CouponType[],
+  mode?: StoreConfig['mode'],
 ): User {
   const firstId = couponTypes?.[0]?.id ?? 'americano';
   const secondId = couponTypes?.[1]?.id ?? 'beverage';
@@ -40,6 +47,7 @@ export function normalizeUser(
     last_used: data.last_used ?? '',
     level: data.level ?? 0,
     stamps: data.stamps ?? 0,
+    points: data.points ?? (mode === 'point' ? data.stamps ?? 0 : 0),
     phase: data.phase ?? firstId,
     coupons,
     couponIssuedAt,
@@ -48,6 +56,17 @@ export function normalizeUser(
     created_at: data.created_at,
     store_code: data.store_code,
   };
+}
+
+/**
+ * 포인트 잔액 읽기. **포인트 모드에서만 부른다.**
+ *
+ * normalizeUser를 거치지 않은 raw 문서(고객 검색 목록 등)용 폴백 —
+ * points 필드가 생기기 전 문서는 잔액이 stamps에 들어 있다.
+ * 백필(scripts/migrate-points-field.mjs) 후에는 항상 points가 잡힌다.
+ */
+export function pointsOf(u: {points?: number; stamps?: number}): number {
+  return u.points ?? u.stamps ?? 0;
 }
 
 /** couponTypes 배열에서 각 타입별 초기값 0으로 빈 맵 생성 */

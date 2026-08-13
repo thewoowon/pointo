@@ -9,6 +9,7 @@ import {
 } from '../../analytics/events';
 import dayjs from 'dayjs';
 import {useFocusEffect} from '@react-navigation/native';
+import {pointsOf} from '../../utils/coupons';
 
 export function useNumberInput() {
   const {storeCode, storeName, setIsAuthenticated} = useAuth();
@@ -126,7 +127,9 @@ export function useNumberInput() {
         user_id: hashPhone(phoneNumber),
         user_tier: getTierFromLevel(user.level ?? 0, storeConfig.levelTiers),
         user_level: user.level ?? 0,
-        stamps_total: user.stamps ?? 0,
+        // 모드마다 '보유량'이 사는 필드가 다르다 (포인트=points, 스탬프=stamps)
+        stamps_total:
+          storeConfig.mode === 'point' ? pointsOf(user) : user.stamps ?? 0,
         days_since_signup: daysSinceSignup,
         days_since_last_visit: daysSinceLastVisit,
         return_bucket: getReturnBucket(daysSinceLastVisit),

@@ -98,16 +98,21 @@ export function useDashboard(phoneNumber: string, onClose: () => void) {
 
   const couponCount = user ? totalCoupons(user.coupons) : 0;
 
+  // 무엇이 바뀌었는지는 모드마다 보는 필드가 다르다 — 포인트 모드는 points,
+  // 스탬프 모드는 stamps/쿠폰. 한쪽 모드에서 다른 쪽 필드를 보면 모드를
+  // 전환한 매장에서 있지도 않은 변화를 감지한다.
   const hasChange =
     !!user &&
     !!prevUser &&
-    (user.stamps !== prevUser.stamps ||
-      couponCount !== totalCoupons(prevUser.coupons));
+    (isPointMode
+      ? user.points !== prevUser.points
+      : user.stamps !== prevUser.stamps ||
+        couponCount !== totalCoupons(prevUser.coupons));
 
   const changeSummary = (() => {
     if (!user || !prevUser || !hasChange) return null;
     if (isPointMode) {
-      const diff = user.stamps - prevUser.stamps;
+      const diff = user.points - prevUser.points;
       return {
         type: diff > 0 ? ('earn' as const) : ('use' as const),
         amount: Math.abs(diff),
@@ -234,7 +239,7 @@ export function useDashboard(phoneNumber: string, onClose: () => void) {
           if (!data) return;
 
           if (!userRef.current && !prevUserRef.current) {
-            const initial = normalizeUser(data, storeConfig.couponTypes);
+            const initial = normalizeUser(data, storeConfig.couponTypes, storeConfig.mode);
             const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(
               initial.coupons,
               initial.couponIssuedAt,
@@ -244,7 +249,7 @@ export function useDashboard(phoneNumber: string, onClose: () => void) {
             return;
           }
 
-          const raw = normalizeUser(data, storeConfig.couponTypes);
+          const raw = normalizeUser(data, storeConfig.couponTypes, storeConfig.mode);
           const {coupons: vc, issuedAt: vi} = filterExpiredCoupons(
             raw.coupons,
             raw.couponIssuedAt,

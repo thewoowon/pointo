@@ -16,6 +16,7 @@ import {useAuth, useLayoutMode, useStoreConfig, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 import {MagnifierIcon, NewXIcon} from '../../components/Icons';
 import {maskPhone} from './logDisplay';
+import {pointsOf} from '../../utils/coupons';
 import {
   MIN_QUERY_LENGTH,
   useCustomerSearch,
@@ -57,7 +58,7 @@ const CustomerSearchSheet = ({
 
   const holdingLabel = (c: CustomerHit) =>
     storeConfig.mode === 'point'
-      ? `${(c.stamps ?? 0).toLocaleString()}${storeConfig.pointUnit}`
+      ? `${pointsOf(c).toLocaleString()}${storeConfig.pointUnit}`
       : `${(c.stamps ?? 0) % storeConfig.stampsPerCoupon}/${
           storeConfig.stampsPerCoupon
         }개`;
