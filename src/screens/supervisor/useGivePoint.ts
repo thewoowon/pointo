@@ -350,6 +350,8 @@ export function useGivePoint(
       note: noteString,
       store_code: storeCode ?? undefined,
       user_level: user.level,
+      // 스탬프는 안 줄어드니(stamp: 0) 사용 장수는 여기에 남긴다 — 통계가 읽는다.
+      coupons_redeemed: selected,
       mode: 'stamp',
     });
 

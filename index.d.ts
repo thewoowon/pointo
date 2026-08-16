@@ -172,6 +172,14 @@ interface Log {
   store_code?: string;
   user_level?: number;
   coupons_issued?: number;
+  /**
+   * 이 사용 건에서 실제로 차감된 쿠폰 장수 (stamp_used 전용).
+   *
+   * 스탬프 모드의 쿠폰 사용은 스탬프를 건드리지 않아 `stamp`가 0으로 기록된다.
+   * 그래서 통계가 스탬프 수로 장수를 역산하면 항상 0장이 됐다. 장수는 여기서 센다.
+   * 이 필드가 없는 옛 로그는 역산 폴백을 쓴다 (analytics/kpis.ts).
+   */
+  coupons_redeemed?: number;
   mode?: LogMode;
 }
 
@@ -184,6 +192,8 @@ interface LogDto {
   store_code?: string;
   user_level?: number;
   coupons_issued?: number;
+  /** Log.coupons_redeemed 참고 */
+  coupons_redeemed?: number;
   mode?: LogMode;
 }
 

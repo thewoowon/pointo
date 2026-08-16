@@ -95,9 +95,16 @@ export function computePortfolioKpis(
     return s + Object.values(coupons).reduce((cs, v) => cs + (v ?? 0), 0);
   }, 0);
 
-  // stamp_used 1건의 stamp 필드는 실제 소진 스탬프 수.
+  // 사용 장수는 로그의 coupons_redeemed가 정답이다.
+  //
+  // 예전엔 stamp 필드에서 역산했는데(stamp / 장당 스탬프), 지금의 스탬프 카드
+  // 모델은 쿠폰을 써도 스탬프가 줄지 않아 stamp가 늘 0이다 — 그래서 사용 장수와
+  // 사용률이 항상 0으로 나왔다. coupons_redeemed가 없는 옛 로그만 역산으로 센다.
   const totalCouponsRedeemed = usedLogs.reduce(
-    (s, l) => s + Math.floor((Number(l.stamp) || 0) / stampsPerCoupon),
+    (s, l) =>
+      s +
+      (l.coupons_redeemed ??
+        Math.floor((Number(l.stamp) || 0) / stampsPerCoupon)),
     0,
   );
   const totalCouponsIssued = heldTotal + totalCouponsRedeemed;
