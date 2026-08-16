@@ -1,4 +1,4 @@
-import {useCallback, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import {Alert} from 'react-native';
 import {useAuth, useFirestore, useAnalytics, useStoreConfig} from '../../hooks';
 import {
@@ -54,9 +54,8 @@ export function useGivePoint(
   const isPointMode = storeConfig.mode === 'point';
   const couponExpiryDays = storeConfig.couponExpiryDays;
 
-  const [mode, setMode] = useState<GiveMode>('earn');
-  const [number, setNumber] = useState('');
-  const [user, setUser] = useState<User>({
+  /** 고객이 바뀔 때 되돌아갈 자리. 아직 아무것도 안 읽은 상태다. */
+  const blankUser = (): User => ({
     last_used: '',
     level: 0,
     stamps: 0,
@@ -65,12 +64,37 @@ export function useGivePoint(
     coupons: {},
     hasRated: false,
   });
+
+  const [mode, setMode] = useState<GiveMode>('earn');
+  const [number, setNumber] = useState('');
+  const [user, setUser] = useState<User>(blankUser);
   /**
    * 사용하려고 고른 쿠폰 **장**들의 key (CouponEntry.key).
    * 타입별 개수가 아니라 장을 직접 들고 있어야, 체크한 줄과 실제로 차감되는
    * 장의 만료일이 어긋나지 않는다.
    */
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+
+  /**
+   * 고객이 바뀌면 언제나 '적립'부터 다시 시작한다.
+   *
+   * 모바일 풀스크린(GivePointSheet)은 닫혀 있어도 마운트된 채로 남아서, 비워주지
+   * 않으면 앞 고객이 남긴 탭·입력값·선택한 쿠폰·잔액이 다음 고객 화면에 그대로
+   * 붙어 나온다 — 한 명 사용 처리하고 다음 손님을 적립하려는데 '사용'이 켜져
+   * 있던 현장 제보가 이것이다. 카운터에서 압도적으로 잦은 동작은 적립이고,
+   * 남의 잔액이 잠깐이라도 보이면 안 되므로 잔액도 같이 지운다.
+   *
+   * (태블릿 DetailView는 모달이 닫힐 때 통째로 언마운트돼 원래 초기화됐다.
+   *  그래서 모바일 리뉴얼 이후에만 증상이 나타났다)
+   */
+  useEffect(() => {
+    setMode('earn');
+    setNumber('');
+    setSelectedKeys([]);
+    setUser(blankUser());
+    // blankUser는 매 렌더 새 함수 — 고객이 바뀔 때만 돌아야 한다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneNumber]);
 
   const handleApprovePoint = async (): Promise<boolean> => {
     if (number.length === 0) {
