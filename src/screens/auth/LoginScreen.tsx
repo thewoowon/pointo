@@ -126,6 +126,10 @@ const LoginScreen = ({navigation}: any) => {
     }
   };
 
+  // 이미 로그인된 계정이 있으면 위 useEffect가 곧 목적지로 넘긴다.
+  // 그동안 로그인 버튼을 보여주면 "로그인해야 하나?" 싶은 깜빡임이 생긴다.
+  const isResolving = !!ownerUid;
+
   return (
     <View style={styles.container}>
       <StatusBar
@@ -142,6 +146,14 @@ const LoginScreen = ({navigation}: any) => {
           />
         </View>
 
+        {isResolving ? (
+          <View style={styles.actions}>
+            <ActivityIndicator
+              size="large"
+              color={theme.color.surface.brand.primary}
+            />
+          </View>
+        ) : (
         <View style={styles.actions}>
           <View style={styles.socialLoginContainer}>
             <View style={styles.horizontalLine}></View>
@@ -193,6 +205,7 @@ const LoginScreen = ({navigation}: any) => {
             로그인 시 서비스 이용약관 및 개인정보처리방침에 동의하게 됩니다.
           </Text>
         </View>
+        )}
       </SafeAreaView>
     </View>
   );

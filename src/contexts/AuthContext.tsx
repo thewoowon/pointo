@@ -9,6 +9,7 @@ import {
 
 const AUTH_STORAGE_KEY = '@pointo_auth';
 const DEVICE_STORAGE_KEY = '@pointo_device';
+const OWNER_STORAGE_KEY = '@pointo_owner';
 
 /** 점주가 로그인한 소셜 제공자 */
 export type OwnerProvider = 'google' | 'apple';
@@ -17,10 +18,31 @@ type AuthSession = {
   storeCode: string;
   storeName: string | null;
   mode: 'supervisor' | 'client';
-  // 점주 계정 식별자
-  ownerUid?: string | null;
-  ownerEmail?: string | null;
-  ownerProvider?: OwnerProvider | null;
+};
+
+/**
+ * 로그인한 점주 계정. **매장 세션과 분리해서 저장한다.**
+ *
+ * 예전엔 이 정보가 AuthSession 안에만 있었다. 그런데 매장에서 나오면
+ * (MainScreen '나가기', 고객 모드 종료) isAuthenticated=false가 되면서
+ * AuthSession이 통째로 지워졌고, 그러면 다음 실행 때 복원할 계정 정보가 없어
+ * Firebase 세션이 멀쩡히 살아 있는데도 로그인 화면부터 다시 시작해야 했다.
+ * 로그인 상태는 매장 진입 여부와 독립이므로 별도 키에 둔다.
+ */
+type OwnerSession = {
+  uid: string;
+  email: string | null;
+  provider: OwnerProvider | null;
+};
+
+/** Firebase 세션에 실린 제공자 (저장된 값이 없을 때의 폴백) */
+const providerOf = (
+  user: FirebaseAuthTypes.User,
+): OwnerProvider | null => {
+  const ids = user.providerData.map(p => p.providerId);
+  if (ids.includes('apple.com')) return 'apple';
+  if (ids.includes('google.com')) return 'google';
+  return null;
 };
 
 /**
@@ -101,17 +123,51 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     } catch {}
   }, []);
 
+  const persistOwner = useCallback(async (owner: OwnerSession | null) => {
+    try {
+      if (owner) {
+        await AsyncStorage.setItem(OWNER_STORAGE_KEY, JSON.stringify(owner));
+      } else {
+        await AsyncStorage.removeItem(OWNER_STORAGE_KEY);
+      }
+    } catch {}
+  }, []);
+
   const initializeAuth = useCallback(async () => {
     try {
-      const [storedSession, storedDevice, firebaseUser] = await Promise.all([
-        AsyncStorage.getItem(AUTH_STORAGE_KEY),
-        AsyncStorage.getItem(DEVICE_STORAGE_KEY),
-        // Firestore 요청 전에 Firebase가 세션 복원을 끝내야 한다.
-        // 안 기다리면 첫 요청이 무인증으로 판정돼 permission-denied가 난다.
-        waitForAuthReady(),
-      ]);
+      const [storedSession, storedDevice, storedOwner, firebaseUser] =
+        await Promise.all([
+          AsyncStorage.getItem(AUTH_STORAGE_KEY),
+          AsyncStorage.getItem(DEVICE_STORAGE_KEY),
+          AsyncStorage.getItem(OWNER_STORAGE_KEY),
+          // Firestore 요청 전에 Firebase가 세션 복원을 끝내야 한다.
+          // 안 기다리면 첫 요청이 무인증으로 판정돼 permission-denied가 난다.
+          waitForAuthReady(),
+        ]);
 
-      // 기기 잠금 먼저 복원
+      // 점주 로그인 복원. 매장 세션·기기 잠금보다 먼저 —
+      // 매장에 들어가 있지 않아도(스위처에서 앱을 껐어도, 고객 모드로 잠긴
+      // 기기여도) 로그인 상태 자체는 이어져야 한다. 그래야 PIN을 풀거나 매장에서
+      // 나왔을 때 곧장 '내 매장'으로 돌아간다.
+      // 신뢰의 근거는 저장된 값이 아니라 살아있는 Firebase 세션이다 —
+      // 익명 세션(고객 전용 기기)은 점주가 아니므로 여기 해당하지 않는다.
+      const ownerSessionValid = !!firebaseUser && !firebaseUser.isAnonymous;
+      if (ownerSessionValid) {
+        const stored: OwnerSession | null = storedOwner
+          ? JSON.parse(storedOwner)
+          : null;
+        // 저장값은 같은 계정일 때만 쓴다. 이메일·제공자는 로그인 때 소셜
+        // 응답에서 받은 값이 더 정확하고(애플 비공개 이메일 등), uid는 항상
+        // 실제 Firebase 세션을 따른다.
+        const mine = stored?.uid === firebaseUser.uid ? stored : null;
+        setOwnerUid(firebaseUser.uid);
+        setOwnerEmail(mine?.email ?? firebaseUser.email ?? null);
+        setOwnerProvider(mine?.provider ?? providerOf(firebaseUser));
+      } else if (storedOwner) {
+        await AsyncStorage.removeItem(OWNER_STORAGE_KEY);
+      }
+
+      // 기기 잠금 복원
       const device: DeviceConfig = storedDevice
         ? {...EMPTY_DEVICE_LOCK, ...JSON.parse(storedDevice)}
         : EMPTY_DEVICE_LOCK;
@@ -135,8 +191,6 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         // 점주 세션인데 Firebase 세션이 없거나 익명이면 신뢰할 수 없다.
         // (Firebase Auth 도입 전 버전에서 업데이트된 기기가 여기 해당 —
         //  저장된 ownerUid는 제공자 id라 규칙을 통과하지 못한다)
-        const ownerSessionValid =
-          !!firebaseUser && !firebaseUser.isAnonymous;
         if (session.mode === 'supervisor' && !ownerSessionValid) {
           await AsyncStorage.removeItem(AUTH_STORAGE_KEY);
           return; // 로그인 화면으로 떨어뜨린다
@@ -149,10 +203,6 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
         initStoreCode(session.storeCode);
         setStoreName(session.storeName);
         setMode(session.mode);
-        // 저장값보다 실제 Firebase 세션을 우선한다 (레거시 uid가 남아있을 수 있다)
-        setOwnerUid(firebaseUser?.uid ?? session.ownerUid ?? null);
-        setOwnerEmail(session.ownerEmail ?? null);
-        setOwnerProvider(session.ownerProvider ?? null);
         setIsAuthenticated(true);
       }
     } catch {
@@ -226,14 +276,7 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
   useEffect(() => {
     if (isLoading) return;
     if (isAuthenticated && storeCode) {
-      persistSession({
-        storeCode,
-        storeName,
-        mode,
-        ownerUid,
-        ownerEmail,
-        ownerProvider,
-      });
+      persistSession({storeCode, storeName, mode});
     } else if (!isAuthenticated) {
       persistSession(null);
     }
@@ -242,12 +285,21 @@ export const AuthProvider: React.FC<{children: React.ReactNode}> = ({
     storeCode,
     storeName,
     mode,
-    ownerUid,
-    ownerEmail,
-    ownerProvider,
     isLoading,
     persistSession,
   ]);
+
+  // 로그인한 계정은 매장 세션과 따로 저장한다. 매장에서 나와도(위 effect가
+  // AuthSession을 지우는 순간) 로그인 상태는 유지돼야 하기 때문.
+  // 로그아웃은 ownerUid를 null로 만들고, 그때 이 저장분도 함께 지워진다.
+  useEffect(() => {
+    if (isLoading) return;
+    persistOwner(
+      ownerUid
+        ? {uid: ownerUid, email: ownerEmail, provider: ownerProvider}
+        : null,
+    );
+  }, [ownerUid, ownerEmail, ownerProvider, isLoading, persistOwner]);
 
   return (
     <AuthContext.Provider

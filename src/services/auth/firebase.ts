@@ -39,14 +39,25 @@ export const isAnonymousSession = (): boolean =>
  */
 export function waitForAuthReady(): Promise<FirebaseAuthTypes.User | null> {
   return new Promise(resolve => {
-    const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(
-      auth,
+    // 리스너가 동기로 불릴 가능성에 대비한다. 예전엔 콜백 안에서 `const
+    // unsubscribe`를 그대로 참조했는데, 그 경우 아직 초기화 전이라 콜백이
+    // ReferenceError로 터지고 Promise가 거부돼 앱이 로그인 화면에 갇힌다.
+    // 네이티브 SDK는 다음 틱에 부르지만, 여기서 앱 시작 전체가 걸리므로
+    // 순서에 기대지 않는다.
+    let unsubscribe: (() => void) | undefined;
+    let settled = false;
+
+    unsubscribe = onAuthStateChanged(
+      getAuth(),
       (user: FirebaseAuthTypes.User | null) => {
-        unsubscribe();
+        settled = true;
+        unsubscribe?.();
         resolve(user);
       },
     );
+
+    // 동기로 불렸다면 위 unsubscribe?.()가 빈손이었다 — 여기서 해제한다.
+    if (settled) unsubscribe?.();
   });
 }
 
