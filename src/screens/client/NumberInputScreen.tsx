@@ -29,11 +29,7 @@ import {
 import {LoadingOverlay} from '../../components/overlay';
 import DashboardView from './DashboardView';
 import {useNumberInput} from './useNumberInput';
-
-const IDLE_BACKGROUNDS = [
-  require('../../../src/assets/images/bg_pointo_1.png'),
-  require('../../../src/assets/images/bg_pointo_2.png'),
-];
+import {IDLE_BACKGROUNDS} from './idleBackgrounds';
 
 const SUMMER_COLORS = {
   accent: c.surface.brand.primary,

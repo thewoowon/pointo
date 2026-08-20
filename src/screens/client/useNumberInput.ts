@@ -10,6 +10,7 @@ import {
 import dayjs from 'dayjs';
 import {useFocusEffect} from '@react-navigation/native';
 import {pointsOf} from '../../utils/coupons';
+import {IDLE_BACKGROUNDS} from './idleBackgrounds';
 
 export function useNumberInput() {
   const {storeCode, storeName, setIsAuthenticated} = useAuth();
@@ -69,8 +70,8 @@ export function useNumberInput() {
 
   const dismissIdle = useCallback(() => {
     setIdleVisible(false);
-    // 다음 유휴 진입 때 배경을 번갈아 보여줘 화면이 정적이지 않게
-    setIdleBgIndex(i => (i + 1) % 2);
+    // 다음 유휴 진입 때 배경을 돌려 보여줘 화면이 정적이지 않게
+    setIdleBgIndex(i => (i + 1) % IDLE_BACKGROUNDS.length);
     resetIdleTimer();
   }, [resetIdleTimer]);
 
