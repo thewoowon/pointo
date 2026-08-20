@@ -13,11 +13,12 @@ const SegmentedToggle = ({mode, onChange}: SegmentedToggleProps) => (
   <View style={s.track}>
     {(['earn', 'use'] as const).map(value => {
       const active = mode === value;
+      const activeStyle = value === 'earn' ? s.earnStyle : s.useStyle;
       return (
         <Pressable
           key={value}
           onPress={() => onChange(value)}
-          style={[s.segment, active && s.segmentActive]}>
+          style={[s.segment, active && s.segmentActive, active && activeStyle]}>
           <Text style={[s.label, active && s.labelActive]}>
             {value === 'earn' ? '적립하기' : '사용하기'}
           </Text>
@@ -41,12 +42,17 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   segmentActive: {
-    backgroundColor: p.base.white,
     shadowColor: p.gray[900],
     shadowOffset: {width: 0, height: 1},
     shadowOpacity: 0.06,
     shadowRadius: 3,
     elevation: 2,
+  },
+  earnStyle: {
+    backgroundColor: p.blue[500],
+  },
+  useStyle: {
+    backgroundColor: p.orange[500],
   },
   label: {
     fontSize: 16,
@@ -54,7 +60,7 @@ const s = StyleSheet.create({
     color: p.gray[400],
     letterSpacing: -0.4,
   },
-  labelActive: {fontFamily: f.semibold, color: p.blue[500]},
+  labelActive: {fontFamily: f.semibold, color: 'white'},
 });
 
 export default SegmentedToggle;

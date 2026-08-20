@@ -5,6 +5,7 @@ import type {useGivePoint} from '../useGivePoint';
 import AmountInput from './AmountInput';
 import Keypad from './Keypad';
 import CouponPicker from './CouponPicker';
+import {useTheme} from '../../../hooks';
 
 type Give = ReturnType<typeof useGivePoint>;
 
@@ -35,7 +36,9 @@ const previewText = (g: Give): string => {
 
   if (g.mode === 'earn') {
     if (g.isPointMode) {
-      return `적립 후 포인트 ${(g.user.points + amount).toLocaleString()}${unit}`;
+      return `적립 후 포인트 ${(
+        g.user.points + amount
+      ).toLocaleString()}${unit}`;
     }
     const spc = g.storeConfig.stampsPerCoupon;
     // handleApprove와 같은 기준을 써야 한다 — 레거시 문서는 stamps가 판을
@@ -74,11 +77,25 @@ const GiveBody = ({g, couponListMaxHeight}: GiveBodyProps) => {
   const isCouponUse = g.mode === 'use' && !g.isPointMode;
   const unit = g.isPointMode ? g.storeConfig.pointUnit : '개';
   const showPresets =
-    g.isPointMode && g.mode === 'earn' && g.storeConfig.pointPresets?.length > 0;
+    g.isPointMode &&
+    g.mode === 'earn' &&
+    g.storeConfig.pointPresets?.length > 0;
+  const t = useTheme();
 
   return (
     <View style={s.body}>
-      <Text style={s.title}>{giveTitle(g)}</Text>
+      <Text
+        style={[
+          s.title,
+          {
+            color:
+              g.mode === 'earn'
+                ? t.color.texticon.onNormal.primary
+                : p.orange[500],
+          },
+        ]}>
+        {giveTitle(g)}
+      </Text>
 
       {isCouponUse ? (
         <CouponPicker
