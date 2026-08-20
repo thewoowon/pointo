@@ -162,7 +162,9 @@
       "Bash(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android)",
       "Bash(node -e \"console.log\\(require\\('./node_modules/react-native-screens/package.json'\\).version\\)\")",
       "Bash(node -e \"const p=require\\('./package.json'\\);console.log\\('screens:',p.dependencies['react-native-screens']\\)\")",
-      "Bash(node -e \"console.log\\('installed:', require\\('./node_modules/react-native-screens/package.json'\\).version\\); console.log\\('declared:', require\\('./package.json'\\).dependencies['react-native-screens']\\)\")"
+      "Bash(node -e \"console.log\\('installed:', require\\('./node_modules/react-native-screens/package.json'\\).version\\); console.log\\('declared:', require\\('./package.json'\\).dependencies['react-native-screens']\\)\")",
+      "Bash(cd /Users/mac/dev/pointo && ls -la && echo \"---PKG---\" && cat package.json 2>/dev/null)",
+      "Read(//Users/mac/dev/pointo/**)"
     ],
     "additionalDirectories": [
       "/tmp"
