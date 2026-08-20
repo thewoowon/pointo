@@ -18,6 +18,7 @@ import {
   semanticColors as c,
   primitives as p,
   fontFamily as f,
+  displayFontFamily as d,
 } from '../../theme';
 import PrivacyPolicyModal from '../../components/PrivacyPolicyModal';
 import {
@@ -58,7 +59,10 @@ const Keypad = ({
   const fontSize = expanded ? 28 : 24;
   const keyStyle = ({pressed}: {pressed: boolean}) => [
     s.keyBtn,
-    {height: btnHeight, backgroundColor: pressed ? p.slate[100] : 'transparent'},
+    {
+      height: btnHeight,
+      backgroundColor: pressed ? p.slate[100] : 'transparent',
+    },
   ];
   return (
     <View style={{width: '100%', gap: 20}}>
@@ -615,7 +619,7 @@ const s = StyleSheet.create({
   },
   idleWordmark: {
     fontSize: 32,
-    fontFamily: f.extrabold,
+    fontFamily: d.bold,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
     lineHeight: 32,

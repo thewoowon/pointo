@@ -1,10 +1,6 @@
 import React from 'react';
 import {StyleSheet, Text, View} from 'react-native';
-import {
-  primitives as p,
-  fontFamily as f,
-  displayFontFamily as df,
-} from '../../../theme';
+import {primitives as p, fontFamily as f} from '../../../theme';
 
 type AmountInputProps = {
   /** 빈 문자열이면 placeholder 0을 회색으로 */
@@ -33,7 +29,7 @@ const AmountInput = ({value, unit}: AmountInputProps) => {
 const s = StyleSheet.create({
   box: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'flex-end',
     gap: 8,
     height: 80,
@@ -45,7 +41,7 @@ const s = StyleSheet.create({
   },
   value: {
     fontSize: 38,
-    fontFamily: df.semibold,
+    fontFamily: f.semibold,
     color: p.gray[900],
     letterSpacing: -1,
   },

@@ -1,9 +1,6 @@
 import React from 'react';
 import {Pressable, StyleSheet, Text, View} from 'react-native';
-import {
-  primitives as p,
-  displayFontFamily as df,
-} from '../../../theme';
+import {primitives as p, fontFamily as f} from '../../../theme';
 import {LeftArrowIcon} from '../../../components/Icons';
 
 // 빈 칸은 0을 가운데에 두기 위한 자리 (누를 수 없음)
@@ -53,7 +50,7 @@ const s = StyleSheet.create({
   keyPressed: {backgroundColor: p.slate[100]},
   keyText: {
     fontSize: 28,
-    fontFamily: df.semibold,
+    fontFamily: f.medium,
     color: p.gray[900],
   },
 });
