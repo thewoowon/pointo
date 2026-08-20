@@ -604,7 +604,7 @@ const s = StyleSheet.create({
   },
   idleSloganWrap: {
     alignItems: 'center',
-    gap: 8,
+    gap: 0,
   },
   idleSlogan: {
     fontSize: 32,
@@ -618,12 +618,10 @@ const s = StyleSheet.create({
     textShadowRadius: 12,
   },
   idleWordmark: {
-    fontSize: 32,
+    fontSize: 56,
     fontFamily: d.bold,
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',
-    lineHeight: 32,
-    letterSpacing: 2,
     textShadowColor: 'rgba(0,0,0,0.35)',
     textShadowOffset: {width: 0, height: 2},
     textShadowRadius: 12,
