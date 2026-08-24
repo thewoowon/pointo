@@ -20,9 +20,15 @@ import {
   GoogleIcon,
   AppleIcon,
   RightChevronIcon,
+  CheckIcon,
 } from '../../components/Icons';
 import PinPad from '../../components/PinPad';
 import StoreModeSheet, {SheetStore} from './StoreModeSheet';
+import {
+  hasDoneFirstGive,
+  hasSeenOnboarding,
+  markFirstGiveDone,
+} from '../onboarding';
 
 const SwitcherScreen = ({navigation}: any) => {
   const theme = useTheme();
@@ -40,7 +46,7 @@ const SwitcherScreen = ({navigation}: any) => {
     setIsAuthenticated,
     lockDeviceToClient,
   } = useAuth();
-  const {getOwnerStores, getOwnerSlotInfo} = useFirestore();
+  const {getOwnerStores, getOwnerSlotInfo, hasAnyLog} = useFirestore();
 
   const uid = ownerUid;
 
@@ -51,6 +57,17 @@ const SwitcherScreen = ({navigation}: any) => {
     limit: number;
     canAdd: boolean;
   }>({current: 0, limit: 3, canAdd: true});
+
+  /**
+   * 매장 준비 체크리스트 상태. null이면 아직 판정 전(카드를 안 그린다).
+   *
+   * 매장은 만들었는데 첫 적립이 0건인 채로 멈추는 게 지금의 이탈 지점이라,
+   * 남은 단계가 홈에 계속 보이게 한다. 첫 적립이 확인되면 카드는 영구히 사라진다.
+   */
+  const [setup, setSetup] = useState<{
+    guideSeen: boolean;
+    gave: boolean;
+  } | null>(null);
 
   // 모드 선택 시트 + 고객모드 고정 PIN 설정
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -70,6 +87,24 @@ const SwitcherScreen = ({navigation}: any) => {
     setStores(list);
     setSlot(slotInfo);
     setIsLoading(false);
+
+    if (list.length === 0) {
+      setSetup(null);
+      return;
+    }
+    // 첫 적립 여부는 한 번 참이 되면 뒤집히지 않는다 — 캐시가 있으면 서버를
+    // 다시 두드리지 않는다. 없을 때만 매장을 훑고, 하나라도 찾으면 즉시 멈춘다.
+    let gave = await hasDoneFirstGive();
+    if (!gave) {
+      for (const store of list) {
+        if (await hasAnyLog(store.storeCode)) {
+          gave = true;
+          await markFirstGiveDone();
+          break;
+        }
+      }
+    }
+    setSetup({guideSeen: await hasSeenOnboarding('setup'), gave});
     // useFirestore()는 매 렌더 새 함수 참조를 반환하므로 uid만 의존
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
@@ -210,6 +245,17 @@ const SwitcherScreen = ({navigation}: any) => {
               </View>
             ) : (
               <>
+                {!!setup && !setup.gave && (
+                  <SetupChecklist
+                    guideSeen={setup.guideSeen}
+                    styles={styles}
+                    theme={theme}
+                    onOpenGuide={() =>
+                      navigation.navigate('Onboarding', {slot: 'setup'})
+                    }
+                  />
+                )}
+
                 <View style={styles.slotRow}>
                   <Text style={styles.slotText}>
                     운영 중인 매장{'  '}
@@ -262,6 +308,87 @@ const SwitcherScreen = ({navigation}: any) => {
         onSuccess={handlePinSet}
         onCancel={() => setPinVisible(false)}
       />
+    </View>
+  );
+};
+
+/**
+ * 매장 준비 체크리스트.
+ *
+ * 매장을 만든 직후가 이탈 구간이다 — 기기를 한 대만 두면 관리자든 고객이든
+ * 한쪽 화면만 켜지고, 그러면 적립이 안 되는데 이유를 알 길이 없어 그대로 멈춘다.
+ * 남은 단계를 홈에 계속 남겨두면 "끝내야 할 게 있다"는 신호가 되고, 막힌
+ * 사람에겐 사용법으로 가는 길이 항상 열려 있다.
+ *
+ * ③은 여기서 누를 수 있는 게 아니라 매장에 들어가서 하는 일이라 버튼이 없다.
+ */
+const SetupChecklist = ({
+  guideSeen,
+  styles,
+  theme,
+  onOpenGuide,
+}: {
+  guideSeen: boolean;
+  styles: ReturnType<typeof createStyles>;
+  theme: Theme;
+  onOpenGuide: () => void;
+}) => {
+  const steps = [
+    {label: '매장 만들기', hint: null, done: true, onPress: null},
+    {
+      label: '사용법 익히기',
+      hint: '적립하려면 고객 화면이 필요해요 — 없으면 QR로 손님 휴대폰을',
+      done: guideSeen,
+      onPress: onOpenGuide,
+    },
+    {
+      label: '첫 적립 해보기',
+      hint: '매장에 들어가 손님에게 첫 적립을 해보세요',
+      done: false,
+      onPress: null,
+    },
+  ];
+
+  return (
+    <View style={styles.setupCard}>
+      <Text style={styles.setupTitle}>매장 준비 3단계</Text>
+      <Text style={styles.setupSubtitle}>
+        첫 적립까지 마치면 이 카드는 사라져요.
+      </Text>
+
+      {steps.map((step, i) => (
+        <Pressable
+          key={step.label}
+          style={({pressed}) => [
+            styles.setupRow,
+            {opacity: step.onPress && pressed ? 0.6 : 1},
+          ]}
+          disabled={!step.onPress}
+          onPress={step.onPress ?? undefined}>
+          {step.done ? (
+            <CheckIcon
+              width={22}
+              height={22}
+              color={theme.color.surface.brand.primary}
+            />
+          ) : (
+            <View style={styles.setupNumber}>
+              <Text style={styles.setupNumberText}>{i + 1}</Text>
+            </View>
+          )}
+
+          <View style={styles.setupTexts}>
+            <Text style={[styles.setupLabel, step.done && styles.setupLabelDone]}>
+              {step.label}
+            </Text>
+            {!step.done && !!step.hint && (
+              <Text style={styles.setupHint}>{step.hint}</Text>
+            )}
+          </View>
+
+          {!!step.onPress && !step.done && <RightChevronIcon />}
+        </Pressable>
+      ))}
     </View>
   );
 };
@@ -409,6 +536,72 @@ const createStyles = (theme: Theme) =>
       textAlign: 'center',
       lineHeight: 19,
       marginTop: 4,
+    },
+    setupCard: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderRadius: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+      marginBottom: 8,
+      // shadow
+      shadowColor: theme.color.etc.absolute.black,
+      shadowOffset: {width: 0, height: 1},
+      shadowOpacity: 0.02,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    setupTitle: {
+      fontSize: 16,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    setupSubtitle: {
+      marginTop: 4,
+      marginBottom: 8,
+      fontSize: 13,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    setupRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 10,
+    },
+    setupNumber: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1,
+      borderColor: theme.palette.gray[300],
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    setupNumberText: {
+      fontSize: 12,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    setupTexts: {
+      flex: 1,
+      gap: 2,
+    },
+    setupLabel: {
+      fontSize: 15,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    setupLabelDone: {
+      color: theme.color.texticon.onNormal.lowemp,
+      textDecorationLine: 'line-through',
+    },
+    setupHint: {
+      fontSize: 12,
+      lineHeight: 18,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
     },
     slotRow: {
       width: '100%',

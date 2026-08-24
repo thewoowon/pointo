@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   Modal,
   Pressable,
@@ -45,6 +45,7 @@ import QrShareModal from './QrShareModal';
 import {useMasterDetail} from '../../components';
 import {LoadingOverlay} from '../../components/overlay';
 import {maskPhone, logActionStyle, logPillText} from './logDisplay';
+import {markFirstGiveDone} from '../onboarding';
 
 /**
  * 고객 셀프 조회 QR 노출 여부.
@@ -68,7 +69,7 @@ const MainScreen = ({navigation}: any) => {
   // Master-detail panel visibility (centralized — see SplitLayout primitive).
   const {showList, showDetailPanel} = useMasterDetail(showDetail);
   const {storeCode, setIsAuthenticated, initStoreCode} = useAuth();
-  const {getLogs, getLogsByPhoneNumber} = useFirestore(storeCode);
+  const {getLogs, getLogsByPhoneNumber, hasAnyLog} = useFirestore(storeCode);
   const {track} = useAnalytics();
   // 적립/사용 시트를 여는 두 경로 —
   // (1) 세션: 고객이 태블릿에 번호를 입력해 시작한 흐름
@@ -97,6 +98,13 @@ const MainScreen = ({navigation}: any) => {
     filter: 'all',
   });
   const [searchVisible, setSearchVisible] = useState(false);
+  /**
+   * 이 매장이 아직 한 번도 적립을 못 해봤는지. null이면 확인 전.
+   *
+   * "오늘은 아직 없음"과 "한 번도 없음"은 완전히 다른 상태다. 후자만이 기기 두 대
+   * 얘기를 꺼낼 자리고, 잘 굴러가는 매장에 안내를 띄우면 그냥 소음이다.
+   */
+  const [neverGave, setNeverGave] = useState<boolean | null>(null);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [qrVisible, setQrVisible] = useState(false);
   // 모바일 헤더는 QR만 남기고, 통계·매장설정은 요약(⋮) 메뉴 안으로 접었다.
@@ -229,6 +237,29 @@ const MainScreen = ({navigation}: any) => {
       fetchLogs();
     }, [date]),
   );
+
+  // 손님 폰에서 번호가 들어오면 적립 시트가 뜬다. QR 모달(RN Modal)이 그 위를
+  // 덮으므로 비켜준다 — 점주가 QR을 띄운 채 기다리는 게 정상 흐름이라 반드시 필요.
+  useEffect(() => {
+    if (sessionActive) setQrVisible(false);
+  }, [sessionActive]);
+
+  // 첫 적립 여부는 날짜와 무관하므로 매장이 바뀔 때만 확인한다.
+  useEffect(() => {
+    let active = true;
+    hasAnyLog().then(has => {
+      if (!active) return;
+      setNeverGave(!has);
+      // 스위처의 준비 체크리스트가 같은 사실을 본다 — 여기서 확인했으면
+      // 거기서 다시 물어볼 필요가 없다.
+      if (has) void markFirstGiveDone();
+    });
+    return () => {
+      active = false;
+    };
+    // useFirestore()는 매 렌더 새 참조를 반환하므로 storeCode만 의존
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeCode]);
 
   useFocusEffect(
     useCallback(() => {
@@ -633,6 +664,34 @@ const MainScreen = ({navigation}: any) => {
                           </Pressable>
                         );
                       })
+                    ) : neverGave &&
+                      !searchContext.searchText &&
+                      searchContext.filter === 'all' ? (
+                      /* 한 번도 적립이 없는 매장 — 이 화면이 이탈 직전 마지막
+                         화면이다. 여기서 이유를 말해주지 않으면 점주는 "안 되는
+                         앱"이라고 결론 내고 나간다. */
+                      <View style={styles.guideBox}>
+                        <Text style={styles.guideTitle}>
+                          아직 적립 내역이 없어요
+                        </Text>
+                        <Text style={styles.guideBody}>
+                          {'포인토는 관리자 화면과 고객 화면이\n짝을 이뤄 동작해요.\n'}
+                          {'손님이 고객 화면에 번호를 넣으면\n이 화면에서 적립해드리는 방식이에요.'}
+                        </Text>
+                        <Text style={styles.guideHint}>
+                          {'여분의 기기가 없다면 위 QR을 손님께 보여주세요.\n손님 휴대폰이 고객 화면을 대신해요.'}
+                        </Text>
+                        <Pressable
+                          style={({pressed}) => [
+                            styles.guideBtn,
+                            {opacity: pressed ? 0.8 : 1},
+                          ]}
+                          onPress={() =>
+                            navigation.navigate('Onboarding', {slot: 'replay'})
+                          }>
+                          <Text style={styles.guideBtnText}>사용법 보기</Text>
+                        </Pressable>
+                      </View>
                     ) : (
                       <View style={styles.emptyBox}>
                         <Text style={styles.emptyText}>
@@ -1003,6 +1062,49 @@ const createStyles = (theme: Theme, isCompact: boolean) =>
       justifyContent: 'center',
       alignItems: 'center',
       height: 250,
+    },
+    guideBox: {
+      alignSelf: 'center',
+      width: '100%',
+      maxWidth: 420,
+      alignItems: 'center',
+      paddingHorizontal: 24,
+      paddingTop: 48,
+      paddingBottom: 32,
+      gap: 12,
+    },
+    guideTitle: {
+      fontSize: 18,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
+    guideBody: {
+      fontSize: 14,
+      lineHeight: 22,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.midemp,
+      textAlign: 'center',
+    },
+    guideHint: {
+      fontSize: 13,
+      lineHeight: 20,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
+      textAlign: 'center',
+    },
+    guideBtn: {
+      marginTop: 8,
+      height: 48,
+      paddingHorizontal: 28,
+      borderRadius: 12,
+      backgroundColor: theme.color.surface.brand.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    guideBtnText: {
+      fontSize: 15,
+      fontFamily: theme.font.semibold,
+      color: theme.color.etc.absolute.white,
     },
     mTodayFab: {
       position: 'absolute',

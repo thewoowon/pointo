@@ -381,6 +381,35 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
+  /**
+   * 이 매장에 적립/사용 기록이 한 건이라도 있는지.
+   *
+   * "아직 첫 적립을 못 한 매장"을 가려내는 용도다 — 개수는 필요 없어서 limit(1)로
+   * 존재 여부만 본다(읽기 1건). `code`를 주면 훅 인자와 무관하게 그 매장을 본다:
+   * 스위처는 매장 세션에 들어가기 전이라 storeCode가 없는 채로 여러 매장을 훑는다.
+   *
+   * 실패하면 `true`(=있다)로 답한다. 안내 배너를 못 띄우는 쪽이, 잘 쓰고 있는
+   * 점주에게 "아직 적립이 없어요"를 잘못 띄우는 쪽보다 낫다.
+   */
+  async function hasAnyLog(code?: string | null): Promise<boolean> {
+    const target = code ?? storeCode;
+    if (!target) return true;
+    try {
+      const db = getFirestore();
+      const snapshot = await getDocs(
+        query(
+          collection(db, 'logs'),
+          where('store_code', '==', target),
+          limit(1),
+        ),
+      );
+      return !snapshot.empty;
+    } catch (error) {
+      console.error('Error checking logs:', error);
+      return true;
+    }
+  }
+
   /** 회원 수. 문서 수가 아니라 **고유 전화번호 수**를 센다. */
   async function getUserCount(): Promise<number> {
     try {
@@ -828,6 +857,7 @@ const useFirestore = (storeCode?: string | null) => {
     addLog,
     getLogs,
     getLogsAfter,
+    hasAnyLog,
     getUserCount,
     getLogsInRange,
     deleteLogsInRange,
