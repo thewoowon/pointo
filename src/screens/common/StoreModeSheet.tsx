@@ -23,15 +23,20 @@ type Props = {
 };
 
 /**
- * 스토어 선택 후 뜨는 모드 선택 바텀시트.
- *   관리자 모드 / 고객 모드 / 이 기기 고객 전용 고정(PIN)
+ * 스토어 선택 후 뜨는 **기기 역할** 선택 바텀시트.
+ *   관리자용 / 고객용 / 이 기기 고객 전용 고정(PIN)
  * 부모가 ref.present() 로 호출한다.
+ *
+ * "모드를 고른다"가 아니라 "역할을 배정한다"로 말하는 이유:
+ * 둘 중 하나만 고르면 되는 것처럼 읽히면, 기기 한 대로 들어와 아무것도 못 하고
+ * 나가는 일이 생긴다(자연유입 점주의 실제 이탈 경로다). 두 화면이 짝이라는 사실을
+ * 알려주기 가장 좋은 순간이 고르는 바로 이 순간이라 여기서 한 줄 못 박는다.
  */
 const StoreModeSheet = forwardRef<BottomSheetModal, Props>(
   ({store, onSupervisor, onClient, onLockClient}, ref) => {
     const theme = useTheme();
     const styles = useMemo(() => createStyles(theme), [theme]);
-    const snapPoints = useMemo(() => ['48%'], []);
+    const snapPoints = useMemo(() => ['56%'], []);
 
     const renderBackdrop = (props: any) => (
       <BottomSheetBackdrop
@@ -51,7 +56,11 @@ const StoreModeSheet = forwardRef<BottomSheetModal, Props>(
         handleIndicatorStyle={styles.handle}>
         <BottomSheetView style={styles.content}>
           <Text style={styles.storeName}>{store?.name ?? '매장'}</Text>
-          <Text style={styles.prompt}>어떤 모드로 열까요?</Text>
+          <Text style={styles.prompt}>이 기기의 역할을 정해주세요</Text>
+          <Text style={styles.note}>
+            두 화면이 짝을 이뤄 동작해요. 고객용 기기가 없으면 관리자 화면의 QR로
+            손님 휴대폰을 대신 쓸 수 있어요.
+          </Text>
 
           <Pressable style={styles.row} onPress={onSupervisor}>
             <View style={styles.rowWrap}>
@@ -63,8 +72,10 @@ const StoreModeSheet = forwardRef<BottomSheetModal, Props>(
                 />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>관리자 모드</Text>
-                <Text style={styles.rowSub}>매장 관리 · 통계 · 설정</Text>
+                <Text style={styles.rowTitle}>관리자용</Text>
+                <Text style={styles.rowSub}>
+                  사장님이 보는 화면 · 적립내역 · 통계
+                </Text>
               </View>
             </View>
             <RightChevronIcon />
@@ -76,8 +87,10 @@ const StoreModeSheet = forwardRef<BottomSheetModal, Props>(
                 <ProfileIcon width={24} height={24} color={'#F97316'} />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>고객 모드</Text>
-                <Text style={styles.rowSub}>적립 · 쿠폰 사용 (카운터용)</Text>
+                <Text style={styles.rowTitle}>고객용</Text>
+                <Text style={styles.rowSub}>
+                  손님에게 내주는 화면 · 번호 입력
+                </Text>
               </View>
             </View>
             <RightChevronIcon />
@@ -122,6 +135,13 @@ const createStyles = (t: Theme) =>
       fontFamily: t.font.bold,
       color: t.color.texticon.onNormal.highemp,
       lineHeight: 28,
+    },
+    note: {
+      fontSize: 13,
+      lineHeight: 20,
+      fontFamily: t.font.regular,
+      color: t.color.texticon.onNormal.midemp,
+      marginTop: t.spacing[1],
       marginBottom: t.spacing[4],
     },
     row: {
