@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFirestore, useTheme} from '../../hooks';
+import {hasSeenOnboarding} from '../../screens/onboarding';
 import type {Theme} from '../../theme';
 
 const StoreRegisterScreen = ({navigation, route}: any) => {
@@ -69,11 +70,24 @@ const StoreRegisterScreen = ({navigation, route}: any) => {
     await finalizeStore(result.storeCode);
   };
 
-  const handleGoHome = () => {
-    if (ownerUid) {
+  /**
+   * 등록 완료 후 이동. 첫 매장이면 사용법 온보딩을 한 번 끼운다.
+   *
+   * 자연유입 점주가 멈추는 지점이 정확히 여기다 — 매장은 만들었는데 적립 이력이
+   * 0건. 기기를 한 대만 들고 관리자/고객 한쪽으로 들어가면 아무 일도 일어나지
+   * 않는데, 그 이유를 알려주는 화면이 없었다. "기기 두 대"가 실감나는 순간은
+   * 로그인 직전이 아니라 내 매장이 막 생긴 지금이라 여기서 한 번 더 보여준다.
+   * 두 번째 매장부터는 곧장 내 매장으로.
+   */
+  const handleGoHome = async () => {
+    if (!ownerUid) {
+      navigation.navigate('Login');
+      return;
+    }
+    if (await hasSeenOnboarding('setup')) {
       navigation.navigate('Switcher');
     } else {
-      navigation.navigate('Login');
+      navigation.navigate('Onboarding', {slot: 'setup'});
     }
   };
 

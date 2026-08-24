@@ -67,6 +67,17 @@ const AccountSettingsScreen = ({navigation}: any) => {
             <Text style={styles.accountEmail}>{ownerEmail ?? '-'}</Text>
           </View>
 
+          {/* 사용법 — 온보딩 다시보기.
+              기기 두 대 구성은 한 번 보고 잊기 쉬운 개념이라, 언제든 다시
+              꺼내볼 수 있는 자리가 하나는 있어야 한다. */}
+          <Text style={styles.sectionLabel}>도움말</Text>
+          <Pressable
+            style={({pressed}) => [styles.row, {opacity: pressed ? 0.6 : 1}]}
+            onPress={() => navigation.navigate('Onboarding', {slot: 'replay'})}>
+            <Text style={styles.rowText}>포인토 사용법</Text>
+            <RightChevronIcon />
+          </Pressable>
+
           {/* 약관/정책 */}
           <Text style={styles.sectionLabel}>약관</Text>
           <Pressable style={styles.row} onPress={() => setPrivacyVisible(true)}>
