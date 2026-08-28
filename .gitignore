@@ -95,3 +95,7 @@ firestore-debug.log
 
 # renewal 폴더 전부
 renewal/
+
+# 운영 데이터 산출물 — 고객 전화번호가 들어간다. 절대 커밋 금지.
+.backup-*.md
+.backup-*.csv

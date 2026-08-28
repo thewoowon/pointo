@@ -74,6 +74,33 @@ export function useGivePoint(
    * 장의 만료일이 어긋나지 않는다.
    */
   const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
+  /**
+   * 이 고객의 문서를 실제로 한 번 읽었는가.
+   *
+   * `user`의 초기값은 blankUser — level 0, coupons {}, stamps 0이다. 그런데
+   * 적립·사용 핸들러는 전부 그 값을 **기준으로 새 값을 계산해 통째로 덮어쓴다.**
+   * 그래서 문서가 도착하기 전에 적립을 누르면 쿠폰과 레벨이 0으로 밀린다.
+   *
+   * 창이 좁아 보이지만 그렇지 않다. _resolveUserDoc은 복합 ID를 먼저 조회하고
+   * 없으면 레거시(전화번호만) 문서로 폴백하므로, 레거시 고객은 **getDoc 왕복이
+   * 2회**다. 카운터 와이파이에서 수 초가 걸리고, 그 사이 한 번 누르면 끝이다.
+   * (KB000001에서 실제로 54명이 이렇게 날아갔다 — 레거시 문서가 남아 있는
+   *  유일한 매장이라 이 매장만 터졌다)
+   *
+   * 문서를 못 읽었으면 쓰지 않는다. 어차피 updateDoc은 없는 문서에 실패하므로
+   * 여기서 막아도 정상 흐름이 잃는 것은 없다.
+   */
+  const [loaded, setLoaded] = useState(false);
+
+  /** 아직 못 읽었으면 쓰기를 거부한다. 덮어쓰기보다 한 번 더 누르는 편이 낫다. */
+  const guardLoaded = (): boolean => {
+    if (loaded) return true;
+    Alert.alert(
+      '고객 정보를 불러오는 중이에요',
+      '잠시 후 다시 눌러주세요.',
+    );
+    return false;
+  };
 
   /**
    * 고객이 바뀌면 언제나 '적립'부터 다시 시작한다.
@@ -92,11 +119,13 @@ export function useGivePoint(
     setNumber('');
     setSelectedKeys([]);
     setUser(blankUser());
+    setLoaded(false);
     // blankUser는 매 렌더 새 함수 — 고객이 바뀔 때만 돌아야 한다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phoneNumber]);
 
   const handleApprovePoint = async (): Promise<boolean> => {
+    if (!guardLoaded()) return false;
     if (number.length === 0) {
       Alert.alert('적립할 포인트를 입력해주세요', '다시 입력해주세요.');
       return false;
@@ -155,6 +184,7 @@ export function useGivePoint(
   };
 
   const handleUsingPoint = async (): Promise<boolean> => {
+    if (!guardLoaded()) return false;
     const pointsToUse = parseInt(number, 10);
     if (isNaN(pointsToUse) || pointsToUse < 1) {
       Alert.alert('사용할 포인트를 입력해주세요', '다시 입력해주세요.');
@@ -209,6 +239,7 @@ export function useGivePoint(
   };
 
   const handleApprove = async (): Promise<boolean> => {
+    if (!guardLoaded()) return false;
     if (number.length === 0) {
       Alert.alert('적립할 스탬프를 입력해주세요', '다시 입력해주세요.');
       return false;
@@ -337,6 +368,7 @@ export function useGivePoint(
   };
 
   const handleUsing = async (): Promise<boolean> => {
+    if (!guardLoaded()) return false;
     const selected = selectedKeys.length;
     if (selected < 1) {
       Alert.alert('사용할 쿠폰을 선택해주세요', '쿠폰을 눌러 선택해주세요.');
@@ -546,6 +578,7 @@ export function useGivePoint(
               couponIssuedAt: validIssuedAt,
             };
             setUser(filtered);
+            setLoaded(true);
           }
         });
       };
@@ -570,6 +603,8 @@ export function useGivePoint(
     mode,
     number,
     user,
+    /** 문서를 아직 못 읽었으면 false — 적립/사용 버튼을 비활성화하는 데 쓴다 */
+    loaded,
     couponEntries,
     selectedKeys,
     selectedCount: selectedKeys.length,
