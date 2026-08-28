@@ -66,6 +66,13 @@ await testEnv.withSecurityRulesDisabled(async ctx => {
     store_code: 'STORE_B', stamps: 5, level: 1, coupons: {},
   });
 
+  // 진행도가 쌓인 단골 — blankUser 덮어쓰기 방어 테스트용
+  await setDoc(doc(db, 'users/01099998888_STORE_A'), {
+    store_code: 'STORE_A', stamps: 7, level: 14,
+    coupons: {coupon_a: 3, coupon_b: 7},
+  });
+
+
   await setDoc(doc(db, 'logs/logA'), {
     store_code: 'STORE_A', phone_number: '01011112222', stamp: 1,
     action: 'stamp_saved', note: '', timestamp: new Date(),
@@ -250,7 +257,35 @@ await check('타인: 남의 레거시 계정 읽기', DENY, () =>
 await check('타인: 남의 레거시 매장 탈취', DENY, () =>
   updateDoc(doc(ownerB, 'stores/STORE_L'), {ownerId: 'uidB'}));
 
-console.log('\n[6] 서버 전용 컬렉션 ⭐');
+console.log('\n[6] 적립 진행도 방어 ⭐ (blankUser 덮어쓰기)');
+const 단골 = 'users/01099998888_STORE_A';
+await check('정상 적립: 스탬프+쿠폰+레벨 증가', ALLOW, () =>
+  updateDoc(doc(kiosk, 단골), {
+    stamps: 0, level: 15, coupons: {coupon_a: 4, coupon_b: 7},
+  }));
+await check('정상 사용: 쿠폰 차감 (키는 남는다)', ALLOW, () =>
+  updateDoc(doc(kiosk, 단골), {
+    coupons: {coupon_a: 0, coupon_b: 0},
+  }));
+await check('정상: 진행도를 안 건드리는 쓰기', ALLOW, () =>
+  updateDoc(doc(kiosk, 단골), {last_used: '2026-08-28'}));
+await check('blankUser 덮어쓰기 (레벨 14 → 0)', DENY, () =>
+  updateDoc(doc(kiosk, 단골), {
+    stamps: 1, level: 0, coupons: {}, couponIssuedAt: {},
+  }));
+await check('레벨만 깎기', DENY, () =>
+  updateDoc(doc(kiosk, 단골), {level: 13}));
+await check('쿠폰 맵 통째로 비우기', DENY, () =>
+  updateDoc(doc(kiosk, 단골), {coupons: {}}));
+await check('점주도 진행도는 못 날린다', DENY, () =>
+  updateDoc(doc(ownerA, 단골), {level: 0, coupons: {}}));
+// 신규 가입은 level 0 / coupons {} 로 만들어진다 — 막으면 안 된다
+await check('신규 가입: 빈 진행도로 생성', ALLOW, () =>
+  setDoc(doc(kiosk, 'users/01077776666_STORE_A'), {
+    store_code: 'STORE_A', stamps: 0, level: 0, coupons: {},
+  }));
+
+console.log('\n[7] 서버 전용 컬렉션 ⭐');
 await check('점주A: 자기 Apple 토큰 읽기', DENY, () =>
   getDoc(doc(ownerA, 'ownerTokens/uidA')));
 await check('키오스크: Apple 토큰 읽기', DENY, () =>

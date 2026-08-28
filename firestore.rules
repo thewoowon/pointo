@@ -68,6 +68,36 @@ service cloud.firestore {
       return request.resource.data.store_code;
     }
 
+    /**
+     * 적립 진행도를 통째로 날리는 쓰기를 거부한다.
+     *
+     * 적립·사용 핸들러는 로컬 `user` 상태로 새 값을 계산해 문서를 덮어쓰는데,
+     * 그 초기값이 blankUser(level 0, coupons {})다. 문서를 읽어오기 전에 점주가
+     * 적립을 누르면 blankUser가 그대로 저장돼 쿠폰과 레벨이 사라진다.
+     * (KB000001에서 54명이 이렇게 날아갔다)
+     *
+     * 앱은 guardLoaded로 고쳤지만 **배포되기 전까지, 그리고 업데이트를 미루는
+     * 매장 기기에서는 계속 발생한다.** 여기서 막으면 버전과 무관하게 즉시 멈춘다.
+     *
+     * 정상 쓰기와 구분되는 두 가지 불변식만 본다:
+     *   1) level은 코드 어디에서도 감소하지 않는다 (`level += 1`만 존재)
+     *   2) 쿠폰을 다 써도 맵은 비지 않는다 — removeCouponEntries는 키를 남겨
+     *      `{coupon_a: 0}`이 되지 `{}`가 되지 않는다. 정확히 `{}`인 쓰기는
+     *      blankUser뿐이다.
+     *
+     * 두 필드를 건드리지 않는 쓰기(세션·약관 등)는 그대로 통과한다.
+     */
+    function keepsProgress() {
+      return (
+        !('level' in request.resource.data)
+        || request.resource.data.level >= resource.data.get('level', 0)
+      ) && (
+        !('coupons' in request.resource.data)
+        || request.resource.data.coupons.keys().size() > 0
+        || resource.data.get('coupons', {}).keys().size() == 0
+      );
+    }
+
     // ─── owners — 점주 계정 ────────────────────────────────────────────
     // 본인 문서만. 계정 열거(list)는 전면 금지.
     match /owners/{uid} {
@@ -127,11 +157,13 @@ service cloud.firestore {
 
       allow create: if isSignedIn() && incomingStore() is string;
 
-      allow update: if isSignedIn() && (
-        // 매장 코드는 바꿀 수 없다 (다른 매장으로 문서를 옮기는 것 방지)
-        !('store_code' in request.resource.data)
-        || incomingStore() == resource.data.get('store_code', incomingStore())
-      );
+      allow update: if isSignedIn()
+        && (
+          // 매장 코드는 바꿀 수 없다 (다른 매장으로 문서를 옮기는 것 방지)
+          !('store_code' in request.resource.data)
+          || incomingStore() == resource.data.get('store_code', incomingStore())
+        )
+        && keepsProgress();
 
       // 고객 탈퇴(키오스크) 또는 점주의 고객 삭제
       allow delete: if isSignedIn();
