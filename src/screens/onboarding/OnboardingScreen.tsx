@@ -55,11 +55,56 @@ const OnboardingScreen = ({navigation, route}: any) => {
 
   const isLast = index === SLIDES.length - 1;
 
+  /** 온보딩 전체 소요시간용 기준점 */
+  const startedAtRef = useRef(Date.now());
+
+  /**
+   * 지금 보고 있는 장표를 왜 떠나는가. 기본값은 'left'(이탈)다 — 다음으로
+   * 넘기거나 완료하는 경로에서만 덮어쓰므로, 아무 조작 없이 화면이 사라지면
+   * 자연히 이탈로 남는다. 어느 장표에서 그만두는지가 이 온보딩의 핵심 지표다.
+   */
+  const exitReasonRef = useRef<'moved' | 'completed' | 'left'>('left');
+
   useEffect(() => {
     logEvent('onboarding_started', {slot});
     // 진입 시 1회
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /**
+   * 장표별 노출/체류시간.
+   *
+   * 노출 수만으로는 "봤다"와 "읽었다"를 구분할 수 없다. 2번 장표(기기 두 대)는
+   * 이해시키는 게 목적이라 오래 머물러야 정상이고, 반대로 어떤 장표를 0.5초에
+   * 넘긴다면 그건 읽히지 않았다는 뜻이다. 진입에서 한 건, 이탈에서 체류시간을
+   * 실어 한 건을 남긴다.
+   *
+   * cleanup은 장표 전환뿐 아니라 언마운트(뒤로가기·완료 후 화면 전환)에서도
+   * 돌기 때문에, 마지막으로 보던 장표의 체류시간도 빠지지 않는다.
+   */
+  useEffect(() => {
+    const slide = SLIDES[index];
+    const enteredAt = Date.now();
+    exitReasonRef.current = 'left';
+
+    logEvent('onboarding_slide_viewed', {
+      slot,
+      slide_id: slide.id,
+      slide_index: index,
+    });
+
+    return () => {
+      logEvent('onboarding_slide_exited', {
+        slot,
+        slide_id: slide.id,
+        slide_index: index,
+        dwell_ms: Date.now() - enteredAt,
+        exit_reason: exitReasonRef.current,
+      });
+    };
+    // logEvent는 매 렌더 새 참조를 반환하므로 의존성에서 뺀다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [index, slot]);
 
   // 회전하면 페이지 폭이 바뀐다. 스크롤 오프셋은 옛 폭 기준이라 그대로 두면
   // 페이지 중간에 걸린다 — 현재 인덱스로 다시 스냅시킨다.
@@ -70,7 +115,11 @@ const OnboardingScreen = ({navigation, route}: any) => {
   }, [width]);
 
   const finish = useCallback(async () => {
-    logEvent('onboarding_completed', {slot});
+    exitReasonRef.current = 'completed';
+    logEvent('onboarding_completed', {
+      slot,
+      total_ms: Date.now() - startedAtRef.current,
+    });
     await markOnboardingSeen(slot);
     const next = NEXT_ROUTE[slot];
     if (next) {
@@ -86,12 +135,15 @@ const OnboardingScreen = ({navigation, route}: any) => {
       await finish();
       return;
     }
+    exitReasonRef.current = 'moved';
     listRef.current?.scrollToIndex({index: index + 1, animated: true});
   };
 
   const handleScrollEnd = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const next = Math.round(e.nativeEvent.contentOffset.x / width);
-    if (next !== index) setIndex(next);
+    if (next === index) return;
+    exitReasonRef.current = 'moved';
+    setIndex(next);
   };
 
   return (
