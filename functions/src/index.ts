@@ -56,7 +56,12 @@ function getTransporter() {
  * 않은 from을 인증 계정 주소로 조용히 바꿔 쓰기 때문에, 상수로 박아두면
  * 계정을 옮겼을 때 실제 발신자와 어긋난다.
  */
-async function sendNotice(subject: string, html: string, tag: string) {
+async function sendNotice(
+  subject: string,
+  html: string,
+  tag: string,
+  replyTo?: string,
+) {
   try {
     const transporter = getTransporter();
     await transporter.sendMail({
@@ -64,6 +69,9 @@ async function sendNotice(subject: string, html: string, tag: string) {
       to: NOTIFY_EMAILS.join(", "),
       subject,
       html,
+      // 의견처럼 사람이 보낸 알림은 받은 메일에서 바로 답장이 되어야 한다.
+      // 여기가 비면 답장이 우리 발신 계정으로 되돌아온다.
+      ...(replyTo ? {replyTo} : {}),
     });
     logger.info(`Notice email sent: ${tag} → ${NOTIFY_EMAILS.length}명`);
   } catch (error) {
@@ -71,11 +79,28 @@ async function sendNotice(subject: string, html: string, tag: string) {
   }
 }
 
+/**
+ * 사람이 쓴 자유 텍스트를 메일 HTML에 넣기 전에 무해화한다.
+ *
+ * 매장 이름처럼 우리가 형식을 아는 값과 달리, 의견 본문에는 `<`나 `&`가 그냥
+ * 들어온다. 이스케이프하지 않으면 본문 일부가 태그로 먹혀 사라지고(최악의 경우
+ * 메일 레이아웃이 통째로 깨진다), 정작 읽어야 할 내용을 못 읽는다.
+ */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 /** 알림 메일 공통 레이아웃 */
 function noticeHtml(opts: {
   title: string;
   lead: string;
   rows: {label: string; value: string; accent?: boolean}[];
+  /** 사람이 쓴 원문. 줄바꿈을 살려 인용 블록으로 보여준다 (이스케이프는 호출자 책임) */
+  quote?: string;
   footer?: string;
   cta?: {label: string; href: string};
 }): string {
@@ -98,7 +123,9 @@ function noticeHtml(opts: {
           <table style="width: 100%; border-collapse: collapse;">${rows}
           </table>
         </div>
-${opts.footer ? `
+${opts.quote ? `
+        <div style="border-left: 3px solid #D4845A; padding: 4px 0 4px 16px; margin: 20px 0; color: #191D2B; font-size: 15px; line-height: 1.7; white-space: pre-wrap;">${opts.quote}</div>
+` : ""}${opts.footer ? `
         <p style="color: #73777B; font-size: 13px;">${opts.footer}</p>
 ` : ""}${opts.cta ? `
         <a href="${opts.cta.href}"
@@ -201,6 +228,76 @@ export const onOwnerCreated = onDocumentCreated(
     });
 
     await sendNotice(`[포인토] 새 점주 가입: ${email}`, html, `owner:${uid}`);
+  },
+);
+
+// ─── 의견 보내기 알림 ─────────────────────────────────────────────────────
+
+/**
+ * feedback 문서가 생기면 의견 원문을 메일로 보낸다.
+ *
+ * 규칙에서 feedback 조회를 전면 차단했기 때문에(본문에 매장 사정이 그대로 담긴다),
+ * 콘솔을 직접 열지 않으면 의견이 들어온 사실조차 알 수 없다. 그런데 의견은
+ * "언젠가 확인하면 되는 것"이 아니라 답이 늦으면 그대로 이탈하는 신호라서,
+ * 도착 즉시 우리 쪽으로 밀어 올린다.
+ *
+ * 답장은 점주에게 바로 가야 하므로 Reply-To에 점주 이메일을 싣는다. 주소는
+ * 문서에 실려온 값이 아니라 Auth에서 읽는다 — 문서 필드는 클라이언트가 쓰는
+ * 값이라 위조가 가능하고, 그러면 우리 답장이 엉뚱한 곳으로 간다.
+ */
+export const onOpinionCreated = onDocumentCreated(
+  {document: "feedback/{docId}", region: REGION},
+  async (event) => {
+    const docId = event.params.docId;
+    const data = event.data?.data();
+    if (!data) return;
+
+    const text = String(data.text ?? "").trim();
+    if (!text) return;
+
+    const uid = String(data.ownerUid ?? "");
+    let email = data.ownerEmail || "(이메일 없음)";
+    if (uid) {
+      try {
+        const user = await getAuth().getUser(uid);
+        if (user.email) email = user.email;
+      } catch (e) {
+        logger.warn(`onOpinionCreated: ${uid} 계정 조회 실패`, e);
+      }
+    }
+
+    // serverTimestamp는 Admin SDK에서 Timestamp로 온다. 트리거가 다시 돌 때를
+    // 대비해 값이 없으면 현재 시각으로 채운다.
+    const createdAt: string =
+      data.createdAt?.toDate?.().toISOString() ?? new Date().toISOString();
+
+    const device = [data.platform, data.osVersion].filter(Boolean).join(" ");
+    // 제목에는 첫 줄만. 본문 전체를 넣으면 받은편지함에서 목록이 무너진다.
+    const summary = text.split("\n")[0].slice(0, 30);
+
+    const html = noticeHtml({
+      title: "점주가 의견을 보냈습니다",
+      lead: "'찾으시는 기능이 없으신가요?'로 들어온 의견입니다.",
+      rows: [
+        {label: "보낸 사람", value: email},
+        {label: "앱 버전", value: data.appVersion || "(확인 불가)"},
+        {label: "기기", value: device || "(확인 불가)"},
+        {label: "보낸 시간", value: formatKst(createdAt)},
+      ],
+      quote: escapeHtml(text),
+      footer: "이 메일에 그대로 답장하면 점주에게 바로 갑니다.",
+      cta: {
+        label: "Firebase Console에서 확인",
+        href: `https://console.firebase.google.com/project/kbffee-a365e/firestore/databases/-default-/data/~2Ffeedback~2F${docId}`,
+      },
+    });
+
+    await sendNotice(
+      `[포인토] 의견 도착: ${summary}${text.length > 30 ? "…" : ""}`,
+      html,
+      `opinion:${docId}`,
+      typeof email === "string" && email.includes("@") ? email : undefined,
+    );
   },
 );
 
