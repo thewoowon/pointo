@@ -257,7 +257,21 @@ await check('타인: 남의 레거시 계정 읽기', DENY, () =>
 await check('타인: 남의 레거시 매장 탈취', DENY, () =>
   updateDoc(doc(ownerB, 'stores/STORE_L'), {ownerId: 'uidB'}));
 
-console.log('\n[6] 적립 진행도 방어 ⭐ (blankUser 덮어쓰기)');
+console.log('\n[6] 의견 보내기 — 쓰기 전용');
+await check('점주A: 의견 남기기', ALLOW, () =>
+  addDoc(collection(ownerA, 'feedback'), {
+    text: '고객 검색이 느려요', ownerUid: 'uidA', createdAt: new Date(),
+  }));
+await check('점주A: 빈 의견', DENY, () =>
+  addDoc(collection(ownerA, 'feedback'), {text: '', ownerUid: 'uidA'}));
+await check('점주A: 남의 이름으로 의견 남기기', DENY, () =>
+  addDoc(collection(ownerA, 'feedback'), {text: '위장', ownerUid: 'uidB'}));
+await check('키오스크: 의견 남기기 (익명 스팸)', DENY, () =>
+  addDoc(collection(kiosk, 'feedback'), {text: '스팸', ownerUid: 'uidA'}));
+await check('점주A: 남의 의견 훔쳐보기', DENY, () =>
+  getDocs(collection(ownerA, 'feedback')));
+
+console.log('\n[7] 적립 진행도 방어 ⭐ (blankUser 덮어쓰기)');
 const 단골 = 'users/01099998888_STORE_A';
 await check('정상 적립: 스탬프+쿠폰+레벨 증가', ALLOW, () =>
   updateDoc(doc(kiosk, 단골), {
@@ -285,7 +299,7 @@ await check('신규 가입: 빈 진행도로 생성', ALLOW, () =>
     store_code: 'STORE_A', stamps: 0, level: 0, coupons: {},
   }));
 
-console.log('\n[7] 서버 전용 컬렉션 ⭐');
+console.log('\n[8] 서버 전용 컬렉션 ⭐');
 await check('점주A: 자기 Apple 토큰 읽기', DENY, () =>
   getDoc(doc(ownerA, 'ownerTokens/uidA')));
 await check('키오스크: Apple 토큰 읽기', DENY, () =>

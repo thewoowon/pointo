@@ -285,6 +285,20 @@ const SwitcherScreen = ({navigation}: any) => {
                 </View>
               </>
             )}
+
+            {/* 의견 보내기.
+                점주가 막혔을 때 우리에게 말할 창구가 앱 안에 없어서, 지금은
+                스토어 리뷰나 지인 연락으로 이탈한 뒤에야 알게 된다. 계정 허브
+                맨 아래에 상주시켜 두 번 터치로 닿게 한다. */}
+            <View style={styles.feedbackBox}>
+              <Text style={styles.feedbackLead}>찾으시는 기능이 없으신가요?</Text>
+              <Pressable
+                onPress={() => navigation.navigate('Opinion')}
+                hitSlop={12}
+                style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
+                <Text style={styles.feedbackLink}>의견 보내기</Text>
+              </Pressable>
+            </View>
           </ScrollView>
         )}
 
@@ -447,9 +461,27 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     scrollContent: {
+      flexGrow: 1,
       padding: 20,
       gap: 12,
       alignItems: 'center',
+    },
+    // 매장이 한두 개뿐이라 화면이 텅 비어도 링크는 바닥에 앉아 있게 한다.
+    feedbackBox: {
+      marginTop: 'auto',
+      paddingTop: 32,
+      alignItems: 'center',
+      gap: 10,
+    },
+    feedbackLead: {
+      fontSize: 14,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    feedbackLink: {
+      fontSize: 14,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.primary,
     },
     profileBox: {
       padding: 20,

@@ -29,6 +29,8 @@ export const AnalyticsEvent = {
 
   // ── Satisfaction ───────────────────────────────
   RATING_SUBMITTED: 'rating_submitted',
+  /** 점주가 '의견 보내기'로 한 건 남겼다 (params: length) */
+  OPINION_SUBMITTED: 'opinion_submitted',
 
   // ── Owner Ops ──────────────────────────────────
   OWNER_LOGIN: 'owner_login',

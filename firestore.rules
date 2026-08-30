@@ -201,6 +201,20 @@ service cloud.firestore {
       allow list, delete: if false;
     }
 
+    // ─── feedback — 점주 의견 보내기 ──────────────────────────────────
+    // 쓰기 전용이다. 남의 의견을 읽을 이유가 없고 본문에 매장 사정이 그대로
+    // 담기므로 조회는 전면 차단하고 콘솔/Admin SDK로만 본다.
+    // 익명(키오스크) 세션은 제외한다 — 손님이 쓰는 화면에는 이 입구가 없고,
+    // 열어두면 아무나 무제한으로 문서를 만들 수 있다.
+    match /feedback/{docId} {
+      allow create: if isOwner()
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000;
+      allow read, update, delete: if false;
+    }
+
     // ─── ownerTokens — 서버 전용 (Apple refresh token) ────────────────
     // Functions는 Admin SDK라 규칙을 우회한다. 클라이언트는 전면 차단.
     match /ownerTokens/{uid} {
