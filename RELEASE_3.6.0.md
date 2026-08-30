@@ -1,14 +1,16 @@
 # 3.6.0 (빌드 1) — 제출 준비
 
-마지막 **출시** 버전은 **3.4.0 (빌드 5)**다. 3.5.0 / 3.5.2는 버전만 올려두고
-제출하지 않았으므로, 이번 제출에는 그 사이의 작업이 전부 실린다.
-버전 문자열이 3.4.0에서 바뀌었으므로 빌드 번호는 1부터 다시 센다.
+라이브 버전은 **3.5.2**다. 온보딩 4장·QR 적립·준비 체크리스트·이미지 최적화·
+적립 진행도 유실 수정은 이미 그 빌드로 나갔다.
+
+**이번 버전에 사용자가 볼 수 있는 변화는 의견 보내기 하나뿐이다.**
+온보딩 장표별 체류시간 계측이 함께 들어가지만 화면에 드러나지 않는다.
 
 | 항목 | 값 |
 |---|---|
 | `package.json` | 3.6.0 |
 | iOS `MARKETING_VERSION` | 3.6.0 (Debug/Release 둘 다) |
-| iOS `CURRENT_PROJECT_VERSION` | 1 |
+| iOS `CURRENT_PROJECT_VERSION` | 1 (버전 문자열이 바뀌었으므로 1부터) |
 | Android `versionName` / `versionCode` | 3.6.0 / 1 (Play 미출시 — 문자열만 동기화) |
 
 ---
@@ -16,105 +18,58 @@
 ## App Store "이번 버전의 새로운 기능" (한국어)
 
 ```
-처음 쓰실 때 가장 많이 막히던 부분을 손봤어요.
-
-• 사용법 안내가 생겼어요. 적립하려면 관리자 화면과 고객 화면이 둘 다 켜져
-  있어야 하는데, 왜 그런지를 처음 실행할 때 알려드려요.
-• 고객용 기기가 따로 없어도 괜찮아요. QR을 보여드리면 손님 휴대폰에서
-  번호를 입력할 수 있어요.
-• 매장을 만든 뒤 첫 적립까지 뭐가 남았는지 홈에서 알려드려요.
-• 불편한 점이나 필요한 기능을 앱에서 바로 보내실 수 있어요.
-• 적립 진행도가 초기화되던 문제를 고쳤어요.
+불편한 점이나 필요한 기능을 앱에서 바로 보내실 수 있어요.
+'내 매장' 맨 아래 '의견 보내기'에서 편하게 남겨주세요.
 ```
-
-## 3.4.0 이후 들어간 것 (내부용)
-
-| 커밋 | 내용 |
-|---|---|
-| `7a15d38` | 대기화면 워드마크·슬로건 |
-| `8b81501` | 사용법 온보딩 4장 (첫 실행 / 매장 등록 직후 / 설정에서 다시보기) |
-| `284b47d` | 손님 폰으로 적립받는 QR |
-| `045dea4` | 첫 적립까지의 준비 체크리스트 |
-| `d793c54` | 온보딩 이미지 2.05MB → 0.39MB |
-| `83ec669` | **적립 진행도 유실 수정** — 고객 문서를 읽기 전에는 쓰지 않는다 |
-| `6d406fb` | 같은 유실을 규칙에서도 차단 (앱 배포와 무관, 2026-08-28 배포 완료) |
-| `dc22780` `6df5fc2` | 의견 보내기 + 도착 시 메일 알림 |
-| `37c75fa` | 온보딩 장표별 체류시간 계측 |
 
 ---
 
 ## App Review Notes (English — App Store Connect에 그대로 붙여넣기)
 
 ```
-WHAT THIS APP IS
+Pointo is a loyalty stamp app for small shops in Korea. It replaces the
+paper stamp cards a shop hands out to its customers.
 
-Pointo replaces paper loyalty stamp cards for small businesses. One app has two
-modes, chosen after sign-in:
+NEW IN THIS VERSION
 
-  • Owner mode  — the shop owner records a stamp or a point for a customer.
-  • Customer mode — a screen the customer taps to enter their phone number.
+Owners can now send us feedback from inside the app. On the "내 매장"
+(My Stores) screen, scroll to the bottom and tap "의견 보내기" (Send
+feedback), type anything, then tap "작성 완료" (Submit). The message
+reaches our team by email.
 
-Customers do not install anything. The shop runs the customer screen on a spare
-phone or tablet placed on the counter, or shows a QR code so the customer can use
-their own phone instead.
+The link is there from the moment you sign in — a store does not have to
+be registered first — so steps 2 to 4 below are only needed if you want
+to review the rest of the app.
 
-SIGNING IN — NO DEMO ACCOUNT NEEDED
+We store the message text, the account email address and the app version.
+No customer data is involved, and nothing is shown to other users.
 
-The app uses Sign in with Apple and Google Sign-In only. Please sign in with any
-Apple ID; a shop-owner account is created instantly and you land on the "내 매장"
-(My Stores) screen. Everything described below is reachable from there without
-creating a store, so no demo credentials are required.
+GETTING IN
 
-If you prefer a pre-filled account, please reply to this message and we will
-provide one within a few hours.
+  1. Launch → the onboarding guide appears → "완료" (Done) →
+     "애플로 계속하기" (Continue with Apple).
+  2. The "내 매장" (My Stores) screen will be empty for a new account.
+     Tap "새 매장 등록" (Register new store). Any store name and phone
+     number will do — the store is created immediately, with no
+     approval step.
+  3. Tap "바로 시작" (Start now). The onboarding guide appears once more →
+     "완료" (Done). You will land on "내 매장" (My Stores).
+  4. Tap the store, then choose "관리자용" (Owner).
 
-WHAT IS NEW IN 3.6.0
+Owner mode covers every feature of the app. Wherever a customer phone
+number is asked for, any fictitious number works (e.g. 010-0000-0000).
 
-1. First-run guide (4 screens) explaining that recording a stamp needs both the
-   owner screen and the customer screen to be open.
-2. QR flow for shops without a second device: the owner shows a QR code and the
-   customer enters their phone number on their own phone.
-3. A setup checklist on the home screen that disappears after the first stamp.
-4. NEW: "Send feedback" — owners can send us a free-text message from inside the
-   app.
-5. Fix for a bug that could reset a customer's stamp progress.
+CUSTOMER MODE SETS A DEVICE PIN
 
-HOW TO REACH THE NEW FEEDBACK FEATURE (about 20 seconds)
-
-  Sign in  →  "내 매장" (My Stores)  →  scroll to the bottom
-  →  tap "의견 보내기" (Send feedback)  →  type any text
-  →  tap "작성 완료" (Submit)
-
-You will see a confirmation alert. The message is delivered to our team by email.
-We store only the message text, the account email address, the app version and the
-OS version. No customer data is involved, and nothing is shown publicly or to
-other users.
-
-ABOUT THE CORE STAMPING FLOW (please read if you want to test it)
-
-Recording a stamp requires two screens at the same time — this is the product's
-core constraint, not a defect, and it is what the new first-run guide explains.
-With a single device you can review the whole app, but the moment of stamping
-cannot be completed, because the owner screen has to stay open while the customer
-enters their number on the second screen.
-
-To test it end to end you have two options:
-
-  (a) Two devices — sign in on both, open the same store, choose Owner mode on
-      one and Customer mode on the other.
-  (b) One device + any phone with a camera — in Owner mode, tap the QR button.
-      Scanning it opens a web page where the phone number is entered, and the
-      stamp is then recorded on the owner device.
+Choosing "고객용" (Customer) locks the device into the kiosk screen and
+asks you to set a 4-digit PIN first. That PIN is required to exit
+customer mode, and there is no master PIN — please note it down.
 
 ACCOUNT DELETION
 
-Account deletion is available in Settings (gear icon on the My Stores screen) →
-회원 탈퇴. It removes the account after a 30-day grace period and revokes the
-Sign in with Apple token, as required by guideline 5.1.1(v).
-
-CONTACT
-
-thewoowon@gmail.com — we monitor this during review hours and can respond quickly.
+"내 매장" (My Stores) → settings icon in the header → "회원 탈퇴"
+(Delete account). The account is deactivated at once and permanently
+deleted after a 30-day grace period.
 ```
 
 ---
@@ -124,12 +79,10 @@ thewoowon@gmail.com — we monitor this during review hours and can respond quic
 1. **⚠️ 운영 Firestore 규칙에 `match /feedback/` 블록이 있는지 확인** —
    Console → Firestore → 규칙. 없으면 의견 보내기가 심사 중에
    permission-denied로 실패해 2.1(App Completeness) 사유가 된다.
-   해소법: 커밋된 HEAD에서 `firebase deploy --only firestore:rules`.
-   지금은 HEAD == 운영 규칙 + feedback이라 재배포해도 달라지는 게 없다
-   (8/28 배포 때 의견 보내기 WIP가 함께 나갔고, 이제 그 WIP가 커밋됐다).
+   8/28 규칙 배포 때 의견 보내기 WIP가 함께 나갔으므로 이미 들어가 있을 것이다.
+   확실히 하려면 커밋된 HEAD에서 `firebase deploy --only firestore:rules` —
+   지금은 HEAD == 운영 규칙이라 재배포해도 달라지는 게 없다.
 2. `firebase deploy --only functions` — `onOpinionCreated` 배포.
    안 해도 앱은 정상 동작하고 의견도 저장된다. 메일 알림만 안 온다.
 3. 실기기에서 의견 보내기 왕복 1회 — 전송 성공 + 메일 수신 확인.
-4. `83ec669`(적립 진행도 가드)가 빌드에 포함됐는지 확인. 이번 릴리스의 진짜
-   목적이다.
-5. Xcode Archive → 3.6.0 (1).
+4. Xcode Archive → 3.6.0 (1).
