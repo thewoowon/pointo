@@ -1,8 +1,6 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
-    // reanimated 4부터 워클릿 변환은 react-native-worklets가 담당한다.
-    'react-native-worklets/plugin',
     [
       'module:react-native-dotenv',
       {
@@ -14,6 +12,11 @@ module.exports = {
         allowUndefined: true,
       },
     ],
+    // reanimated 4부터 워클릿 변환은 react-native-worklets가 담당한다.
+    // ⚠️ 반드시 plugins 배열의 마지막이어야 한다. 앞에 두면 뒤따르는 플러그인이
+    //    변환한 코드를 워클릿으로 못 잡아 런타임에
+    //    "`scheduleOnUI` can only be used with worklets"로 터진다.
+    'react-native-worklets/plugin',
   ],
   env: {
     // 릴리즈 번들에서 console.log를 제거한다.
