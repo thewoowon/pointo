@@ -1,7 +1,8 @@
 module.exports = {
   presets: ['module:@react-native/babel-preset'],
   plugins: [
-    'react-native-reanimated/plugin',
+    // reanimated 4부터 워클릿 변환은 react-native-worklets가 담당한다.
+    'react-native-worklets/plugin',
     [
       'module:react-native-dotenv',
       {
