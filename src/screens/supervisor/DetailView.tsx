@@ -10,6 +10,7 @@ import {
   ConfirmButton,
   CustomerDetailPanel,
   canConfirm,
+  confirmLabel,
 } from './givepoint';
 
 /** 좌측 고객정보 컬럼 폭 */
@@ -90,7 +91,11 @@ const DetailView = ({
             <View style={s.panel}>
               <SegmentedToggle mode={g.mode} onChange={g.switchMode} />
               <GiveBody g={g} couponListMaxHeight={COUPON_LIST_MAX_HEIGHT} />
-              <ConfirmButton enabled={canConfirm(g)} onPress={onConfirm} />
+              <ConfirmButton
+                enabled={canConfirm(g)}
+                label={confirmLabel(g)}
+                onPress={onConfirm}
+              />
             </View>
           </ScrollView>
         </View>

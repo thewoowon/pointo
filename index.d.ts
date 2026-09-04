@@ -91,6 +91,19 @@ interface StoreConfig {
   couponSequence: string[];
   levelIncrementOn: string;
   // ── 포인트 모드 전용 ──
+  /**
+   * 포인트를 무엇으로 정하는가.
+   * 'manual' = 직원이 적립할 포인트를 직접 입력 (기존 방식)
+   * 'rate'   = 결제 금액을 입력하면 적립률을 곱해 자동 계산
+   *
+   * `mode`를 3값으로 늘리지 않고 하위 옵션으로 둔 이유: `mode`는 stamps↔points
+   * 필드 분리의 기준이라 normalizeUser·통계·고객 화면이 전부 참조한다. 세 번째
+   * 값이 생기면 그 분기를 전수로 다시 봐야 하지만, 하위 옵션이면 적립 입력
+   * 한 군데만 갈라진다.
+   */
+  pointEarnMode: 'manual' | 'rate';
+  /** 적립률 (basis point). 200 = 2.00%. `pointEarnMode: 'rate'`에서만 의미. */
+  rewardRateBps: number;
   pointPresets: PointPreset[];
   pointUnit: string;
   /** 쿠폰 유효기간 (일). 0이면 무기한. */
@@ -163,6 +176,20 @@ interface Owner {
  */
 type LogMode = 'stamp' | 'point';
 
+/**
+ * 적립·사용이 어떤 입력에서 나왔는가.
+ *
+ * 'manual_point'  = 직원이 포인트를 직접 입력
+ * 'manual_amount' = 직원이 결제 금액을 입력하고 적립률로 계산 (포인트 rate 모드)
+ * 'stamp'         = 스탬프 적립
+ * 'coupon'        = 쿠폰 사용
+ *
+ * 지금은 전부 사람이 넣는 값이라 구분이 통계용이지만, 결제 정보가 다른 경로로
+ * 들어오게 되면 이 필드가 그 경로를 구분하는 자리가 된다. 값이 없는 로그는
+ * 이 필드가 생기기 전 기록이고, mode로 대략 추정할 수 있다.
+ */
+type RewardSource = 'manual_point' | 'manual_amount' | 'stamp' | 'coupon';
+
 interface Log {
   action: 'stamp_saved' | 'stamp_used';
   phone_number: string;
@@ -181,6 +208,20 @@ interface Log {
    */
   coupons_redeemed?: number;
   mode?: LogMode;
+  source?: RewardSource;
+  /**
+   * 이 적립의 근거가 된 결제 금액 (원). `source: 'manual_amount'` 전용.
+   */
+  purchase_amount?: number;
+  /**
+   * 적립 시점의 매장 적립률 (basis point). `source: 'manual_amount'` 전용.
+   *
+   * 현재 매장 설정을 보지 않고 **로그에 박아두는** 이유: 매장이 적립률을 2%에서
+   * 3%로 바꿔도 지난달 건은 2%로 계산된 것이다. 나중에 재해석하면 정산과
+   * 고객 문의 대응이 전부 어긋난다. 금액·적립률·포인트 셋이 다 남아 있어야
+   * 사후에 계산이 맞았는지 검증할 수 있다.
+   */
+  reward_rate_bps?: number;
 }
 
 interface LogDto {
@@ -195,6 +236,20 @@ interface LogDto {
   /** Log.coupons_redeemed 참고 */
   coupons_redeemed?: number;
   mode?: LogMode;
+  source?: RewardSource;
+  /**
+   * 이 적립의 근거가 된 결제 금액 (원). `source: 'manual_amount'` 전용.
+   */
+  purchase_amount?: number;
+  /**
+   * 적립 시점의 매장 적립률 (basis point). `source: 'manual_amount'` 전용.
+   *
+   * 현재 매장 설정을 보지 않고 **로그에 박아두는** 이유: 매장이 적립률을 2%에서
+   * 3%로 바꿔도 지난달 건은 2%로 계산된 것이다. 나중에 재해석하면 정산과
+   * 고객 문의 대응이 전부 어긋난다. 금액·적립률·포인트 셋이 다 남아 있어야
+   * 사후에 계산이 맞았는지 검증할 수 있다.
+   */
+  reward_rate_bps?: number;
 }
 
 interface Session {

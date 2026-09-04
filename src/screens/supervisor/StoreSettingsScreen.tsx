@@ -12,6 +12,14 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useAuth, useFirestore, useStoreConfig, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
+import {
+  bpsToPctLabel,
+  calcPointsFromAmount,
+  validateRatePct,
+} from '../../utils/reward';
+
+/** 적립률 예시에 쓰는 결제 금액. 사장님이 실제로 든 숫자를 그대로 쓴다. */
+const RATE_EXAMPLE_AMOUNT = 12_000;
 
 // styles에 바인딩한 서브컴포넌트를 한 번만 생성 (컴포넌트 안 useMemo에서 호출).
 // 렌더마다 재정의하지 않으므로 Field 내부 TextInput 포커스가 유지된다.
@@ -95,6 +103,12 @@ const StoreSettingsScreen = ({navigation}: any) => {
     storeConfig.pointPresets ?? [],
   );
   const [pointUnit, setPointUnit] = useState(storeConfig.pointUnit ?? '원');
+  const [pointEarnMode, setPointEarnMode] = useState<'manual' | 'rate'>(
+    storeConfig.pointEarnMode ?? 'manual',
+  );
+  const [rewardRatePct, setRewardRatePct] = useState(
+    storeConfig.rewardRateBps ? bpsToPctLabel(storeConfig.rewardRateBps) : '',
+  );
   const [newPresetName, setNewPresetName] = useState('');
   const [newPresetPoints, setNewPresetPoints] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -115,6 +129,10 @@ const StoreSettingsScreen = ({navigation}: any) => {
     );
     setPointPresets(storeConfig.pointPresets ?? []);
     setPointUnit(storeConfig.pointUnit ?? '원');
+    setPointEarnMode(storeConfig.pointEarnMode ?? 'manual');
+    setRewardRatePct(
+      storeConfig.rewardRateBps ? bpsToPctLabel(storeConfig.rewardRateBps) : '',
+    );
   }, [storeConfig]);
 
   const handleAddPreset = () => {
@@ -137,6 +155,19 @@ const StoreSettingsScreen = ({navigation}: any) => {
   const handleRemovePreset = (id: string) => {
     setPointPresets(prev => prev.filter(p => p.id !== id));
   };
+
+  /**
+   * 적립률을 입력하는 동안 실제 금액으로 환산해 보여준다.
+   *
+   * 사장님에게 "2%"는 감이 안 오는 숫자다. "12,000원이면 240원"이라고 해야
+   * 높은지 낮은지 판단이 선다 — 이 줄이 이 섹션에서 제일 중요한 부분이다.
+   */
+  const rateExample = useMemo(() => {
+    const rate = validateRatePct(rewardRatePct);
+    if (!rate.ok) return '적립률을 입력하면 예시가 나타납니다.';
+    const points = calcPointsFromAmount(RATE_EXAMPLE_AMOUNT, rate.bps);
+    return `${RATE_EXAMPLE_AMOUNT.toLocaleString()}${pointUnit} 결제 → ${points.toLocaleString()}${pointUnit} 적립`;
+  }, [rewardRatePct, pointUnit]);
 
   /**
    * 운영 모드 전환 안내. 잔액은 모드별 필드(stamps/points)로 분리돼 있어서
@@ -231,6 +262,18 @@ const StoreSettingsScreen = ({navigation}: any) => {
       return;
     }
 
+    // 적립률은 rate 모드일 때만 본다. manual로 돌려놨는데 옛 입력값 때문에
+    // 저장이 막히면 사장님 입장에선 이유를 알 수 없다.
+    let rewardRateBps = storeConfig.rewardRateBps ?? 0;
+    if (storeMode === 'point' && pointEarnMode === 'rate') {
+      const rate = validateRatePct(rewardRatePct);
+      if (!rate.ok) {
+        Alert.alert('입력 오류', rate.message);
+        return;
+      }
+      rewardRateBps = rate.bps;
+    }
+
     const updatedConfig: StoreConfig = {
       ...storeConfig,
       mode: storeMode,
@@ -246,6 +289,8 @@ const StoreSettingsScreen = ({navigation}: any) => {
       levelIncrementOn: newCouponSequence[0],
       pointPresets,
       pointUnit,
+      pointEarnMode,
+      rewardRateBps,
     };
 
     // 검증을 전부 통과한 뒤에 묻는다 — 확인을 누르고 나서 입력 오류로 막히면
@@ -411,6 +456,59 @@ const StoreSettingsScreen = ({navigation}: any) => {
           {/* ── 포인트 모드 전용 섹션 ── */}
           {storeMode === 'point' && (
             <>
+              <Section title="적립 방식">
+                <View style={styles.field}>
+                  <View style={styles.segmentContainer}>
+                    <Pressable
+                      onPress={() => setPointEarnMode('manual')}
+                      style={[
+                        styles.segmentButton,
+                        pointEarnMode === 'manual' && styles.segmentActive,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.segmentText,
+                          pointEarnMode === 'manual' && styles.segmentTextActive,
+                        ]}>
+                        포인트 직접 입력
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setPointEarnMode('rate')}
+                      style={[
+                        styles.segmentButton,
+                        pointEarnMode === 'rate' && styles.segmentActive,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.segmentText,
+                          pointEarnMode === 'rate' && styles.segmentTextActive,
+                        ]}>
+                        결제 금액 비례
+                      </Text>
+                    </Pressable>
+                  </View>
+                </View>
+                <Text style={styles.segmentHint}>
+                  {pointEarnMode === 'manual'
+                    ? '적립할 포인트를 직원이 직접 입력합니다.'
+                    : '결제 금액만 입력하면 적립률을 곱해 자동으로 계산합니다.'}
+                </Text>
+
+                {pointEarnMode === 'rate' && (
+                  <>
+                    <Field
+                      label="적립률 (%)"
+                      value={rewardRatePct}
+                      onChangeText={setRewardRatePct}
+                      keyboardType="numeric"
+                      placeholder="2"
+                    />
+                    <Text style={styles.rateExample}>{rateExample}</Text>
+                  </>
+                )}
+              </Section>
+
               <Section title="포인트 단위">
                 <Field
                   label="단위 표시"
@@ -423,6 +521,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
                 </Text>
               </Section>
 
+              {pointEarnMode === 'manual' && (
               <Section title="포인트 프리셋">
                 <Text style={styles.segmentHint}>
                   자주 사용하는 포인트를 미리 등록하면 한 번의 터치로 적립할 수 있습니다.
@@ -467,6 +566,7 @@ const StoreSettingsScreen = ({navigation}: any) => {
                   </Pressable>
                 </View>
               </Section>
+              )}
             </>
           )}
 
@@ -660,6 +760,19 @@ const createStyles = (theme: Theme) => {
     color: c.texticon.onNormal.midemp,
     marginTop: 6,
     lineHeight: 18,
+  },
+  // 적립률 환산 예시. 힌트보다 눈에 띄어야 해서 배경을 깔고 숫자를 키운다.
+  rateExample: {
+    marginTop: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    backgroundColor: c.surface.normal.container10,
+    fontSize: 15,
+    fontFamily: f.semibold,
+    color: c.texticon.onNormal.highestemp,
+    letterSpacing: -0.3,
+    fontVariant: ['tabular-nums'],
   },
   presetRow: {
     flexDirection: 'row',

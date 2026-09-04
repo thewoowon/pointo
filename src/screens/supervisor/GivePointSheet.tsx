@@ -18,6 +18,7 @@ import {
   ConfirmButton,
   CustomerDetailPanel,
   canConfirm,
+  confirmLabel,
 } from './givepoint';
 
 /** 쿠폰 목록에 내주는 높이 (모바일은 화면이 좁아 태블릿보다 짧게) */
@@ -109,7 +110,11 @@ const GivePointSheet = ({
         </ScrollView>
 
         <View style={s.footer}>
-          <ConfirmButton enabled={canConfirm(g)} onPress={onConfirm} />
+          <ConfirmButton
+                enabled={canConfirm(g)}
+                label={confirmLabel(g)}
+                onPress={onConfirm}
+              />
         </View>
       </SafeAreaView>
 

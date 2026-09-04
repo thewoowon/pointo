@@ -6,12 +6,20 @@ import AmountInput from './AmountInput';
 import Keypad from './Keypad';
 import CouponPicker from './CouponPicker';
 import {useTheme} from '../../../hooks';
+import {bpsToPctLabel, calcPointsFromAmount} from '../../../utils/reward';
 
 type Give = ReturnType<typeof useGivePoint>;
+
+/** rate 모드에서 지금 입력된 금액으로 적립될 포인트. 그 외에는 0. */
+const earnedPoints = (g: Give): number =>
+  g.isRateEarn
+    ? calcPointsFromAmount(parseInt(g.number, 10) || 0, g.rewardRateBps)
+    : 0;
 
 /** 무엇을 하려는 참인지 한 줄로. 화면 전체에서 유일한 제목이다. */
 export const giveTitle = (g: Give): string => {
   if (g.mode === 'earn') {
+    if (g.isRateEarn) return '결제 금액을 입력해주세요';
     return g.isPointMode
       ? '적립할 포인트를 입력해주세요'
       : '적립할 스탬프 개수를 입력해주세요';
@@ -21,10 +29,28 @@ export const giveTitle = (g: Give): string => {
     : '사용할 쿠폰을 선택해주세요';
 };
 
+/**
+ * 확인 버튼에 적을 말. rate 모드에서는 **적립될 포인트**를 버튼에 박는다 —
+ * 누르기 직전에 결과를 한 번 더 보여주는 게 이 기능의 요점이라서.
+ */
+export const confirmLabel = (g: Give): string => {
+  if (g.mode !== 'earn' || !g.isRateEarn) return '확인';
+  const points = earnedPoints(g);
+  return points > 0
+    ? `${points.toLocaleString()}${g.storeConfig.pointUnit} 적립하기`
+    : '확인';
+};
+
 /** 확인을 눌러도 되는 상태인지 */
 export const canConfirm = (g: Give): boolean => {
+  // 쓰기가 날아가는 중이면 무엇도 누를 수 없다 (중복 적립 방지)
+  if (g.submitting) return false;
   const amount = parseInt(g.number, 10) || 0;
-  if (g.mode === 'earn') return amount >= 1;
+  if (g.mode === 'earn') {
+    // rate 모드는 금액이 있어도 적립 포인트가 0이면(100원 × 0.5%) 막는다
+    if (g.isRateEarn) return earnedPoints(g) >= 1;
+    return amount >= 1;
+  }
   if (g.isPointMode) return amount >= 1 && amount <= g.user.points;
   return g.selectedCount > 0;
 };
@@ -35,6 +61,19 @@ const previewText = (g: Give): string => {
   const unit = g.storeConfig.pointUnit;
 
   if (g.mode === 'earn') {
+    if (g.isRateEarn) {
+      if (amount <= 0) return '결제 금액을 입력해주세요';
+      const points = earnedPoints(g);
+      if (points < 1) {
+        return '결제 금액이 적어 적립될 포인트가 없어요';
+      }
+      // 사장님이 쓴 표현("12,000원의 2%")을 그대로 옮긴다.
+      return `${amount.toLocaleString()}원의 ${bpsToPctLabel(
+        g.rewardRateBps,
+      )}% → ${points.toLocaleString()}${unit} · 적립 후 ${(
+        g.user.points + points
+      ).toLocaleString()}${unit}`;
+    }
     if (g.isPointMode) {
       return `적립 후 포인트 ${(
         g.user.points + amount
@@ -75,10 +114,18 @@ type GiveBodyProps = {
  */
 const GiveBody = ({g, couponListMaxHeight}: GiveBodyProps) => {
   const isCouponUse = g.mode === 'use' && !g.isPointMode;
-  const unit = g.isPointMode ? g.storeConfig.pointUnit : '개';
+  // rate 모드의 적립 입력은 포인트가 아니라 결제 금액이라 단위가 항상 '원'이다.
+  const isAmountEntry = g.isRateEarn && g.mode === 'earn';
+  const unit = isAmountEntry
+    ? '원'
+    : g.isPointMode
+    ? g.storeConfig.pointUnit
+    : '개';
+  // 프리셋은 포인트를 직접 넣는 매장의 도구다. 금액 입력에는 맞지 않는다.
   const showPresets =
     g.isPointMode &&
     g.mode === 'earn' &&
+    !g.isRateEarn &&
     g.storeConfig.pointPresets?.length > 0;
   const t = useTheme();
 

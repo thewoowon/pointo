@@ -22,6 +22,10 @@ export const DEFAULT_STORE_CONFIG: StoreConfig = {
     {maxLevel: Infinity, emoji: '👑', name: '레전드', color: '#9B59B6', bgColor: 'rgba(155,89,182,0.12)'},
   ],
   levelIncrementOn: 'coupon_a',
+  // 기존 포인트 매장은 전부 직원이 포인트를 직접 넣고 있다. 기본값을 'manual'로
+  // 두면 config에 이 키가 없는 매장이 전부 지금 그대로 동작한다 — 백필이 없다.
+  pointEarnMode: 'manual',
+  rewardRateBps: 0,
   pointPresets: [],
   pointUnit: '원',
   sessionTimeoutSeconds: 60,

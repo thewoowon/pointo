@@ -22,6 +22,20 @@ import {
   filterExpiredCoupons,
 } from '../../utils/coupons';
 import {pushRecentLog} from '../../utils/recentLogs';
+import {calcPointsFromAmount, MAX_PURCHASE_AMOUNT} from '../../utils/reward';
+
+/**
+ * 결제 금액을 애널리틱스용 구간 문자열로. 원본 금액은 매장 매출이라 보내지 않고,
+ * "어느 정도 객단가에서 쓰이는가"만 알면 충분하다.
+ */
+const amountBucket = (amount: number): string => {
+  if (amount < 5_000) return '0_4999';
+  if (amount < 10_000) return '5000_9999';
+  if (amount < 20_000) return '10000_19999';
+  if (amount < 50_000) return '20000_49999';
+  if (amount < 100_000) return '50000_99999';
+  return '100000_plus';
+};
 
 export type GiveMode = 'earn' | 'use';
 
@@ -52,6 +66,15 @@ export function useGivePoint(
     useFirestore(storeCode);
 
   const isPointMode = storeConfig.mode === 'point';
+  /**
+   * 결제 금액을 입력받아 적립률로 계산하는 매장인가.
+   *
+   * 스탬프 매장에는 적용되지 않는다 — 스탬프는 금액이 아니라 방문을 센다.
+   * 사용(use) 흐름도 그대로다. 바뀌는 건 "포인트 모드에서 적립할 때" 하나뿐이다.
+   */
+  const isRateEarn =
+    isPointMode && storeConfig.pointEarnMode === 'rate' && storeConfig.rewardRateBps > 0;
+  const rewardRateBps = storeConfig.rewardRateBps;
   const couponExpiryDays = storeConfig.couponExpiryDays;
 
   /** 고객이 바뀔 때 되돌아갈 자리. 아직 아무것도 안 읽은 상태다. */
@@ -92,6 +115,19 @@ export function useGivePoint(
    */
   const [loaded, setLoaded] = useState(false);
 
+  /**
+   * 지금 쓰기가 날아가는 중인가.
+   *
+   * `loaded`는 "문서를 읽었나"만 본다. 읽은 뒤에 적립을 두 번 누르면 두 번 다
+   * 통과하고, 둘 다 같은 `user.points`를 기준으로 새 값을 계산해 덮어쓴다 —
+   * 카운터 와이파이에서 응답이 늦으면 실제로 눌러진다. 늦게 도착한 쪽이
+   * 이기므로 한 건이 조용히 사라지거나, 사용 흐름에선 잔액이 되살아난다.
+   *
+   * 버튼 disable만으로는 부족하다. 태블릿과 모바일이 각자 버튼을 그리고
+   * 프리셋·키패드에서도 확정이 들어올 수 있어서, 관문인 이 훅에서 막는다.
+   */
+  const [submitting, setSubmitting] = useState(false);
+
   /** 아직 못 읽었으면 쓰기를 거부한다. 덮어쓰기보다 한 번 더 누르는 편이 낫다. */
   const guardLoaded = (): boolean => {
     if (loaded) return true;
@@ -120,6 +156,7 @@ export function useGivePoint(
     setSelectedKeys([]);
     setUser(blankUser());
     setLoaded(false);
+    setSubmitting(false);
     // blankUser는 매 렌더 새 함수 — 고객이 바뀔 때만 돌아야 한다
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phoneNumber]);
@@ -127,18 +164,60 @@ export function useGivePoint(
   const handleApprovePoint = async (): Promise<boolean> => {
     if (!guardLoaded()) return false;
     if (number.length === 0) {
-      Alert.alert('적립할 포인트를 입력해주세요', '다시 입력해주세요.');
+      Alert.alert(
+        isRateEarn
+          ? '결제 금액을 입력해주세요'
+          : '적립할 포인트를 입력해주세요',
+        '다시 입력해주세요.',
+      );
       return false;
     }
-    const pointValue = parseInt(number, 10);
-    if (isNaN(pointValue) || pointValue < 1) {
-      Alert.alert('적립할 포인트를 1 이상 입력해주세요', '다시 입력해주세요.');
+    const entered = parseInt(number, 10);
+    if (isNaN(entered) || entered < 1) {
+      Alert.alert(
+        isRateEarn
+          ? '결제 금액을 1원 이상 입력해주세요'
+          : '적립할 포인트를 1 이상 입력해주세요',
+        '다시 입력해주세요.',
+      );
       return false;
+    }
+
+    /**
+     * rate 모드에선 입력값이 포인트가 아니라 **결제 금액**이다.
+     * 적립될 포인트는 미리보기와 같은 함수로 다시 계산한다 — 화면이 계산해
+     * 넘겨주는 구조로 두면 두 값이 갈라졌을 때 알아챌 방법이 없다.
+     */
+    const pointValue = isRateEarn
+      ? calcPointsFromAmount(entered, rewardRateBps)
+      : entered;
+
+    if (isRateEarn) {
+      if (entered > MAX_PURCHASE_AMOUNT) {
+        Alert.alert(
+          '결제 금액을 다시 확인해주세요',
+          `${MAX_PURCHASE_AMOUNT.toLocaleString()}원까지 입력할 수 있어요.`,
+        );
+        return false;
+      }
+      // 100원 × 0.5% 같은 경우. 조용히 0을 적립하면 사장님이 앱을 못 믿는다.
+      if (pointValue < 1) {
+        Alert.alert(
+          '적립될 포인트가 없어요',
+          '결제 금액이 적어 적립 포인트가 0입니다.',
+        );
+        return false;
+      }
     }
 
     // 포인트는 points에만 쌓는다. stamps는 스탬프 모드가 판을 세는 필드라
     // 여기서 건드리면 모드를 바꿨을 때 서로의 값을 덮어쓴다.
     const newPoints = user.points + pointValue;
+    const unit = storeConfig.pointUnit;
+    const note = isRateEarn
+      ? `${entered.toLocaleString()}원 결제 · ${pointValue.toLocaleString()}${unit} 적립`
+      : `${pointValue.toLocaleString()}${unit} 적립`;
+
     await updateUser(phoneNumber, {
       points: newPoints,
       last_used: new Date().toISOString().split('T')[0],
@@ -154,10 +233,16 @@ export function useGivePoint(
       phone_number: phoneNumber,
       stamp: pointValue,
       timestamp: Timestamp.now(),
-      note: `${pointValue.toLocaleString()}${storeConfig.pointUnit} 적립`,
+      note,
       store_code: storeCode ?? undefined,
       user_level: user.level,
       mode: 'point',
+      source: isRateEarn ? 'manual_amount' : 'manual_point',
+      // 적립률은 바뀔 수 있다. 이 건이 어떤 금액에 어떤 율로 계산됐는지는
+      // 지금 남겨두지 않으면 나중에 복원할 방법이 없다.
+      ...(isRateEarn
+        ? {purchase_amount: entered, reward_rate_bps: rewardRateBps}
+        : {}),
     });
 
     try {
@@ -173,6 +258,14 @@ export function useGivePoint(
         stamps_total: newPoints,
         days_since_signup: daysSinceSignup,
         stamp_count: pointValue,
+        earn_source: isRateEarn ? 'manual_amount' : 'manual_point',
+        // 금액은 구간으로만 보낸다 — 개별 결제액은 매장 매출이라 원본을 안 싣는다.
+        ...(isRateEarn
+          ? {
+              amount_bucket: amountBucket(entered),
+              reward_rate_bps: rewardRateBps,
+            }
+          : {}),
       });
     } catch (error) {
       console.log('Error logging point earned event:', error);
@@ -214,6 +307,7 @@ export function useGivePoint(
       store_code: storeCode ?? undefined,
       user_level: user.level,
       mode: 'point',
+      source: 'manual_point',
     });
 
     try {
@@ -315,6 +409,7 @@ export function useGivePoint(
       user_level: level,
       coupons_issued: difference,
       mode: 'stamp',
+      source: 'stamp',
     });
 
     try {
@@ -409,6 +504,7 @@ export function useGivePoint(
       // 스탬프는 안 줄어드니(stamp: 0) 사용 장수는 여기에 남긴다 — 통계가 읽는다.
       coupons_redeemed: selected,
       mode: 'stamp',
+      source: 'coupon',
     });
 
     try {
@@ -433,6 +529,23 @@ export function useGivePoint(
     updateLogs();
     return true;
   };
+
+  /**
+   * 쓰기 핸들러를 한 번에 하나만 통과시킨다.
+   *
+   * 실패해도(false, 예외) 반드시 잠금을 푼다 — 네트워크 오류 한 번에 버튼이
+   * 영영 잠기면 카운터에서 앱을 껐다 켜야 한다.
+   */
+  const exclusive =
+    (fn: () => Promise<boolean>) => async (): Promise<boolean> => {
+      if (submitting) return false;
+      setSubmitting(true);
+      try {
+        return await fn();
+      } finally {
+        setSubmitting(false);
+      }
+    };
 
   const switchMode = (newMode: GiveMode) => {
     setMode(newMode);
@@ -462,7 +575,9 @@ export function useGivePoint(
       const maxLen = isPointMode ? 7 : 3;
       if (number.length > maxLen) {
         Alert.alert(
-          isPointMode
+          isRateEarn
+            ? '결제 금액이 큰 것 같아요'
+            : isPointMode
             ? '적립하는 포인트가 많은 것 같아요'
             : '적립하는 스탬프의 수가 많은 것 같아요',
           '한 번 더 확인해주세요.',
@@ -485,7 +600,9 @@ export function useGivePoint(
         const maxLen = isPointMode ? 7 : 3;
         if (number.length > maxLen) {
           Alert.alert(
-            isPointMode
+            isRateEarn
+              ? '결제 금액이 큰 것 같아요'
+              : isPointMode
               ? '적립하는 포인트가 많은 것 같아요'
               : '적립하는 스탬프의 수가 많은 것 같아요',
             '한 번 더 확인해주세요.',
@@ -605,6 +722,11 @@ export function useGivePoint(
     user,
     /** 문서를 아직 못 읽었으면 false — 적립/사용 버튼을 비활성화하는 데 쓴다 */
     loaded,
+    /** 쓰기가 날아가는 중 — 확인 버튼을 비활성화하는 데 쓴다 */
+    submitting,
+    /** 포인트 모드에서 결제 금액 × 적립률로 적립하는 매장인가 */
+    isRateEarn,
+    rewardRateBps,
     couponEntries,
     selectedKeys,
     selectedCount: selectedKeys.length,
@@ -615,9 +737,11 @@ export function useGivePoint(
     onNumberPress,
     phoneNumberLabel,
     close,
-    handleApprove,
-    handleApprovePoint,
-    handleUsing,
-    handleUsingPoint,
+    // 쓰기는 전부 exclusive를 통과시킨다. 화면이 직접 원본을 부르지 못하게
+    // 여기서만 노출한다 — 새 화면이 늘어도 가드가 빠질 자리가 없다.
+    handleApprove: exclusive(handleApprove),
+    handleApprovePoint: exclusive(handleApprovePoint),
+    handleUsing: exclusive(handleUsing),
+    handleUsingPoint: exclusive(handleUsingPoint),
   };
 }
