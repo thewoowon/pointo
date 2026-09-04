@@ -4,7 +4,7 @@ import dayjs from 'dayjs';
 import {useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 import {ShortRightArrowIcon, XIcon} from '../../components/Icons';
-import {logActionStyle} from './logDisplay';
+import {logActionStyle, logSummary} from './logDisplay';
 
 export type SelectedLogContext = {
   selectedLog: Log | null;
@@ -106,15 +106,11 @@ const LogDetailPanel = ({
               </Text>
             </View>
             <View style={styles.cardBodyRow}>
-              <Text style={styles.cardNote}>
-                {selectedLog.action === 'stamp_saved'
-                  ? '스탬프 적립'
-                  : selectedLog.note}
-              </Text>
+              <Text style={styles.cardNote}>{logSummary(selectedLog)}</Text>
+              {/* 포인트는 자릿수가 커진다 — 3500이 아니라 3,500으로 읽혀야 한다 */}
               <Text style={styles.cardAmount}>
-                {selectedLog.action === 'stamp_saved'
-                  ? `+${selectedLog.stamp}`
-                  : `-${selectedLog.stamp}`}
+                {selectedLog.action === 'stamp_saved' ? '+' : '-'}
+                {(Number(selectedLog.stamp) || 0).toLocaleString()}
               </Text>
             </View>
           </View>
@@ -133,7 +129,7 @@ const LogDetailPanel = ({
               <View key={index} style={styles.historyRow}>
                 <View style={styles.historyLeft}>
                   <ActionPill log={log} theme={theme} styles={styles} />
-                  <Text style={styles.historyNote}>{log.note}</Text>
+                  <Text style={styles.historyNote}>{logSummary(log)}</Text>
                 </View>
                 <Text style={styles.historyTime}>
                   {dayjs(log.timestamp).format('YYYY-MM-DD HH:mm')}

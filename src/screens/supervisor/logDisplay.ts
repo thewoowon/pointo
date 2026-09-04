@@ -21,6 +21,24 @@ export const maskPhone = (phone: string): string => {
 export const logPillText = (log: Log, label: string): string =>
   log.stamp === 0 ? label : `${label} ${log.stamp}`;
 
+/**
+ * 로그 한 건을 한 줄로 설명한다.
+ *
+ * 예전엔 적립 건을 무조건 '스탬프 적립'으로 적었다. 포인트 매장에서도 그렇게
+ * 나와 이미 어긋나 있었는데, 금액 비례 적립이 생기면서 더 곤란해졌다 —
+ * `note`에 "12,000원 결제 · 240원 적립"처럼 근거가 되는 금액이 담기는데
+ * 그걸 버리고 고정 문구를 쓰면, 정작 사장님이 확인하고 싶은 값이 안 보인다.
+ *
+ * 그래서 note가 있으면 note를 쓴다. note가 비는 것은 옛 스탬프 적립 로그뿐이라
+ * 폴백은 mode로 가른다.
+ */
+export const logSummary = (log: Log): string => {
+  const note = log.note?.trim();
+  if (note) return note;
+  if (log.action === 'stamp_used') return '사용';
+  return log.mode === 'point' ? '포인트 적립' : '스탬프 적립';
+};
+
 export type LogActionStyle = {
   /** '적립' | '사용' */
   label: string;
