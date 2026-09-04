@@ -275,9 +275,15 @@ export const onOpinionCreated = onDocumentCreated(
     // 제목에는 첫 줄만. 본문 전체를 넣으면 받은편지함에서 목록이 무너진다.
     const summary = text.split("\n")[0].slice(0, 30);
 
+    // 같은 컬렉션으로 의견과 설문이 함께 들어온다. 받은편지함에서 둘을 구분해야
+    // 설문 회수를 세거나 의견에 답장하는 일이 서로 섞이지 않는다.
+    const isSurvey = data.kind === "survey";
+
     const html = noticeHtml({
-      title: "점주가 의견을 보냈습니다",
-      lead: "'찾으시는 기능이 없으신가요?'로 들어온 의견입니다.",
+      title: isSurvey ? "점주가 설문에 답했습니다" : "점주가 의견을 보냈습니다",
+      lead: isSurvey
+        ? `앱 안에서 받은 이용 설문 응답입니다. (${data.surveyId ?? "?"})`
+        : "'찾으시는 기능이 없으신가요?'로 들어온 의견입니다.",
       rows: [
         {label: "보낸 사람", value: email},
         {label: "앱 버전", value: data.appVersion || "(확인 불가)"},
@@ -293,7 +299,9 @@ export const onOpinionCreated = onDocumentCreated(
     });
 
     await sendNotice(
-      `[포인토] 의견 도착: ${summary}${text.length > 30 ? "…" : ""}`,
+      isSurvey ?
+        `[포인토] 설문 응답 도착 (${data.surveyId ?? "?"})` :
+        `[포인토] 의견 도착: ${summary}${text.length > 30 ? "…" : ""}`,
       html,
       `opinion:${docId}`,
       typeof email === "string" && email.includes("@") ? email : undefined,

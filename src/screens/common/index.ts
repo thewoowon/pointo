@@ -3,3 +3,4 @@ export {default as AccountSettingsScreen} from './AccountSettingsScreen';
 export {default as DeletionConfirmScreen} from './DeletionConfirmScreen';
 export {default as DeletionPendingScreen} from './DeletionPendingScreen';
 export {default as OpinionScreen} from './OpinionScreen';
+export {default as SurveyScreen} from './SurveyScreen';

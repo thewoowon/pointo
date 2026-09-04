@@ -31,6 +31,8 @@ export const AnalyticsEvent = {
   RATING_SUBMITTED: 'rating_submitted',
   /** 점주가 '의견 보내기'로 한 건 남겼다 (params: length) */
   OPINION_SUBMITTED: 'opinion_submitted',
+  /** 점주가 인앱 이용 설문에 답했다 (params: survey_id, answered) */
+  SURVEY_SUBMITTED: 'survey_submitted',
 
   // ── Owner Ops ──────────────────────────────────
   OWNER_LOGIN: 'owner_login',

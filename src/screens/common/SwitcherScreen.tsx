@@ -29,6 +29,7 @@ import {
   hasSeenOnboarding,
   markFirstGiveDone,
 } from '../onboarding';
+import {shouldAskSurvey, snoozeSurvey} from '../../services/survey';
 
 const SwitcherScreen = ({navigation}: any) => {
   const theme = useTheme();
@@ -46,7 +47,8 @@ const SwitcherScreen = ({navigation}: any) => {
     setIsAuthenticated,
     lockDeviceToClient,
   } = useAuth();
-  const {getOwnerStores, getOwnerSlotInfo, hasAnyLog} = useFirestore();
+  const {getOwnerStores, getOwnerSlotInfo, getOwnerProfile, hasAnyLog} =
+    useFirestore();
 
   const uid = ownerUid;
 
@@ -68,6 +70,16 @@ const SwitcherScreen = ({navigation}: any) => {
     guideSeen: boolean;
     gave: boolean;
   } | null>(null);
+
+  /**
+   * 이용 설문을 권할지. 판정 전에는 false라 카드가 깜빡이지 않는다.
+   *
+   * 문자로 돌린 구글 폼은 회수가 2건이었다. 점주가 링크를 누르지 않기 때문인데,
+   * 여기는 매장을 고르러 어차피 들르는 화면이라 같은 질문을 훨씬 많이 회수할 수
+   * 있다. 대신 자리는 맨 아래다 — 첫 적립 체크리스트가 위에 떠 있을 수 있고,
+   * 지금 해야 할 일을 설문이 가리면 안 된다.
+   */
+  const [askSurvey, setAskSurvey] = useState(false);
 
   // 모드 선택 시트 + 고객모드 고정 PIN 설정
   const sheetRef = useRef<BottomSheetModal>(null);
@@ -105,6 +117,11 @@ const SwitcherScreen = ({navigation}: any) => {
       }
     }
     setSetup({guideSeen: await hasSeenOnboarding('setup'), gave});
+
+    // 계정 나이는 owners 문서에서 읽는다. 만든 지 며칠 안 된 점주에게 물으면
+    // 답할 경험 자체가 없어서, 회수는 늘고 내용은 비게 된다.
+    const profile = await getOwnerProfile(uid);
+    setAskSurvey(await shouldAskSurvey(uid, profile?.createdAt ?? null));
     // useFirestore()는 매 렌더 새 함수 참조를 반환하므로 uid만 의존
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
@@ -284,6 +301,34 @@ const SwitcherScreen = ({navigation}: any) => {
                   </Pressable>
                 </View>
               </>
+            )}
+
+            {/* 이용 설문. 답했거나 '나중에'를 고르면 사라진다. */}
+            {askSurvey && (
+              <View style={styles.surveyCard}>
+                <Text style={styles.surveyTitle}>30초만 여쭤봐도 될까요?</Text>
+                <Text style={styles.surveyBody}>
+                  어떻게 쓰고 계신지 알려주시면 다음에 무엇을 만들지 정하는 데
+                  그대로 씁니다.
+                </Text>
+                <View style={styles.surveyActions}>
+                  <Pressable
+                    style={styles.surveyBtn}
+                    onPress={() => navigation.navigate('Survey')}>
+                    <Text style={styles.surveyBtnText}>답변하기</Text>
+                  </Pressable>
+                  <Pressable
+                    hitSlop={12}
+                    onPress={async () => {
+                      // 카드를 먼저 지운다 — 저장이 늦어도 눌린 티가 나야 한다.
+                      setAskSurvey(false);
+                      if (uid) await snoozeSurvey(uid);
+                    }}
+                    style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
+                    <Text style={styles.surveyLater}>나중에</Text>
+                  </Pressable>
+                </View>
+              </View>
             )}
 
             {/* 의견 보내기.
@@ -467,6 +512,48 @@ const createStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     // 매장이 한두 개뿐이라 화면이 텅 비어도 링크는 바닥에 앉아 있게 한다.
+    surveyCard: {
+      marginTop: 32,
+      padding: 20,
+      borderRadius: theme.radius.lg,
+      backgroundColor: theme.color.surface.normal.bg1,
+      gap: 8,
+    },
+    surveyTitle: {
+      fontSize: 15,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+      letterSpacing: -0.3,
+    },
+    surveyBody: {
+      fontSize: 13,
+      lineHeight: 20,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.midemp,
+      letterSpacing: -0.2,
+    },
+    surveyActions: {
+      marginTop: 8,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    surveyBtn: {
+      paddingHorizontal: 18,
+      paddingVertical: 10,
+      borderRadius: theme.radius.md,
+      backgroundColor: theme.color.surface.brand.primary,
+    },
+    surveyBtnText: {
+      fontSize: 14,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onBrand.onPrimary,
+    },
+    surveyLater: {
+      fontSize: 14,
+      fontFamily: theme.font.regular,
+      color: theme.color.texticon.onNormal.midemp,
+    },
     feedbackBox: {
       marginTop: 'auto',
       paddingTop: 32,

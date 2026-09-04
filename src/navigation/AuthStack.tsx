@@ -8,6 +8,7 @@ import {
   DeletionConfirmScreen,
   DeletionPendingScreen,
   OpinionScreen,
+  SurveyScreen,
 } from '../screens/common';
 import {OnboardingScreen, hasSeenOnboarding} from '../screens/onboarding';
 import {useAuth, useTheme} from '../hooks';
@@ -75,6 +76,7 @@ const AuthStack = () => {
       <Stack.Screen name="StoreRegister" component={StoreRegisterScreen} />
       <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
       <Stack.Screen name="Opinion" component={OpinionScreen} />
+      <Stack.Screen name="Survey" component={SurveyScreen} />
       <Stack.Screen name="DeletionConfirm" component={DeletionConfirmScreen} />
       <Stack.Screen
         name="DeletionPending"
