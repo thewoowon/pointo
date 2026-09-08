@@ -36,7 +36,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.purgeDeletedOwners = exports.registerAppleToken = exports.onUserDeleted = exports.onOpinionCreated = exports.onOwnerCreated = exports.onStoreCreated = void 0;
+exports.purgeDeletedStores = exports.purgeDeletedOwners = exports.registerAppleToken = exports.onUserDeleted = exports.onOpinionCreated = exports.onOwnerCreated = exports.onStoreCreated = void 0;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const scheduler_1 = require("firebase-functions/v2/scheduler");
 const https_1 = require("firebase-functions/v2/https");
@@ -239,7 +239,7 @@ exports.onOwnerCreated = (0, firestore_1.onDocumentCreated)({ document: "owners/
  * 값이라 위조가 가능하고, 그러면 우리 답장이 엉뚱한 곳으로 간다.
  */
 exports.onOpinionCreated = (0, firestore_1.onDocumentCreated)({ document: "feedback/{docId}", region: REGION }, async (event) => {
-    var _a, _b, _c, _d, _e, _f;
+    var _a, _b, _c, _d, _e, _f, _g, _h;
     const docId = event.params.docId;
     const data = (_a = event.data) === null || _a === void 0 ? void 0 : _a.data();
     if (!data)
@@ -265,9 +265,14 @@ exports.onOpinionCreated = (0, firestore_1.onDocumentCreated)({ document: "feedb
     const device = [data.platform, data.osVersion].filter(Boolean).join(" ");
     // 제목에는 첫 줄만. 본문 전체를 넣으면 받은편지함에서 목록이 무너진다.
     const summary = text.split("\n")[0].slice(0, 30);
+    // 같은 컬렉션으로 의견과 설문이 함께 들어온다. 받은편지함에서 둘을 구분해야
+    // 설문 회수를 세거나 의견에 답장하는 일이 서로 섞이지 않는다.
+    const isSurvey = data.kind === "survey";
     const html = noticeHtml({
-        title: "점주가 의견을 보냈습니다",
-        lead: "'찾으시는 기능이 없으신가요?'로 들어온 의견입니다.",
+        title: isSurvey ? "점주가 설문에 답했습니다" : "점주가 의견을 보냈습니다",
+        lead: isSurvey
+            ? `앱 안에서 받은 이용 설문 응답입니다. (${(_g = data.surveyId) !== null && _g !== void 0 ? _g : "?"})`
+            : "'찾으시는 기능이 없으신가요?'로 들어온 의견입니다.",
         rows: [
             { label: "보낸 사람", value: email },
             { label: "앱 버전", value: data.appVersion || "(확인 불가)" },
@@ -281,7 +286,9 @@ exports.onOpinionCreated = (0, firestore_1.onDocumentCreated)({ document: "feedb
             href: `https://console.firebase.google.com/project/kbffee-a365e/firestore/databases/-default-/data/~2Ffeedback~2F${docId}`,
         },
     });
-    await sendNotice(`[포인토] 의견 도착: ${summary}${text.length > 30 ? "…" : ""}`, html, `opinion:${docId}`, typeof email === "string" && email.includes("@") ? email : undefined);
+    await sendNotice(isSurvey ?
+        `[포인토] 설문 응답 도착 (${(_h = data.surveyId) !== null && _h !== void 0 ? _h : "?"})` :
+        `[포인토] 의견 도착: ${summary}${text.length > 30 ? "…" : ""}`, html, `opinion:${docId}`, typeof email === "string" && email.includes("@") ? email : undefined);
 });
 // ─── 고객 탈퇴 후처리 ──────────────────────────────────────────────────────
 /**
@@ -470,6 +477,88 @@ exports.purgeDeletedOwners = (0, scheduler_1.onSchedule)({
         }
         catch (e) {
             firebase_functions_1.logger.error(`purge failed for owner ${uid}:`, e);
+        }
+    }
+});
+/**
+ * 삭제 요청된 매장을 유예 기간 뒤에 실제로 지운다.
+ *
+ * 점주가 앱에서 누르는 삭제는 `stores.lifecycle`을 바꾸고 계정 목록에서
+ * 코드를 빼는 데까지만 한다. 지우는 대상이 매장 한 줄이 아니라 그 매장 손님들의
+ * 전화번호와 적립 이력이라, 잘못 눌렀을 때 되돌릴 창을 남겨야 하기 때문이다.
+ * 여기가 그 창이 닫히는 자리다.
+ *
+ * 클라이언트에서 곧바로 지우지 않는 이유는 하나 더 있다. 고객 문서와 로그는
+ * 매장당 수천 건이 될 수 있어서, 카운터 기기의 네트워크로 연쇄 삭제를 돌리면
+ * 중간에 끊겼을 때 절반만 지워진 매장이 남는다. 서버에서 배치로 도는 편이 안전하다.
+ */
+exports.purgeDeletedStores = (0, scheduler_1.onSchedule)({ schedule: "every day 04:30", timeZone: "Asia/Seoul", region: REGION }, async () => {
+    var _a, _b, _c, _d, _e, _f, _g;
+    const db = (0, firestore_2.getFirestore)();
+    const cutoff = new Date(Date.now() - GRACE_DAYS * 24 * 60 * 60 * 1000).toISOString();
+    // 복합 인덱스 회피: lifecycle만 쿼리하고 deletedAt은 코드에서 거른다
+    // (purgeDeletedOwners와 같은 이유·같은 방식).
+    const snap = await db
+        .collection("stores")
+        .where("lifecycle", "==", "pending_deletion")
+        .get();
+    const due = snap.docs.filter((d) => { var _a; return ((_a = d.data().deletedAt) !== null && _a !== void 0 ? _a : "") <= cutoff; });
+    if (due.length === 0) {
+        firebase_functions_1.logger.info("purgeDeletedStores: nothing due");
+        return;
+    }
+    for (const storeSnap of due) {
+        const code = storeSnap.id;
+        try {
+            let removed = 0;
+            for (const name of ["users", "logs"]) {
+                // 한 번에 다 지우려 하면 큰 매장에서 쓰기 한도에 걸린다. 배치로 끊는다.
+                for (;;) {
+                    const page = await db
+                        .collection(name)
+                        .where("store_code", "==", code)
+                        .limit(400)
+                        .get();
+                    if (page.empty)
+                        break;
+                    const batch = db.batch();
+                    page.docs.forEach((d) => batch.delete(d.ref));
+                    await batch.commit();
+                    removed += page.size;
+                    if (page.size < 400)
+                        break;
+                }
+            }
+            await db.doc(`sessions/session_${code}`).delete().catch(() => { });
+            // 계정의 매장 목록에서도 뺀다. 삭제 요청 시점에는 일부러 남겨뒀다 —
+            // 그게 있어야 점주가 유예 동안 '삭제 대기'로 보고 되돌릴 수 있다.
+            // 여기가 그 목적이 끝나는 자리다.
+            const ownerId = (_a = storeSnap.data()) === null || _a === void 0 ? void 0 : _a.ownerId;
+            if (ownerId) {
+                await db
+                    .doc(`owners/${ownerId}`)
+                    .update({ storeCodes: firestore_2.FieldValue.arrayRemove(code) })
+                    .catch((e) => firebase_functions_1.logger.warn(`unlink ${code} from ${ownerId}:`, e));
+            }
+            await storeSnap.ref.delete();
+            firebase_functions_1.logger.info(`purged store ${code} (${removed} docs)`);
+            await sendNotice(`[포인토] 매장 삭제 완료: ${(_c = (_b = storeSnap.data()) === null || _b === void 0 ? void 0 : _b.name) !== null && _c !== void 0 ? _c : code}`, noticeHtml({
+                title: "삭제 요청된 매장을 정리했습니다",
+                lead: `유예 ${GRACE_DAYS}일이 지나 실제로 삭제했습니다.`,
+                rows: [
+                    { label: "매장 코드", value: code },
+                    { label: "매장 이름", value: (_e = (_d = storeSnap.data()) === null || _d === void 0 ? void 0 : _d.name) !== null && _e !== void 0 ? _e : "(없음)" },
+                    {
+                        label: "삭제 요청",
+                        value: formatKst(String((_g = (_f = storeSnap.data()) === null || _f === void 0 ? void 0 : _f.deletedAt) !== null && _g !== void 0 ? _g : "")),
+                    },
+                    { label: "지운 문서", value: `${removed}건` },
+                ],
+                footer: "이 시점부터는 되돌릴 수 없습니다.",
+            }), `store-purge:${code}`);
+        }
+        catch (e) {
+            firebase_functions_1.logger.error(`purge failed for store ${code}:`, e);
         }
     }
 });
