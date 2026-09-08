@@ -592,6 +592,18 @@ export const purgeDeletedStores = onSchedule(
         }
 
         await db.doc(`sessions/session_${code}`).delete().catch(() => {});
+
+        // 계정의 매장 목록에서도 뺀다. 삭제 요청 시점에는 일부러 남겨뒀다 —
+        // 그게 있어야 점주가 유예 동안 '삭제 대기'로 보고 되돌릴 수 있다.
+        // 여기가 그 목적이 끝나는 자리다.
+        const ownerId = storeSnap.data()?.ownerId as string | undefined;
+        if (ownerId) {
+          await db
+            .doc(`owners/${ownerId}`)
+            .update({storeCodes: FieldValue.arrayRemove(code)})
+            .catch((e) => logger.warn(`unlink ${code} from ${ownerId}:`, e));
+        }
+
         await storeSnap.ref.delete();
 
         logger.info(`purged store ${code} (${removed} docs)`);

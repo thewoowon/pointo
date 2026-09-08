@@ -748,13 +748,14 @@ const useFirestore = (storeCode?: string | null) => {
   // 앞으로 계정 간 이전이 필요해지면 "인증된 계정 → 인증된 계정" 이전으로 만들 것.
 
   /** 슬롯 여유 확인 */
+  /**
+   * 남은 슬롯. 삭제 대기 매장은 세지 않는다 — 자리를 비우려고 지운 사람에게
+   * 가득 찼다고 하면 지운 의미가 없다. (판정은 getOwnerStoreLists가 한다)
+   */
   async function getOwnerSlotInfo(
     uid: string,
   ): Promise<{current: number; limit: number; canAdd: boolean}> {
-    const owner = await getOwnerProfile(uid);
-    const current = owner?.storeCodes?.length ?? 0;
-    const limit = owner?.slotLimit ?? DEFAULT_SLOT_LIMIT;
-    return {current, limit, canAdd: current < limit};
+    return (await getOwnerStoreLists(uid)).slot;
   }
 
   /**
@@ -790,66 +791,124 @@ const useFirestore = (storeCode?: string | null) => {
     }
   }
 
-  /** 계정에 연결된 스토어 목록 (스위처용) */
-  async function getOwnerStores(
-    uid: string,
-  ): Promise<{storeCode: string; name: string}[]> {
+  /**
+   * 계정에 연결된 매장을 운영 중 / 삭제 대기로 갈라 한 번에 돌려준다.
+   *
+   * 세 가지(목록·삭제 대기·슬롯)를 각각 조회하면 같은 매장 문서를 세 번 읽는다.
+   * 스위처는 뜰 때마다 이걸 부르므로 한 번에 훑고 나눈다.
+   *
+   * 슬롯은 삭제 대기를 빼고 센다. 자리를 비우려고 지운 사람에게 "슬롯이 가득
+   * 찼다"고 하면 지운 의미가 없다.
+   */
+  async function getOwnerStoreLists(uid: string): Promise<{
+    active: {storeCode: string; name: string}[];
+    deleted: {storeCode: string; name: string; deletedAt: string | null}[];
+    slot: {current: number; limit: number; canAdd: boolean};
+  }> {
+    const limitValue = DEFAULT_SLOT_LIMIT;
+    const empty = {
+      active: [],
+      deleted: [],
+      slot: {current: 0, limit: limitValue, canAdd: true},
+    };
     try {
       const owner = await getOwnerProfile(uid);
       const codes = owner?.storeCodes ?? [];
       const db = getFirestore();
-      const results: {storeCode: string; name: string}[] = [];
+
+      const active: {storeCode: string; name: string}[] = [];
+      const deleted: {
+        storeCode: string;
+        name: string;
+        deletedAt: string | null;
+      }[] = [];
+
       for (const code of codes) {
         const snap = await getDoc(doc(db, 'stores', code));
+        // 실삭제까지 끝난 매장은 문서가 없다. 목록에서 조용히 빠진다.
         if (!snap.exists) continue;
         const data = snap.data();
-        // 삭제 대기 매장은 목록에서 뺀다. storeCodes에서도 빠지므로 보통은
-        // 여기까지 오지 않지만, 두 쓰기 중 하나만 성공했을 때 유령 매장이
-        // 목록에 남는 것을 막는다.
-        if (data?.lifecycle === 'pending_deletion') continue;
-        results.push({storeCode: code, name: data?.name ?? code});
+        const name = data?.name ?? code;
+        if (data?.lifecycle === 'pending_deletion') {
+          deleted.push({storeCode: code, name, deletedAt: data?.deletedAt ?? null});
+        } else {
+          active.push({storeCode: code, name});
+        }
       }
-      return results;
+
+      const limitTotal = owner?.slotLimit ?? limitValue;
+      return {
+        active,
+        deleted,
+        slot: {
+          current: active.length,
+          limit: limitTotal,
+          canAdd: active.length < limitTotal,
+        },
+      };
     } catch (error) {
-      console.error('Error getting owner stores:', error);
-      return [];
+      console.error('Error getting owner store lists:', error);
+      return empty;
     }
+  }
+
+  /** 계정에 연결된 스토어 목록 (운영 중인 것만) */
+  async function getOwnerStores(
+    uid: string,
+  ): Promise<{storeCode: string; name: string}[]> {
+    return (await getOwnerStoreLists(uid)).active;
   }
 
   /**
    * 매장 삭제 요청 — soft delete.
    *
-   * 계정 탈퇴와 같은 모양이다. 문서를 지우지 않고 `lifecycle`만 바꾼 뒤,
-   * 계정의 매장 목록에서 코드를 뺀다. 점주 화면에서는 즉시 사라지지만 고객
-   * 전화번호와 적립 이력은 유예 기간 동안 남는다 — 잘못 눌렀을 때 되돌릴
-   * 방법이 없으면 안 되기 때문이다. 실삭제는 스케줄 Function이 한다.
+   * 계정 탈퇴와 같은 모양이다. 문서를 지우지 않고 `lifecycle`만 바꾼다.
+   * 점주 목록에서는 즉시 사라지지만 고객 전화번호와 적립 이력은 유예 기간
+   * 동안 남는다 — 잘못 눌렀을 때 되돌릴 방법이 없으면 안 되기 때문이다.
+   * 실삭제는 스케줄 Function이 한다.
    *
-   * 순서가 중요하다. 매장 문서를 먼저 표시하고 그 다음에 목록에서 뺀다.
-   * 반대로 했다가 두 번째 쓰기가 실패하면, 매장은 계정 목록에서 사라졌는데
-   * 삭제 표시가 없는 상태로 남는다 — 점주는 다시 찾을 수 없고 스케줄러는
-   * 대상으로 보지 않아 영영 떠도는 매장이 된다. 지금 순서라면 두 번째가
-   * 실패해도 표시는 남아 있어 스케줄러가 집어 간다.
+   * `owners.storeCodes`에서는 **빼지 않는다.** 여기서 빼면 그 매장을 다시 찾을
+   * 길이 없어져서, 되돌리기가 우리에게 연락하는 수동 절차가 되어버린다.
+   * 코드는 그대로 두고 목록을 lifecycle로 가른다(getOwnerStoreLists).
+   * 규칙의 ownsStore도 storeCodes를 보므로, 유예 동안 점주가 그 매장을 열어
+   * 확인한 뒤 되돌릴 수 있다는 뜻이기도 하다.
    */
-  async function requestStoreDeletion(
-    uid: string,
-    code: string,
-  ): Promise<boolean> {
+  async function requestStoreDeletion(code: string): Promise<boolean> {
     try {
-      const db = getFirestore();
-      await updateDoc(doc(db, 'stores', code), {
+      await updateDoc(doc(getFirestore(), 'stores', code), {
         lifecycle: 'pending_deletion',
         deletedAt: new Date().toISOString(),
-      });
-
-      const owner = await getOwnerProfile(uid);
-      const codes = owner?.storeCodes ?? [];
-      await updateDoc(doc(db, 'owners', uid), {
-        storeCodes: codes.filter(c => c !== code),
       });
       return true;
     } catch (error) {
       console.error('Error requesting store deletion:', error);
       return false;
+    }
+  }
+
+  /**
+   * 삭제 요청을 되돌린다. 유예가 지나 실삭제된 뒤에는 문서가 없어 실패한다.
+   *
+   * 슬롯 검사를 여기서 한 번 더 하는 이유: 매장을 지우고 그 자리에 새 매장을
+   * 만든 다음 되돌리면 한도를 넘는다. 화면에서 막더라도 마지막 관문은
+   * 쓰기 직전에 있어야 한다.
+   */
+  async function restoreStore(
+    uid: string,
+    code: string,
+  ): Promise<{ok: true} | {ok: false; reason: 'slot_full' | 'failed'}> {
+    try {
+      const {slot} = await getOwnerStoreLists(uid);
+      if (!slot.canAdd) return {ok: false, reason: 'slot_full'};
+
+      await updateDoc(doc(getFirestore(), 'stores', code), {
+        lifecycle: 'active',
+        deletedAt: null,
+      });
+      return {ok: true};
+    } catch (error) {
+      console.error('Error restoring store:', error);
+      return {ok: false, reason: 'failed'};
     }
   }
 
@@ -916,8 +975,10 @@ const useFirestore = (storeCode?: string | null) => {
     getOwnerSlotInfo,
     linkStoreToOwner,
     getOwnerStores,
+    getOwnerStoreLists,
     requestAccountDeletion,
     requestStoreDeletion,
+    restoreStore,
     restoreAccount,
   };
 };

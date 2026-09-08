@@ -31,7 +31,7 @@ const DeletedStoreNotice = ({missing}: {missing: boolean}) => {
           <Text style={[s.body, {color: theme.color.texticon.onNormal.midemp}]}>
             {missing
               ? '이 매장은 삭제가 끝나 더 이상 사용할 수 없습니다.'
-              : '이 매장은 삭제 처리 중이라 적립을 받을 수 없습니다.\n잘못 지우셨다면 내 매장 화면의 \'의견 보내기\'로 알려주세요.'}
+              : '이 매장은 삭제 처리 중이라 적립을 받을 수 없습니다.\n내 매장 화면에서 되돌릴 수 있어요.'}
           </Text>
           <Pressable
             style={[

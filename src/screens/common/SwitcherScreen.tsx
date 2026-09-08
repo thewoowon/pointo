@@ -31,6 +31,12 @@ import {
 } from '../onboarding';
 import {shouldAskSurvey, snoozeSurvey} from '../../services/survey';
 
+/**
+ * 매장 삭제 유예(일). functions의 GRACE_DAYS와 같은 값이어야 한다 —
+ * 여기가 더 길면 이미 사라진 매장을 되돌릴 수 있다고 안내하게 된다.
+ */
+const STORE_GRACE_DAYS = 30;
+
 const SwitcherScreen = ({navigation}: any) => {
   const theme = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -48,16 +54,28 @@ const SwitcherScreen = ({navigation}: any) => {
     lockDeviceToClient,
   } = useAuth();
   const {
-    getOwnerStores,
+    getOwnerStoreLists,
     getOwnerSlotInfo,
     getOwnerProfile,
     requestStoreDeletion,
+    restoreStore,
     hasAnyLog,
   } = useFirestore();
 
   const uid = ownerUid;
 
   const [stores, setStores] = useState<{storeCode: string; name: string}[]>([]);
+  /**
+   * 삭제 요청은 됐지만 아직 유예가 남은 매장.
+   *
+   * 지운 매장을 목록에서 지우기만 하면 되돌리는 길이 앱 밖으로 나간다 —
+   * 우리에게 연락해서 손으로 되돌려달라고 해야 한다. 되돌리기는 필드 하나를
+   * 바꾸는 일이라 그럴 이유가 없다. 남은 기간과 함께 여기 남겨둔다.
+   */
+  const [deletedStores, setDeletedStores] = useState<
+    {storeCode: string; name: string; deletedAt: string | null}[]
+  >([]);
+  const [restoringCode, setRestoringCode] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [slot, setSlot] = useState<{
     current: number;
@@ -107,11 +125,11 @@ const SwitcherScreen = ({navigation}: any) => {
       return;
     }
     setIsLoading(true);
-    const [list, slotInfo] = await Promise.all([
-      getOwnerStores(uid),
-      getOwnerSlotInfo(uid),
-    ]);
+    const {active: list, deleted, slot: slotInfo} = await getOwnerStoreLists(
+      uid,
+    );
     setStores(list);
+    setDeletedStores(deleted);
     setSlot(slotInfo);
     setIsLoading(false);
 
@@ -200,7 +218,7 @@ const SwitcherScreen = ({navigation}: any) => {
           '• 이 매장의 고객 적립 내역과 쿠폰이 함께 정리됩니다.',
           '• 목록에서 바로 사라지고, 고객 화면도 더 이상 쓸 수 없습니다.',
           '',
-          '잘못 지우셨다면 30일 안에 홈 상단 \'의견 보내기\'로 알려주세요. 그 전까지는 되돌려드릴 수 있습니다.',
+          `${STORE_GRACE_DAYS}일 동안은 이 화면에서 되돌릴 수 있습니다. 그 뒤에는 완전히 사라집니다.`,
         ].join('\n'),
         [
           {text: '취소', style: 'cancel', onPress: () => resolve(false)},
@@ -218,7 +236,7 @@ const SwitcherScreen = ({navigation}: any) => {
     if (!(await confirmDelete(target.name))) return;
 
     setIsDeleting(true);
-    const ok = await requestStoreDeletion(uid, pickedCode);
+    const ok = await requestStoreDeletion(pickedCode);
     setIsDeleting(false);
 
     if (!ok) {
@@ -233,6 +251,39 @@ const SwitcherScreen = ({navigation}: any) => {
     setPickedCode(null);
     await load();
     Alert.alert('매장이 삭제되었습니다');
+  };
+
+  /**
+   * 실삭제까지 남은 날. 0 이하면 오늘 밤 스케줄러가 가져간다는 뜻이라 '오늘까지'.
+   * 하루 단위로만 말한다 — 시간 단위로 세는 건 이 화면에서 아무 도움이 안 된다.
+   */
+  const daysLeft = (deletedAt: string | null): number => {
+    if (!deletedAt) return STORE_GRACE_DAYS;
+    const elapsed = (Date.now() - new Date(deletedAt).getTime()) / 86_400_000;
+    return Math.max(0, Math.ceil(STORE_GRACE_DAYS - elapsed));
+  };
+
+  const handleRestoreStore = async (store: {
+    storeCode: string;
+    name: string;
+  }) => {
+    if (!uid || restoringCode) return;
+    setRestoringCode(store.storeCode);
+    const result = await restoreStore(uid, store.storeCode);
+    setRestoringCode(null);
+
+    if (!result.ok) {
+      Alert.alert(
+        result.reason === 'slot_full' ? '슬롯이 가득 찼어요' : '되돌리지 못했어요',
+        result.reason === 'slot_full'
+          ? `운영 중인 매장이 ${slot.limit}개라 되돌릴 자리가 없습니다.\n다른 매장을 정리한 뒤 다시 시도해주세요.`
+          : '네트워크 상태를 확인하고 다시 시도해주세요.',
+      );
+      return;
+    }
+
+    await load();
+    Alert.alert('되돌렸어요', `'${store.name}'을 다시 사용할 수 있습니다.`);
   };
 
   const handleAddStore = async () => {
@@ -445,6 +496,38 @@ const SwitcherScreen = ({navigation}: any) => {
                 )}
               </>
             )}
+
+              {/* 삭제 대기 매장. 편집 중에는 감춘다 — 지우는 손짓과 되살리는
+                  손짓이 같은 화면에 동시에 있으면 헷갈린다. */}
+              {!editing && deletedStores.length > 0 && (
+                <View style={styles.deletedSection}>
+                  <Text style={styles.deletedHeading}>삭제 대기 중</Text>
+                  {deletedStores.map(store => {
+                    const left = daysLeft(store.deletedAt);
+                    const busy = restoringCode === store.storeCode;
+                    return (
+                      <View key={store.storeCode} style={styles.deletedCard}>
+                        <View style={styles.deletedInfo}>
+                          <Text style={styles.deletedName}>{store.name}</Text>
+                          <Text style={styles.deletedMeta}>
+                            {left > 0
+                              ? `${left}일 뒤 완전히 삭제돼요`
+                              : '오늘 완전히 삭제돼요'}
+                          </Text>
+                        </View>
+                        <Pressable
+                          style={styles.restoreBtn}
+                          disabled={busy}
+                          onPress={() => handleRestoreStore(store)}>
+                          <Text style={styles.restoreBtnText}>
+                            {busy ? '되돌리는 중…' : '되돌리기'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                    );
+                  })}
+                </View>
+              )}
 
             {/* 이용 설문. 답했거나 '나중에'를 고르면 사라진다. */}
             {askSurvey && (
@@ -926,6 +1009,53 @@ const createStyles = (theme: Theme) =>
       color: theme.color.etc.absolute.white,
     },
     deleteBtnTextOff: {color: theme.color.texticon.onEnv.onDisabled},
+    deletedSection: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
+      gap: 8,
+    },
+    deletedHeading: {
+      fontSize: 14,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.lowemp,
+      lineHeight: 24,
+      paddingHorizontal: 4,
+    },
+    // 운영 중인 매장 카드보다 눌러보고 싶지 않게 — 그림자 없이 옅은 배경만.
+    deletedCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.color.surface.normal.container10,
+      borderRadius: 14,
+      paddingVertical: 16,
+      paddingHorizontal: 20,
+      borderWidth: 1,
+      borderColor: theme.palette.slate[200],
+    },
+    deletedInfo: {flex: 1, gap: 2},
+    deletedName: {
+      fontSize: 16,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.midemp,
+    },
+    deletedMeta: {
+      fontSize: 12,
+      fontFamily: theme.font.regular,
+      color: theme.palette.red[500],
+    },
+    restoreBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 8,
+      backgroundColor: theme.color.surface.normal.bg1,
+      borderWidth: 1,
+      borderColor: theme.palette.slate[300],
+    },
+    restoreBtnText: {
+      fontSize: 13,
+      fontFamily: theme.font.semibold,
+      color: theme.color.texticon.onNormal.highestemp,
+    },
     storeCard: {
       flexDirection: 'row',
       alignItems: 'center',
