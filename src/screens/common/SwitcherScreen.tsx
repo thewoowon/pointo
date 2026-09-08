@@ -47,8 +47,13 @@ const SwitcherScreen = ({navigation}: any) => {
     setIsAuthenticated,
     lockDeviceToClient,
   } = useAuth();
-  const {getOwnerStores, getOwnerSlotInfo, getOwnerProfile, hasAnyLog} =
-    useFirestore();
+  const {
+    getOwnerStores,
+    getOwnerSlotInfo,
+    getOwnerProfile,
+    requestStoreDeletion,
+    hasAnyLog,
+  } = useFirestore();
 
   const uid = ownerUid;
 
@@ -70,6 +75,16 @@ const SwitcherScreen = ({navigation}: any) => {
     guideSeen: boolean;
     gave: boolean;
   } | null>(null);
+
+  /**
+   * 매장 편집(삭제) 모드인가. 편집 중에는 카드를 눌러도 매장에 들어가지 않는다 —
+   * 지우려고 고르는 손짓과 들어가려는 손짓이 같은 자리에서 일어나기 때문에,
+   * 모드를 나누지 않으면 지우려다 들어가고 들어가려다 지운다.
+   */
+  const [editing, setEditing] = useState(false);
+  /** 편집 모드에서 삭제하려고 고른 매장 코드. 한 번에 하나만 지운다. */
+  const [pickedCode, setPickedCode] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   /**
    * 이용 설문을 권할지. 판정 전에는 false라 카드가 깜빡이지 않는다.
@@ -163,6 +178,63 @@ const SwitcherScreen = ({navigation}: any) => {
     setIsAuthenticated(true);
   };
 
+  /** 편집 모드를 열고 닫는다. 닫을 때는 고른 것도 함께 비운다. */
+  const toggleEditing = () => {
+    setEditing(prev => !prev);
+    setPickedCode(null);
+  };
+
+  /**
+   * 삭제 확인. 시안의 '삭제하시겠습니까?' 한 줄 대신 무엇이 사라지는지 적는다.
+   *
+   * 이 화면에서 지워지는 것은 매장 한 줄이 아니라 그 매장 손님들의 적립이다.
+   * 이 앱에는 이미 같은 무게의 조작(운영 모드 전환)에서 무엇이 멈추고 무엇이
+   * 보관되는지 짚어주는 선례가 있고, 그보다 되돌리기 어려운 일에 더 얇은
+   * 확인을 두는 건 앞뒤가 맞지 않는다.
+   */
+  const confirmDelete = (name: string): Promise<boolean> =>
+    new Promise(resolve => {
+      Alert.alert(
+        `'${name}'을 삭제할까요?`,
+        [
+          '• 이 매장의 고객 적립 내역과 쿠폰이 함께 정리됩니다.',
+          '• 목록에서 바로 사라지고, 고객 화면도 더 이상 쓸 수 없습니다.',
+          '',
+          '잘못 지우셨다면 30일 안에 고객센터로 알려주세요. 그 전까지는 되돌릴 수 있습니다.',
+        ].join('\n'),
+        [
+          {text: '취소', style: 'cancel', onPress: () => resolve(false)},
+          {text: '삭제', style: 'destructive', onPress: () => resolve(true)},
+        ],
+        {cancelable: true, onDismiss: () => resolve(false)},
+      );
+    });
+
+  const handleDeleteStore = async () => {
+    if (!uid || !pickedCode || isDeleting) return;
+    const target = stores.find(st => st.storeCode === pickedCode);
+    if (!target) return;
+
+    if (!(await confirmDelete(target.name))) return;
+
+    setIsDeleting(true);
+    const ok = await requestStoreDeletion(uid, pickedCode);
+    setIsDeleting(false);
+
+    if (!ok) {
+      Alert.alert(
+        '삭제하지 못했어요',
+        '네트워크 상태를 확인하고 다시 시도해주세요.',
+      );
+      return;
+    }
+
+    setEditing(false);
+    setPickedCode(null);
+    await load();
+    Alert.alert('매장이 삭제되었습니다');
+  };
+
   const handleAddStore = async () => {
     if (!uid) return;
     const info = await getOwnerSlotInfo(uid);
@@ -203,6 +275,21 @@ const SwitcherScreen = ({navigation}: any) => {
             onPress={() => navigation.navigate('AccountSettings')}
             hitSlop={8}>
             <SettingIcon />
+          </Pressable>
+        </View>
+
+        {/* 의견 보내기.
+            원래는 스크롤 맨 아래에 있었다. 매장이 여러 개면 화면 밖으로 밀려
+            내려가 있어서, 정작 막혀서 말하고 싶은 순간에 눈에 안 들어왔다.
+            헤더 바로 아래로 올려 스크롤 없이 늘 보이게 둔다. 매장 목록보다
+            위에 있지만 링크 한 줄이라 목록을 밀어내지 않는다. */}
+        <View style={styles.feedbackBox}>
+          <Text style={styles.feedbackLead}>찾으시는 기능이 없으신가요?</Text>
+          <Pressable
+            onPress={() => navigation.navigate('Opinion')}
+            hitSlop={12}
+            style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
+            <Text style={styles.feedbackLink}>의견 보내기</Text>
           </Pressable>
         </View>
 
@@ -275,31 +362,84 @@ const SwitcherScreen = ({navigation}: any) => {
 
                 <View style={styles.slotRow}>
                   <Text style={styles.slotText}>
-                    운영 중인 매장{'  '}
-                    <Text style={styles.slotNumber}>{slot.current}</Text>
-                    {/* /{slot.limit} */}
+                    {editing ? (
+                      '삭제할 매장을 선택해주세요'
+                    ) : (
+                      <>
+                        운영 중인 매장{'  '}
+                        <Text style={styles.slotNumber}>{slot.current}</Text>
+                      </>
+                    )}
                   </Text>
+                  <Pressable
+                    onPress={toggleEditing}
+                    hitSlop={12}
+                    style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
+                    <Text
+                      style={editing ? styles.editCancel : styles.editLink}>
+                      {editing ? '취소' : '매장 편집'}
+                    </Text>
+                  </Pressable>
                 </View>
 
                 <View style={styles.storeList}>
-                  {stores.map(store => (
-                    <Pressable
-                      key={store.storeCode}
-                      style={styles.storeCard}
-                      onPress={() => handleSelectStore(store)}>
-                      <View style={{flex: 1}}>
-                        <Text style={styles.storeName}>{store.name}</Text>
-                      </View>
-                      <RightChevronIcon />
-                    </Pressable>
-                  ))}
+                  {stores.map(store => {
+                    const picked = pickedCode === store.storeCode;
+                    return (
+                      <Pressable
+                        key={store.storeCode}
+                        style={styles.storeCard}
+                        disabled={isDeleting}
+                        onPress={() =>
+                          editing
+                            ? // 고른 것을 다시 누르면 해제. 삭제 버튼이 비활성으로
+                              // 돌아가므로 잘못 골랐을 때 빠져나갈 길이 된다.
+                              setPickedCode(picked ? null : store.storeCode)
+                            : handleSelectStore(store)
+                        }>
+                        {editing && (
+                          <View
+                            style={[
+                              styles.radio,
+                              picked && styles.radioPicked,
+                            ]}>
+                            {picked && <Text style={styles.radioMark}>✓</Text>}
+                          </View>
+                        )}
+                        <View style={styles.storeNameWrap}>
+                          <Text style={styles.storeName}>{store.name}</Text>
+                        </View>
+                        {!editing && <RightChevronIcon />}
+                      </Pressable>
+                    );
+                  })}
                 </View>
 
-                <View style={styles.btnContainer}>
-                  <Pressable style={styles.addBtn} onPress={handleAddStore}>
-                    <Text style={styles.addBtnText}>새 매장 추가하기</Text>
+                {editing && (
+                  <Pressable
+                    style={[
+                      styles.deleteBtn,
+                      !pickedCode && styles.deleteBtnOff,
+                    ]}
+                    disabled={!pickedCode || isDeleting}
+                    onPress={handleDeleteStore}>
+                    <Text
+                      style={[
+                        styles.deleteBtnText,
+                        !pickedCode && styles.deleteBtnTextOff,
+                      ]}>
+                      {isDeleting ? '삭제하는 중…' : '매장 삭제'}
+                    </Text>
                   </Pressable>
-                </View>
+                )}
+
+                {!editing && (
+                  <View style={styles.btnContainer}>
+                    <Pressable style={styles.addBtn} onPress={handleAddStore}>
+                      <Text style={styles.addBtnText}>새 매장 추가하기</Text>
+                    </Pressable>
+                  </View>
+                )}
               </>
             )}
 
@@ -331,19 +471,6 @@ const SwitcherScreen = ({navigation}: any) => {
               </View>
             )}
 
-            {/* 의견 보내기.
-                점주가 막혔을 때 우리에게 말할 창구가 앱 안에 없어서, 지금은
-                스토어 리뷰나 지인 연락으로 이탈한 뒤에야 알게 된다. 계정 허브
-                맨 아래에 상주시켜 두 번 터치로 닿게 한다. */}
-            <View style={styles.feedbackBox}>
-              <Text style={styles.feedbackLead}>찾으시는 기능이 없으신가요?</Text>
-              <Pressable
-                onPress={() => navigation.navigate('Opinion')}
-                hitSlop={12}
-                style={({pressed}) => ({opacity: pressed ? 0.6 : 1})}>
-                <Text style={styles.feedbackLink}>의견 보내기</Text>
-              </Pressable>
-            </View>
           </ScrollView>
         )}
 
@@ -554,11 +681,12 @@ const createStyles = (theme: Theme) =>
       fontFamily: theme.font.regular,
       color: theme.color.texticon.onNormal.midemp,
     },
+    // 헤더 아래 상주. 예전엔 marginTop:'auto'로 스크롤 바닥에 붙였다.
     feedbackBox: {
-      marginTop: 'auto',
-      paddingTop: 32,
+      paddingTop: 12,
+      paddingBottom: 20,
       alignItems: 'center',
-      gap: 10,
+      gap: 8,
     },
     feedbackLead: {
       fontSize: 14,
@@ -747,6 +875,54 @@ const createStyles = (theme: Theme) =>
       gap: 10,
       marginBottom: 20,
     },
+    // 편집 링크는 평상시엔 눈에 띄지 않게, 취소는 빠져나가는 길이라 붉게.
+    editLink: {
+      fontSize: 14,
+      fontFamily: theme.font.medium,
+      color: theme.color.texticon.onNormal.lowemp,
+    },
+    editCancel: {
+      fontSize: 14,
+      fontFamily: theme.font.semibold,
+      color: theme.palette.red[500],
+    },
+    radio: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      borderWidth: 1.5,
+      borderColor: theme.palette.slate[300],
+      marginRight: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    radioPicked: {
+      backgroundColor: theme.palette.red[500],
+      borderColor: theme.palette.red[500],
+    },
+    radioMark: {
+      fontSize: 13,
+      lineHeight: 16,
+      fontFamily: theme.font.bold,
+      color: theme.color.etc.absolute.white,
+    },
+    storeNameWrap: {flex: 1},
+    deleteBtn: {
+      width: '100%',
+      maxWidth: CONTENT_MAX_WIDTH,
+      height: 56,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.palette.red[500],
+    },
+    deleteBtnOff: {backgroundColor: theme.color.surface.env.disabled},
+    deleteBtnText: {
+      fontSize: 16,
+      fontFamily: theme.font.semibold,
+      color: theme.color.etc.absolute.white,
+    },
+    deleteBtnTextOff: {color: theme.color.texticon.onEnv.onDisabled},
     storeCard: {
       flexDirection: 'row',
       alignItems: 'center',

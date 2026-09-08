@@ -128,6 +128,20 @@ interface Store {
   config?: StoreConfig;
   /** 이메일 계정(점주)에 연결된 경우의 소유자 uid. 미연결 스토어는 없음 */
   ownerId?: string;
+  /**
+   * 매장 삭제 상태. 없으면 'active'로 본다(레거시 호환).
+   *
+   * 점주가 삭제를 누르면 매장 문서가 곧바로 사라지는 게 아니라 여기가
+   * 'pending_deletion'이 되고, 계정 목록(owners.storeCodes)에서만 빠진다.
+   * 점주 눈에는 사라지지만 고객 전화번호와 적립 이력은 유예 기간 동안 남는다 —
+   * 잘못 지웠을 때 되돌릴 방법이 있어야 하기 때문이다. 실삭제는 스케줄
+   * Function(purgeDeletedStores)이 유예 경과분만 백업 알림과 함께 처리한다.
+   *
+   * 계정 탈퇴(Owner.accountStatus)와 같은 모양이다. 다르게 만들 이유가 없다.
+   */
+  lifecycle?: 'active' | 'pending_deletion';
+  /** 삭제 요청 시각(ISO). 스케줄러가 +유예일 경과분을 실삭제. */
+  deletedAt?: string | null;
 }
 
 /**

@@ -801,14 +801,55 @@ const useFirestore = (storeCode?: string | null) => {
       const results: {storeCode: string; name: string}[] = [];
       for (const code of codes) {
         const snap = await getDoc(doc(db, 'stores', code));
-        if (snap.exists) {
-          results.push({storeCode: code, name: snap.data()?.name ?? code});
-        }
+        if (!snap.exists) continue;
+        const data = snap.data();
+        // 삭제 대기 매장은 목록에서 뺀다. storeCodes에서도 빠지므로 보통은
+        // 여기까지 오지 않지만, 두 쓰기 중 하나만 성공했을 때 유령 매장이
+        // 목록에 남는 것을 막는다.
+        if (data?.lifecycle === 'pending_deletion') continue;
+        results.push({storeCode: code, name: data?.name ?? code});
       }
       return results;
     } catch (error) {
       console.error('Error getting owner stores:', error);
       return [];
+    }
+  }
+
+  /**
+   * 매장 삭제 요청 — soft delete.
+   *
+   * 계정 탈퇴와 같은 모양이다. 문서를 지우지 않고 `lifecycle`만 바꾼 뒤,
+   * 계정의 매장 목록에서 코드를 뺀다. 점주 화면에서는 즉시 사라지지만 고객
+   * 전화번호와 적립 이력은 유예 기간 동안 남는다 — 잘못 눌렀을 때 되돌릴
+   * 방법이 없으면 안 되기 때문이다. 실삭제는 스케줄 Function이 한다.
+   *
+   * 순서가 중요하다. 매장 문서를 먼저 표시하고 그 다음에 목록에서 뺀다.
+   * 반대로 했다가 두 번째 쓰기가 실패하면, 매장은 계정 목록에서 사라졌는데
+   * 삭제 표시가 없는 상태로 남는다 — 점주는 다시 찾을 수 없고 스케줄러는
+   * 대상으로 보지 않아 영영 떠도는 매장이 된다. 지금 순서라면 두 번째가
+   * 실패해도 표시는 남아 있어 스케줄러가 집어 간다.
+   */
+  async function requestStoreDeletion(
+    uid: string,
+    code: string,
+  ): Promise<boolean> {
+    try {
+      const db = getFirestore();
+      await updateDoc(doc(db, 'stores', code), {
+        lifecycle: 'pending_deletion',
+        deletedAt: new Date().toISOString(),
+      });
+
+      const owner = await getOwnerProfile(uid);
+      const codes = owner?.storeCodes ?? [];
+      await updateDoc(doc(db, 'owners', uid), {
+        storeCodes: codes.filter(c => c !== code),
+      });
+      return true;
+    } catch (error) {
+      console.error('Error requesting store deletion:', error);
+      return false;
     }
   }
 
@@ -876,6 +917,7 @@ const useFirestore = (storeCode?: string | null) => {
     linkStoreToOwner,
     getOwnerStores,
     requestAccountDeletion,
+    requestStoreDeletion,
     restoreAccount,
   };
 };

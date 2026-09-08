@@ -536,3 +536,86 @@ export const purgeDeletedOwners = onSchedule(
     }
   },
 );
+
+/**
+ * 삭제 요청된 매장을 유예 기간 뒤에 실제로 지운다.
+ *
+ * 점주가 앱에서 누르는 삭제는 `stores.lifecycle`을 바꾸고 계정 목록에서
+ * 코드를 빼는 데까지만 한다. 지우는 대상이 매장 한 줄이 아니라 그 매장 손님들의
+ * 전화번호와 적립 이력이라, 잘못 눌렀을 때 되돌릴 창을 남겨야 하기 때문이다.
+ * 여기가 그 창이 닫히는 자리다.
+ *
+ * 클라이언트에서 곧바로 지우지 않는 이유는 하나 더 있다. 고객 문서와 로그는
+ * 매장당 수천 건이 될 수 있어서, 카운터 기기의 네트워크로 연쇄 삭제를 돌리면
+ * 중간에 끊겼을 때 절반만 지워진 매장이 남는다. 서버에서 배치로 도는 편이 안전하다.
+ */
+export const purgeDeletedStores = onSchedule(
+  {schedule: "every day 04:30", timeZone: "Asia/Seoul", region: REGION},
+  async () => {
+    const db = getFirestore();
+    const cutoff = new Date(
+      Date.now() - GRACE_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    // 복합 인덱스 회피: lifecycle만 쿼리하고 deletedAt은 코드에서 거른다
+    // (purgeDeletedOwners와 같은 이유·같은 방식).
+    const snap = await db
+      .collection("stores")
+      .where("lifecycle", "==", "pending_deletion")
+      .get();
+    const due = snap.docs.filter((d) => (d.data().deletedAt ?? "") <= cutoff);
+
+    if (due.length === 0) {
+      logger.info("purgeDeletedStores: nothing due");
+      return;
+    }
+
+    for (const storeSnap of due) {
+      const code = storeSnap.id;
+      try {
+        let removed = 0;
+        for (const name of ["users", "logs"]) {
+          // 한 번에 다 지우려 하면 큰 매장에서 쓰기 한도에 걸린다. 배치로 끊는다.
+          for (;;) {
+            const page = await db
+              .collection(name)
+              .where("store_code", "==", code)
+              .limit(400)
+              .get();
+            if (page.empty) break;
+            const batch = db.batch();
+            page.docs.forEach((d) => batch.delete(d.ref));
+            await batch.commit();
+            removed += page.size;
+            if (page.size < 400) break;
+          }
+        }
+
+        await db.doc(`sessions/session_${code}`).delete().catch(() => {});
+        await storeSnap.ref.delete();
+
+        logger.info(`purged store ${code} (${removed} docs)`);
+        await sendNotice(
+          `[포인토] 매장 삭제 완료: ${storeSnap.data()?.name ?? code}`,
+          noticeHtml({
+            title: "삭제 요청된 매장을 정리했습니다",
+            lead: `유예 ${GRACE_DAYS}일이 지나 실제로 삭제했습니다.`,
+            rows: [
+              {label: "매장 코드", value: code},
+              {label: "매장 이름", value: storeSnap.data()?.name ?? "(없음)"},
+              {
+                label: "삭제 요청",
+                value: formatKst(String(storeSnap.data()?.deletedAt ?? "")),
+              },
+              {label: "지운 문서", value: `${removed}건`},
+            ],
+            footer: "이 시점부터는 되돌릴 수 없습니다.",
+          }),
+          `store-purge:${code}`,
+        );
+      } catch (e) {
+        logger.error(`purge failed for store ${code}:`, e);
+      }
+    }
+  },
+);
