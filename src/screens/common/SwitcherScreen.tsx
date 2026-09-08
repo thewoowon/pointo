@@ -12,7 +12,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect} from '@react-navigation/native';
 import type {BottomSheetModal} from '@gorhom/bottom-sheet';
-import {useAuth, useFirestore, useTheme} from '../../hooks';
+import {useAuth, useFirestore, useOwnerStores, useTheme} from '../../hooks';
 import type {Theme} from '../../theme';
 import {signOutOwner} from '../../services/auth';
 import {
@@ -54,8 +54,7 @@ const SwitcherScreen = ({navigation}: any) => {
     lockDeviceToClient,
   } = useAuth();
   const {
-    getOwnerStoreLists,
-    getOwnerSlotInfo,
+    getOwnerStores,
     getOwnerProfile,
     requestStoreDeletion,
     restoreStore,
@@ -64,24 +63,22 @@ const SwitcherScreen = ({navigation}: any) => {
 
   const uid = ownerUid;
 
-  const [stores, setStores] = useState<{storeCode: string; name: string}[]>([]);
   /**
-   * 삭제 요청은 됐지만 아직 유예가 남은 매장.
+   * 매장 목록은 구독으로 받는다.
    *
-   * 지운 매장을 목록에서 지우기만 하면 되돌리는 길이 앱 밖으로 나간다 —
-   * 우리에게 연락해서 손으로 되돌려달라고 해야 한다. 되돌리기는 필드 하나를
-   * 바꾸는 일이라 그럴 이유가 없다. 남은 기간과 함께 여기 남겨둔다.
+   * 점주가 기기를 두 대 쓰는 경우가 흔한데(카운터 태블릿 + 개인 폰), 한 번만
+   * 읽으면 한쪽에서 지우거나 되돌린 결과가 다른 쪽에 안 보인다. 그 상태로
+   * 같은 매장을 또 지우거나 이미 되돌린 매장을 되돌리려 들게 된다.
+   *
+   * `deleted`는 삭제 요청은 됐지만 유예가 남은 매장 — 되돌리기가 붙는 자리다.
    */
-  const [deletedStores, setDeletedStores] = useState<
-    {storeCode: string; name: string; deletedAt: string | null}[]
-  >([]);
+  const {
+    active: stores,
+    deleted: deletedStores,
+    slot,
+    isLoading,
+  } = useOwnerStores(uid);
   const [restoringCode, setRestoringCode] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [slot, setSlot] = useState<{
-    current: number;
-    limit: number;
-    canAdd: boolean;
-  }>({current: 0, limit: 3, canAdd: true});
 
   /**
    * 매장 준비 체크리스트 상태. null이면 아직 판정 전(카드를 안 그린다).
@@ -119,20 +116,16 @@ const SwitcherScreen = ({navigation}: any) => {
   const [selectedStore, setSelectedStore] = useState<SheetStore | null>(null);
   const [pinVisible, setPinVisible] = useState(false);
 
+  /**
+   * 목록 밖의 것들(첫 적립 체크리스트·설문 노출)을 판정한다.
+   *
+   * 목록 자체는 useOwnerStores가 구독으로 들고 있어서 여기서 다루지 않는다.
+   * 이쪽은 한 번 참이 되면 잘 뒤집히지 않는 값이라 구독할 이유가 없다.
+   */
   const load = useCallback(async () => {
-    if (!uid) {
-      setIsLoading(false);
-      return;
-    }
-    setIsLoading(true);
-    const {active: list, deleted, slot: slotInfo} = await getOwnerStoreLists(
-      uid,
-    );
-    setStores(list);
-    setDeletedStores(deleted);
-    setSlot(slotInfo);
-    setIsLoading(false);
+    if (!uid) return;
 
+    const list = await getOwnerStores(uid);
     if (list.length === 0) {
       setSetup(null);
       return;
@@ -286,14 +279,14 @@ const SwitcherScreen = ({navigation}: any) => {
     Alert.alert('되돌렸어요', `'${store.name}'을 다시 사용할 수 있습니다.`);
   };
 
-  const handleAddStore = async () => {
+  const handleAddStore = () => {
     if (!uid) return;
-    const info = await getOwnerSlotInfo(uid);
-    setSlot(info);
-    if (!info.canAdd) {
+    // 슬롯은 구독으로 늘 최신이라 누를 때 다시 읽지 않는다. 예전엔 여기서
+    // 한 번 더 조회했는데, 그 값이 오히려 화면보다 늦을 수 있었다.
+    if (!slot.canAdd) {
       Alert.alert(
         '슬롯이 가득 찼어요',
-        `현재 ${info.current}/${info.limit}개를 사용 중입니다.\n구독하면 최대 10개까지 늘릴 수 있어요. (준비 중)`,
+        `현재 ${slot.current}/${slot.limit}개를 사용 중입니다.\n구독하면 최대 10개까지 늘릴 수 있어요. (준비 중)`,
       );
       return;
     }
