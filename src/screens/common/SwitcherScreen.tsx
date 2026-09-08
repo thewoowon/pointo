@@ -200,7 +200,7 @@ const SwitcherScreen = ({navigation}: any) => {
           '• 이 매장의 고객 적립 내역과 쿠폰이 함께 정리됩니다.',
           '• 목록에서 바로 사라지고, 고객 화면도 더 이상 쓸 수 없습니다.',
           '',
-          '잘못 지우셨다면 30일 안에 고객센터로 알려주세요. 그 전까지는 되돌릴 수 있습니다.',
+          '잘못 지우셨다면 30일 안에 홈 상단 \'의견 보내기\'로 알려주세요. 그 전까지는 되돌려드릴 수 있습니다.',
         ].join('\n'),
         [
           {text: '취소', style: 'cancel', onPress: () => resolve(false)},
@@ -343,8 +343,11 @@ const SwitcherScreen = ({navigation}: any) => {
                 <Pressable style={styles.primaryBtn} onPress={handleAddStore}>
                   <Text style={styles.primaryBtnText}>새 매장 등록</Text>
                 </Pressable>
+                {/* 예전엔 '고객센터로 문의'였는데 고객센터라는 창구가 없다.
+                    실제로 우리에게 닿는 길은 의견 보내기 하나뿐이고, 그건
+                    지금 이 화면 위쪽에 있다. */}
                 <Text style={styles.emptyHelp}>
-                  이미 운영 중인 매장이 있다면 고객센터로 문의해주세요.
+                  이미 운영 중인 매장이 있다면 위 '의견 보내기'로 알려주세요.
                 </Text>
               </View>
             ) : (
