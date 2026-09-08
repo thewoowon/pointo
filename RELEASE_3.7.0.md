@@ -156,6 +156,20 @@ deleted after a 30-day grace period.
 7. Android: `./gradlew bundleRelease` → 3.7.0 / versionCode 1로 Play 첫 업로드.
    업로드 키는 이미 생성돼 있다.
 
+   **`clean`을 같은 명령에 붙이지 말 것.** `./gradlew clean bundleRelease`는
+   실패한다 — `clean`이 node_modules 안 네이티브 라이브러리들의 build까지
+   지우는데, 그 경로는 설정 단계에 이미 잡혀 있어서 prefab 소비 단계에서
+   "directory ... is not readable"로 터진다. (reanimated·worklets)
+   청소가 필요하면 `./gradlew clean`을 **따로** 돌리고 나서 빌드한다.
+
+   빌드 뒤 버전 확인:
+   ```
+   grep -oE 'android:version(Code|Name)="[^"]*"' \
+     android/app/build/intermediates/merged_manifest/release/processReleaseMainManifest/AndroidManifest.xml
+   ```
+   AAB는 protobuf 매니페스트라 aapt2로 직접 못 읽는다. 이 병합 매니페스트가
+   번들에 들어간 값 그대로다.
+
 ---
 
 ## 이번에 하지 않은 것
