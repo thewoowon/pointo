@@ -55,11 +55,16 @@
 ## App Store "이번 버전의 새로운 기능" (한국어)
 
 ```
-결제 금액만 누르면 포인트가 알아서 쌓입니다.
-매장 설정에서 적립률을 정해두시면 12,000원의 2%가 240원으로 바로 계산돼요.
+결제 금액만 누르면, 포인트는 알아서 쌓여요
 
-매장을 직접 삭제하고, 30일 안에는 되돌릴 수도 있습니다.
-'의견 보내기'는 찾기 쉽도록 홈 위쪽으로 옮겼어요.
+매장 설정에서 적립률을 한 번 정해두시면 됩니다. 직원은 결제 금액만
+입력하고, 12,000원의 2%는 240원으로 바로 계산돼요. 암산할 일도,
+새 직원에게 규칙을 가르칠 일도 없습니다.
+
+• 매장을 직접 삭제할 수 있어요. 30일 안에는 되돌릴 수 있습니다.
+• 적립 내역에서 결제 금액이 함께 보여요.
+• '의견 보내기'를 찾기 쉽도록 홈 위쪽으로 옮겼어요.
+• 네트워크가 느릴 때 적립이 두 번 되던 문제를 고쳤어요.
 ```
 
 ---
@@ -68,36 +73,48 @@
 
 ```
 Pointo is a loyalty app for small shops in Korea. It replaces the paper
-stamp cards a shop hands out to its customers.
+stamp cards a shop hands out to its customers. A shop can run either
+stamps (one per visit) or points (a balance), and chooses which.
 
 NEW IN THIS VERSION
 
-1) Automatic point calculation from a purchase amount.
+1) Points can now be calculated from the amount a customer paid.
 
-   A shop can set a reward rate once, and then staff only enter the
-   amount the customer paid. The app multiplies it by the rate.
-   Example: 12,000 KRW at 2% becomes 240 points.
+   Until now staff had to work out the points themselves and type that
+   number in. A shop can now set a reward rate once, and staff only enter
+   the amount paid. 12,000 KRW at 2% becomes 240 points.
 
-   To see it: enter a store as "관리자용" (Owner) → header settings icon →
-   "매장 설정" (Store settings) → set "운영 모드" (Operating mode) to
-   "포인트 적립" (Points) → under "적립 방식" (Earning method) choose
-   "결제 금액 비례" (Proportional to amount) → enter 2 in "적립률" (Rate) →
-   "저장" (Save). Then look up any customer and tap 적립 (Earn); the input
-   now asks for the paid amount and shows the resulting points.
+   To try it, from owner mode (see GETTING IN below):
+     a. Tap the gear icon in the header → "매장 설정" (Store settings).
+     b. Under "운영 모드" (Operating mode) choose "포인트 적립" (Points).
+        A confirmation dialog explains the switch — tap "전환" (Switch).
+     c. Under "적립 방식" (Earning method) choose "결제 금액 비례"
+        (Proportional to amount).
+     d. Type 2 into "적립률 (%)" (Reward rate). A line below shows
+        "12,000원 결제 → 240원 적립" as you type.
+     e. Tap "저장" (Save), then go back.
+     f. Enter any phone number for a customer, tap 적립 (Earn). The input
+        now asks for the amount paid. Type 12000 — the screen shows
+        "12,000원의 2% → 240원" and the button reads "240원 적립하기"
+        (Earn 240).
 
-2) Store deletion, reversible for 30 days.
+   "포인트 직접 입력" (Enter points directly) at step (c) keeps the old
+   behaviour, and shops using stamps are unaffected.
+
+2) Owners can delete a store, and undo it for 30 days.
 
    "내 매장" (My Stores) → "매장 편집" (Edit stores) → select a store →
-   "매장 삭제" (Delete store). The store moves to "삭제 대기 중"
-   (Pending deletion) where it can be restored for 30 days. It is
-   permanently removed after that.
+   "매장 삭제" (Delete store) → confirm. The store then appears under
+   "삭제 대기 중" (Pending deletion) with a "되돌리기" (Restore) button
+   next to it. Nothing is permanently removed until the 30 days pass, so
+   deleting a test store during review is safe and reversible.
 
-3) An in-app survey shown once on the home screen, and the existing
-   feedback link moved to the top of that screen.
+3) A one-time survey card on the home screen, and the existing feedback
+   link moved from the bottom of that screen to the top.
 
-No customer-facing account is required to review any of this. Wherever a
-customer phone number is asked for, any fictitious number works
-(e.g. 010-0000-0000).
+We store the survey answers, the account email address and the app
+version. No customer data is involved, and nothing is shown to other
+users.
 
 GETTING IN
 
@@ -111,7 +128,8 @@ GETTING IN
      "완료" (Done). You will land on "내 매장" (My Stores).
   4. Tap the store, then choose "관리자용" (Owner).
 
-Owner mode covers every feature of the app.
+Owner mode covers every feature of the app. Wherever a customer phone
+number is asked for, any fictitious number works (e.g. 010-0000-0000).
 
 CUSTOMER MODE SETS A DEVICE PIN
 
@@ -125,8 +143,6 @@ ACCOUNT DELETION
 (Delete account). The account is deactivated at once and permanently
 deleted after a 30-day grace period.
 ```
-
----
 
 ## 제출 전 체크리스트
 
